@@ -316,22 +316,22 @@
   // Фактура конкретного сырья по названию: у каждого своя форма частиц,
   // размер, цвет и угол естественного откоса (repose, тангенс).
   const MAT = [
-    ["пшениц", { cols: ["#e0ad62", "#c38b3e", "#94642a"], shape: "wheat", n: 300, repose: 0.53 }],
-    ["тритикале", { cols: ["#d4a05a", "#b5813d", "#86592a"], shape: "wheat", n: 260, size: 1.15, repose: 0.55 }],
-    ["ячмен", { cols: ["#ead296", "#cfb16b", "#a5874a"], shape: "barley", n: 260, repose: 0.55 }],
-    ["кукуруз", { cols: ["#f4b93a", "#e39b1c", "#c27610"], shape: "corn", n: 95, repose: 0.5, tile: 72 }],
-    ["овёс", { cols: ["#efe3bd", "#d8c597", "#b29e70"], shape: "oat", n: 230, repose: 0.6 }],
-    ["овес", { cols: ["#efe3bd", "#d8c597", "#b29e70"], shape: "oat", n: 230, repose: 0.6 }],
-    ["горох", { cols: ["#e0c75e", "#c3a83f", "#97802a"], shape: "pea", n: 120, repose: 0.42 }],
+    ["пшениц", { cols: ["#e0ad62", "#c38b3e", "#94642a"], shape: "wheat", n: 340, repose: 0.53, gap: "#5a3c17" }],
+    ["тритикале", { cols: ["#d4a05a", "#b5813d", "#86592a"], shape: "wheat", n: 300, size: 1.15, repose: 0.55, gap: "#553716" }],
+    ["ячмен", { cols: ["#ead296", "#cfb16b", "#a5874a"], shape: "barley", n: 300, repose: 0.55, gap: "#6b5528" }],
+    ["кукуруз", { cols: ["#f4b93a", "#e39b1c", "#c27610"], shape: "corn", n: 120, repose: 0.5, tile: 72, gap: "#6a3c06" }],
+    ["овёс", { cols: ["#efe3bd", "#d8c597", "#b29e70"], shape: "oat", n: 260, repose: 0.6, gap: "#77664a" }],
+    ["овес", { cols: ["#efe3bd", "#d8c597", "#b29e70"], shape: "oat", n: 260, repose: 0.6, gap: "#77664a" }],
+    ["горох", { cols: ["#e0c75e", "#c3a83f", "#97802a"], shape: "pea", n: 150, repose: 0.42, gap: "#5c4c14" }],
     ["шрот подсолн", { cols: ["#8f8777", "#6e665a", "#4c463e"], shape: "flake", n: 900, repose: 0.84 }],
     ["шрот соев", { cols: ["#e2c690", "#c9a86c", "#a2834c"], shape: "crumb", n: 900, repose: 0.8 }],
     ["мел", { cols: ["#f8f7f3", "#e8e5de", "#cdc8bd"], shape: "powder", n: 1000, repose: 1.0 }],
     ["соль", { cols: ["#ffffff", "#e7ecf2", "#c3ccd7"], shape: "crystal", n: 420, repose: 0.62 }],
     ["премикс", { cols: ["#cda96f", "#a9864f", "#7b5d33"], shape: "premix", n: 1000, repose: 0.9 }],
-    ["монокальц", { cols: ["#ecebe6", "#d4d1c8", "#b0aca0"], shape: "granule", n: 520, repose: 0.6 }],
+    ["монокальц", { cols: ["#ecebe6", "#d4d1c8", "#b0aca0"], shape: "granule", n: 560, repose: 0.6, gap: "#9a968c" }],
     ["дрожж", { cols: ["#cfa062", "#ae8046", "#835d30"], shape: "powder", n: 1000, repose: 0.95 }],
-    ["жмых", { cols: ["#7c5c34", "#5e4426", "#3d2b17"], shape: "chunk", n: 160, repose: 0.75 }],
-    ["гранул", { cols: ["#a8743c", "#86562a", "#5c3a1a"], shape: "pellet", n: 70, repose: 0.58 }],
+    ["жмых", { cols: ["#7c5c34", "#5e4426", "#3d2b17"], shape: "chunk", n: 180, repose: 0.75, gap: "#24180b" }],
+    ["гранул", { cols: ["#b98446", "#946232", "#6d4520"], shape: "pellet", n: 120, repose: 0.58, tile: 80, gap: "#2e1b0a" }],
     ["комбикорм", { cols: ["#d9b77a", "#b58d4c", "#7f5f2c"], shape: "mash", n: 900, repose: 0.78 }],
     ["масло", { cols: ["#f2c437", "#d8a316", "#a77a08"], shape: "oil", n: 0, repose: 0 }],
   ];
@@ -355,7 +355,8 @@
       const T = spec.tile || 64, sz = spec.size || 1;
       e = MP[key] = { p: null, c: null, img: off(T, T, (g, w, h) => {
         const r = rnd(key.length * 97 + spec.n), C = spec.cols;
-        g.fillStyle = C[1]; g.fillRect(0, 0, w, h);
+        // фон — тень между частицами: сыпучее видно по отдельным зёрнам, а не сплошной заливкой
+        g.fillStyle = spec.gap ? spec.gap : C[1]; g.fillRect(0, 0, w, h);
         if (spec.shape === "oil") return;
         const hi = (x, y, rx, ry, a) => { g.fillStyle = "rgba(255,255,255,.4)"; g.beginPath(); g.ellipse(x - rx * 0.3, y - ry * 0.3, rx * 0.35, ry * 0.3, a, 0, TAU); g.fill(); };
         // частицы рисуются с переносом через край тайла — шов не виден
@@ -435,11 +436,14 @@
             break;
           case "pellet":
             each((x, y, a, c, q) => {
+              const L = 3.6 + q * 2.4, R = 2.1;
               g.save(); g.translate(x, y); g.rotate(a);
-              g.fillStyle = "rgba(30,15,0,.4)"; g.fillRect(-4.2 + 0.7, -1.9 + 0.8, 8.4, 3.8);
-              g.fillStyle = c; g.fillRect(-4.2, -1.9, 8.4, 3.8);
-              g.fillStyle = "rgba(255,220,170,.35)"; g.fillRect(-4.2, -1.9, 8.4, 0.9);
-              g.fillStyle = C[2]; g.beginPath(); g.ellipse(4.2, 0, 0.8, 1.9, 0, 0, TAU); g.fill();
+              g.fillStyle = "rgba(10,5,0,.55)"; g.beginPath(); g.roundRect ? g.roundRect(-L + 0.8, -R + 1, 2 * L, 2 * R, 1) : g.rect(-L + 0.8, -R + 1, 2 * L, 2 * R); g.fill();
+              const gr = g.createLinearGradient(0, -R, 0, R); gr.addColorStop(0, "#d9a466"); gr.addColorStop(0.35, c); gr.addColorStop(1, C[2]);
+              g.fillStyle = gr; g.fillRect(-L, -R, 2 * L, 2 * R);
+              g.strokeStyle = "rgba(60,32,10,.5)"; g.lineWidth = 0.35; for (let k = -L + 1.6; k < L; k += 1.9) { g.beginPath(); g.moveTo(k, -R); g.lineTo(k + 0.4, R); g.stroke(); }
+              g.fillStyle = "#7a4c22"; g.beginPath(); g.ellipse(L, 0, 0.9, R, 0, 0, TAU); g.fill();
+              g.fillStyle = "rgba(40,20,5,.6)"; g.beginPath(); g.ellipse(L, 0, 0.4, R * 0.6, 0, 0, TAU); g.fill();
               g.restore();
             });
             break;

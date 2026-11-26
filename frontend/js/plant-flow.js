@@ -201,7 +201,7 @@
         V["LClose_ShO" + t.silo] = !!t.closeReq && sh.pos > 0.02;
         if (t.closeReq && sh.pos <= 0.02) { t.closeReq = false; V["LClose_ShO" + t.silo] = false; V.UnBlockSilos[t.silo] = false; t.phase = "leave"; P.log(`Автомобиль загружен из бункера ${300 + t.silo}: ${(t.load * 20).toFixed(1)} т «${t.prod || ""}»`); }
       }
-      if (t.phase === "leave") { t.x -= dt / 7; if (t.x < -1.3) { t.phase = "away"; t.load = 0; } }
+      if (t.phase === "leave") { t.x += dt / 7; if (t.x > 1.4) { t.phase = "away"; t.load = 0; } }
     });
     // подсобный рабочий досыпает добавки в бункеры 201–208
     if (S.autoAdd) for (let i = 1; i <= 8; i++) { const c = C["b" + (200 + i)]; if (c.mass < c.cap * 0.15) c.refill = true; if (c.refill) { if ((S.clock % 4) < dt) c.mass = Math.min(c.cap * 0.85, c.mass + 25); if (c.mass >= c.cap * 0.84) c.refill = false; } }

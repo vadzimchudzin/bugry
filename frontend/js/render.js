@@ -55,6 +55,17 @@
     const c = document.createElement("canvas"); c.width = im.naturalWidth; c.height = im.naturalHeight;
     const x = c.getContext("2d"); x.translate(c.width, 0); x.scale(-1, 1); x.drawImage(im, 0, 0); return c;
   }
+  // «погашенная» копия спрайта: выключенный механизм темнее, при разгоне светлеет
+  function dark(im) {
+    const w = im.naturalWidth || im.width, h = im.naturalHeight || im.height, c = document.createElement("canvas"); c.width = w; c.height = h;
+    const x = c.getContext("2d"); x.filter = "brightness(.6) saturate(.65)"; x.drawImage(im, 0, 0); return c;
+  }
+  const OFF_K = 0.9;
+  function drawLit(key, W, ox, oy, H, run) {
+    ctx.drawImage(mipImg(key, W), ox, oy, W, H);
+    const k = (1 - Math.max(0, Math.min(1, run))) * OFF_K;
+    if (k > 0.01 && IMG[key + "_dk"]) { ctx.globalAlpha = k; ctx.drawImage(mipImg(key + "_dk", W), ox, oy, W, H); ctx.globalAlpha = 1; }
+  }
   function resize() {
     const r = cv.parentElement.getBoundingClientRect();
     if (r.width <= 0 || r.height <= 0) return;
@@ -197,8 +208,10 @@
     L(A.TrPBD.out, A.PBD.in, flowOf("TrPBD"));
     L([2370, 470], [2300, 512], () => (running("Pit1") ? 1.2 : 0), () => CT.PBD.kind, { pts: [[2370, 470], [2370, 490], [2300, 490], [2300, 512]] });
     L([2430, 470], [2500, 512], () => (running("Pit2") ? 1.2 : 0), () => CT.PBD.kind, { pts: [[2430, 470], [2430, 490], [2500, 490], [2500, 512]] });
-    L(A.Pit1.out, A.Drob1.in, flowOf("Pit1"), null, { pts: [A.Pit1.out, [A.Pit1.out[0], 600], [2300, 626], A.Drob1.in] });
-    L(A.Pit2.out, A.Drob2.in, flowOf("Pit2"), null, { pts: [A.Pit2.out, [A.Pit2.out[0], 600], [2500, 626], A.Drob2.in] });
+    [["Pit1", "mag1", "Drob1"], ["Pit2", "mag2", "Drob2"]].forEach(([p, mg, d]) => {
+      const o = A[p].out, i = A[d].in, g = ND[mg], gb = g ? g.y + g.h + 4 : o[1] + 40;
+      L(o, i, flowOf(p), null, { pts: [o, [o[0], gb], [o[0], Math.max(gb + 4, i[1] - 26)], [i[0], i[1] - 10], i] });
+    });
     L(A.Drob1.out, [2300, 982], () => (CT.Drob1.mass > 0.2 && running("Drob1") ? 1.5 : 0), () => "meal");
     L(A.Drob2.out, [2500, 982], () => (CT.Drob2.mass > 0.2 && running("Drob2") ? 1.5 : 0), () => "meal");
     L(A.TrDrob.out, A.Nor3.in, flowOf("TrDrob"));
@@ -237,15 +250,15 @@
     L(A.PP1.o2, A.Torba.in, () => (V.PP1_Pos2 ? EL.Nor6.flow : 0), () => "pellet", { pts: [A.PP1.o2, [A.PP1.o2[0], 1700], [4200, 1752], [4200, 1780]] });
     L(A.Pros.out, A.PP2.in, flowOf("Pros"), () => "pellet", { pts: [A.Pros.out, A.PP2.in] });
     L(A.Pros.waste, A.Tr40800.in, () => (EL.Pros.flow > 0.05 ? 0.4 : 0), () => "fines", { pts: [A.Pros.waste, [A.Pros.waste[0], 2340], [A.Tr40800.in[0], 2366], A.Tr40800.in] });
-    L(A.PP2.o2, A.Tr51100.in, () => (V.PP2_Pos2 ? EL.Pros.flow : 0), () => "pellet", { pts: [A.PP2.o2, A.Tr51100.in] });
+    L(A.PP2.o2, A.Tr51100.in, () => (V.PP2_Pos2 ? EL.Pros.flow : 0), () => "pellet", { pts: [A.PP2.o2, [A.Tr51100.in[0], A.PP2.o2[1]], A.Tr51100.in] });
     L(A.PP2.o1, A.Torba.in, () => (V.PP2_Pos1 ? EL.Pros.flow : 0), () => "pellet", { pts: [A.PP2.o1, [A.PP2.o1[0], 1730], [4240, 1760], [4240, 1780]] });
-    L(A.Tr51100.out, A.PP3.in, flowOf("Tr51100"), () => "pellet", { pts: [A.Tr51100.out, [4632, 1240]] });
-    L(A.PP3.o1, A.Tr51200.in, () => (V.PP3_Pos1 ? EL.Tr51100.flow : 0), () => "pellet", { pts: [A.PP3.o1, [4614, 1191], [4590, 1191]] });
-    L(A.PP3.o2, A.Nor7.in, () => (V.PP3_Pos2 ? EL.Tr51100.flow : 0), () => "pellet", { pts: [A.PP3.o2, [4650, 1330], [4650, 2280], A.Nor7.in] });
-    L(A.Tr51200.out, A.Nor4.in, flowOf("Tr51200"), () => "pellet", { pts: [A.Tr51200.out, [3690, 1230], [3640, 1230], [3606, 1194]] });
+    L(A.Tr51100.out, A.PP3.in, flowOf("Tr51100"), () => "pellet", { pts: [A.Tr51100.out, [A.PP3.in[0], A.Tr51100.out[1] + 8], A.PP3.in] });
+    L(A.PP3.o1, A.Tr51200.in, () => (V.PP3_Pos1 ? EL.Tr51100.flow : 0), () => "pellet", { pts: [A.PP3.o1, [A.Tr51200.in[0], A.PP3.o1[1]], A.Tr51200.in] });
+    L(A.PP3.o2, A.Nor7.in, () => (V.PP3_Pos2 ? EL.Tr51100.flow : 0), () => "pellet", { pts: [A.PP3.o2, [A.Nor7.in[0] - 40, A.PP3.o2[1]], [A.Nor7.in[0] - 40, A.Nor7.in[1] - 40], A.Nor7.in] });
+    { const bi = A.Nor4.sin || [A.Nor4.in[0] + 120, A.Nor4.in[1]]; L(A.Tr51200.out, bi, flowOf("Tr51200"), () => "pellet", { pts: [A.Tr51200.out, [A.Tr51200.out[0], bi[1] - 10], [bi[0] + 6, bi[1] - 10], bi] }); }
     L(A.Nor7.out, A.b309.in, flowOf("Nor7"), () => "pellet", { pts: [A.Nor7.out, [4930, 1358], A.b309.in] });
     L([4930, 1990], [4930, 2060], () => (M.ShO9.pos > 0.3 && CT.s9.mass > 5 ? 5 : 0), () => "pellet", { w: 14 });
-    L(A.Torba.out, [4295, 2100], () => (V.Go_Leb || CT.bigbag.mass > 0 ? 0 : 0), () => "pellet");
+    if (A.Leb && A.Leb.in) L(A.Torba.out, A.Leb.in, () => (V.Go_Leb && CT.Torba && CT.Torba.mass > 1 ? 2 : 0), () => "pellet", { pts: [A.Torba.out, A.Leb.in] });
     L(A.Tr40800.out, A.Tr40100.in, flowOf("Tr40800"), () => "fines", { pts: [[3200, 2400], [3175, 2400]] });
   }
   // аспирационные воздуховоды (пунктир)
@@ -283,14 +296,14 @@
     dt = Math.min(0.05, dt);
     for (const L of LINKS) {
       const q = Math.max(0, +L.on() || 0);
-      L._sp = (L._sp || 0) + Math.min(60, q * 9) * dt;
+      L._sp = (L._sp || 0) + Math.min(140, q * 22) * dt;
       const sg = segsOf(L); if (!sg.list.length) continue;
       while (L._sp >= 1) {
         L._sp -= 1;
-        if (PARTS.length > 2500) break;
+        if (PARTS.length > 4000) break;
         if (L.kind() === "oil") { L._sp = 0; continue; }
         const r = hash(seed++);
-        PARTS.push({ L, s: r * 4, v: 120 + 80 * hash(seed++), seg: 0, off: (r - 0.5) * (L.w * 0.55), c: kc(L.kind(), (seed % 3)) });
+        PARTS.push({ L, s: r * 4, v: 120 + 80 * hash(seed++), seg: 0, off: (r - 0.5) * (L.w * 0.6), c: kc(L.kind(), (seed % 3)), k: L.kind(), r: r * 6.28 });
       }
     }
     let w = 0;
@@ -308,8 +321,11 @@
     for (const p of PARTS) {
       const sg = segsOf(p.L), sc = sg.list[p.seg], d = p.s - sc.from;
       const x = sc.x0 + sc.ux * d - sc.uy * p.off, y = sc.y0 + sc.uy * d + sc.ux * p.off;
-      ctx.beginPath(); ctx.ellipse(x, y, 3.4 + Math.min(3, p.v / 260), 2.5, Math.atan2(sc.uy, sc.ux), 0, TAU);
-      ctx.fillStyle = p.c; ctx.fill();
+      // отдельные частицы: зерно кувыркается в потоке, гранула — цилиндрик, мука — пыль
+      const k = p.k || "grain", a = (p.r || 0) + p.s * 0.08;
+      if (k === "pellet") { ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.fillStyle = "#3a230d"; ctx.fillRect(-3.4, -1.3, 7, 3); ctx.fillStyle = p.c; ctx.fillRect(-3.6, -1.6, 7, 3); ctx.restore(); }
+      else if (k === "meal" || k === "mash" || k === "fines" || k === "add") { ctx.fillStyle = p.c; ctx.fillRect(x - 0.9, y - 0.9, 1.8, 1.8); ctx.fillRect(x + 2.2, y + 1.1, 1.3, 1.3); }
+      else { ctx.beginPath(); ctx.ellipse(x, y, 2.6, 1.35, a, 0, TAU); ctx.fillStyle = "rgba(50,30,8,.55)"; ctx.fill(); ctx.beginPath(); ctx.ellipse(x - 0.3, y - 0.3, 2.3, 1.1, a, 0, TAU); ctx.fillStyle = p.c; ctx.fill(); }
     }
   }
   /* ============================================================ трубы, воздуховоды, пар */
@@ -319,15 +335,51 @@
     for (const L of LINKS) {
       const oil = L.kind() === "oil";
       K.pipe(L.pts, oil ? 8 : L.w, { kind: oil ? "oil" : "galv" });
+      if (!oil && L.w >= 10 && L.pts.length > 1) {
+        const n = L.pts.length, f = (p, q) => { const d = Math.hypot(q[0] - p[0], q[1] - p[1]); if (d > 6) K.flange(p[0] + (q[0] - p[0]) / d * 4, p[1] + (q[1] - p[1]) / d * 4, (q[0] - p[0]) / d, (q[1] - p[1]) / d, L.w); };
+        f(L.pts[0], L.pts[1]); f(L.pts[n - 1], L.pts[n - 2]);
+      }
       if (oil && (+L.on() || 0) > 0.05) K.pipeFlow(L.pts, 8, "rgba(246,196,40,.95)", 70, t);
     }
   }
-  function drawDucts() {
-    const t = T();
-    for (const d of DUCTS) {
-      K.duct(d.pts, d.w, running(d.id), t);
-      if (d.end) { const p = d.pts[d.pts.length - 1], q = d.pts[d.pts.length - 2]; if (Math.abs(p[0] - q[0]) < 1) K.aspNozzle(p[0], p[1] + 2, d.w + 6); }
+  // Магистраль и врезки: врезка рисуется под магистралью и закрывается тройником;
+  // врезка в конце магистрали — продолжение магистрали отводом (без стыка «внахлёст»).
+  function onSeg(p, pts) {
+    for (let i = 1; i < pts.length; i++) {
+      const [x0, y0] = pts[i - 1], [x1, y1] = pts[i];
+      if (Math.abs(y0 - y1) < 1 && Math.abs(p[1] - y0) < 2 && p[0] >= Math.min(x0, x1) - 1 && p[0] <= Math.max(x0, x1) + 1) return { i, end: Math.abs(p[0] - x1) < 2 && i === pts.length - 1 };
     }
+    return null;
+  }
+  function tee(x, y, w, mw) {
+    K.rr(x - w / 2 - 6, y - mw / 2 - 3, w + 12, mw + 6, 2); K.skin("galv", K.shadeCyl(x - w / 2 - 6, 0, x + w / 2 + 6, 0), "#26323a", 1.4);
+    K.flange(x, y + mw / 2 + 5, 0, 1, w);
+  }
+  function drawDucts() {
+    const t = T(), mains = DUCTS.filter((d) => !d.end && !d.stack), joins = [];
+    for (const d of DUCTS.filter((d) => d.end)) {
+      const mn = mains.find((m) => m.id === d.id && onSeg(d.pts[0], m.pts)), hit = mn && onSeg(d.pts[0], mn.pts);
+      if (hit && hit.end) { mn._elbow = d; continue; }
+      if (hit) joins.push([d.pts[0][0], d.pts[0][1], d.w, mn.w]);
+      K.duct(d.pts, d.w, running(d.id), t);
+    }
+    for (const d of DUCTS) {
+      if (d.end) continue;
+      if (d._elbow) {
+        // магистраль переходит в отвод: тот же диаметр до переходника, далее врезка
+        const e = d._elbow, [ex, ey] = e.pts[0], down = ey + d.w * 0.5 + 14;
+        K.duct(e.pts.map((p, i) => (i === 0 ? [ex, down] : p)), e.w, running(e.id), t);
+        K.duct([...d.pts.slice(0, -1), [ex, ey], [ex, down]], d.w, running(d.id), t);
+        K.rr(ex - d.w / 2 - 1, down - 2, d.w + 2, 8, 2); K.skin("galv", K.shadeCyl(ex - d.w / 2, 0, ex + d.w / 2, 0), "#26323a", 1.2);
+        const p = e.pts[e.pts.length - 1], q = e.pts[e.pts.length - 2]; if (Math.abs(p[0] - q[0]) < 1) K.aspNozzle(p[0], p[1] + 2, e.w + 6);
+      } else K.duct(d.pts, d.w, running(d.id), t);
+      if (!d.stack && (d.id === "Asp1" || d.id === "Asp2" || d.id === "AspGr") && A[d.id] && A[d.id].in && Math.hypot(d.pts[0][0] - A[d.id].in[0], d.pts[0][1] - A[d.id].in[1]) < 2) {
+        const [x0, y0] = d.pts[0], [x1, y1] = d.pts[1], L = Math.hypot(x1 - x0, y1 - y0) || 1; K.flange(x0 + (x1 - x0) / L * 3, y0 + (y1 - y0) / L * 3, (x1 - x0) / L, (y1 - y0) / L, d.w);
+      }
+    }
+    joins.forEach(([x, y, w, mw]) => tee(x, y, w, mw));
+    for (const d of DUCTS) if (d.end && !mains.some((m) => m._elbow === d)) { const p = d.pts[d.pts.length - 1], q = d.pts[d.pts.length - 2]; if (Math.abs(p[0] - q[0]) < 1) K.aspNozzle(p[0], p[1] + 2, d.w + 6); }
+    mains.forEach((m) => { m._elbow = null; });
   }
   // Паропровод котёл → кондиционер (в теплоизоляции), регулирующий клапан, конденсатоотводчик;
   // линии питательной воды и возврата конденсата.
@@ -362,6 +414,8 @@
   // Вибрация работающей машины (стук/дрожь), амплитуда в мировых единицах.
   const jit = (id, a, f) => { const m = M[id]; if (!m || m.spin < 0.2) return [0, 0]; const t = T() * (f || 70); return [Math.sin(t * 1.7 + hash(id.length)) * a * m.spin, Math.sin(t * 2.3) * a * 0.6 * m.spin]; };
   const prodPat = (k) => K.grain(k || "grain", KIND[k] || KIND.grain);
+  // фактура продукта: зерно/добавки — по названию сырья, продукты переработки — по виду
+  const matPat = (k, prod) => K.material(k === "grain" || k === "add" ? prod : "", k || "grain", KIND[k] || KIND.grain);
   // Сыпучий продукт: фактура + тень к низу, верх — естественный откос (горка).
   function bulk(x, w, yTop, yBot, kind, hump) {
     if (yBot - yTop < 0.5) return;
@@ -394,23 +448,37 @@
     });
     // связи между ветвями
     for (let yy = y + 225; yy < y + h - 90; yy += 300) { ctx.fillStyle = "#56636c"; ctx.fillRect(lx + legW, yy, rx - lx - legW, 5); }
-    // смотровое окно восходящей ветви: лента с ковшами и продукт
+    // смотровые окна обеих ветвей: восходящая (со стороны загрузки) — ковши с продуктом
+    // идут вверх; нисходящая — пустые ковши после разгрузки идут вниз
     const wy0 = y + 90, wy1 = y + h - 76;
     if (m) m._belt = (m._belt || 0) + run * 3;
-    ctx.save(); ctx.beginPath(); ctx.rect(lx + 4, wy0, legW - 8, wy1 - wy0); ctx.clip();
-    cavity(lx + 4, wy0, legW - 8, wy1 - wy0);
-    ctx.fillStyle = "#3b3b36"; ctx.fillRect(lx + 6, wy0, 4, wy1 - wy0);   // лента
-    const sp = 26, off = ((m && m._belt) || 0) % sp;
-    for (let yy = wy1 + sp - off; yy > wy0 - sp; yy -= sp) {
-      K.path([[lx + 9, yy], [lx + legW - 6, yy - 3], [lx + legW - 9, yy + 10], [lx + 9, yy + 11]], true);
-      ctx.fillStyle = "#c46f2a"; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = "#5a2f10"; ctx.stroke();   // пластиковый ковш
-      if (e) {
-        const tt = 1 - (yy - wy0) / (wy1 - wy0), q = cellAt(e, tt) / (e.cap || 1);
-        if (q > 0.03) { const hh = Math.min(7, 7 * q + 1); ctx.fillStyle = prodPat(e.kinds[Math.min(e.N - 1, Math.floor(tt * e.N))] || "grain"); ctx.beginPath(); ctx.ellipse(lx + legW / 2 + 1, yy - hh / 2 + 1, legW / 2 - 9, hh, 0, Math.PI, 0); ctx.fill(); }
+    const sp = 26, off = ((m && m._belt) || 0) % sp, upX = lx, dnX = rx;
+    [[upX, 1], [dnX, -1]].forEach(([X, dir]) => {
+      ctx.save(); ctx.beginPath(); ctx.rect(X + 4, wy0, legW - 8, wy1 - wy0); ctx.clip();
+      cavity(X + 4, wy0, legW - 8, wy1 - wy0);
+      const bx = dir > 0 ? X + 6 : X + legW - 10; ctx.fillStyle = "#3b3b36"; ctx.fillRect(bx, wy0, 4, wy1 - wy0);   // лента
+      ctx.fillStyle = "rgba(255,255,255,.12)"; for (let yy = wy0 + ((dir > 0 ? -off : off) % 9 + 9) % 9; yy < wy1; yy += 9) ctx.fillRect(bx, yy, 4, 1);
+      for (let k = -1; k < (wy1 - wy0) / sp + 2; k++) {
+        const yy = dir > 0 ? wy1 - k * sp - off : wy0 + k * sp + off - sp;
+        if (dir > 0) {
+          K.path([[X + 9, yy], [X + legW - 6, yy - 3], [X + legW - 9, yy + 10], [X + 9, yy + 11]], true);
+          ctx.fillStyle = "#c46f2a"; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = "#5a2f10"; ctx.stroke();   // ковш открыт вверх
+          if (e) {
+            const tt = 1 - (yy - wy0) / (wy1 - wy0), q = cellAt(e, tt) / (e.cap || 1);
+            if (q > 0.03) { const hh = Math.min(7, 7 * q + 1); ctx.save(); ctx.beginPath(); ctx.ellipse(X + legW / 2 + 1, yy + 1, legW / 2 - 9, hh, 0, Math.PI, 0); ctx.translate(0, -(m ? m._belt : 0)); ctx.fillStyle = matPat(e.kinds[Math.min(e.N - 1, Math.max(0, Math.floor(tt * e.N)))] || "grain", e.prod); ctx.fill(); ctx.restore(); }
+          }
+        } else {
+          K.path([[X + legW - 9, yy], [X + 6, yy + 3], [X + 9, yy - 10], [X + legW - 9, yy - 11]], true);
+          ctx.fillStyle = "#b3611f"; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = "#5a2f10"; ctx.stroke();   // пустой ковш, перевёрнут
+        }
       }
-    }
-    ctx.restore();
-    cutFrame(lx + 4, wy0, legW - 8, wy1 - wy0);
+      ctx.restore();
+      cutFrame(X + 4, wy0, legW - 8, wy1 - wy0);
+      // стрелка направления хода ленты
+      const ay = (wy0 + wy1) / 2, ax = X + legW + 8; ctx.fillStyle = run > 0.05 ? "#5cf08a" : "rgba(120,140,150,.6)"; ctx.beginPath();
+      if (dir > 0) { ctx.moveTo(ax - 5, ay + 4); ctx.lineTo(ax + 5, ay + 4); ctx.lineTo(ax, ay - 6); } else { ctx.moveTo(ax - 5, ay - 4); ctx.lineTo(ax + 5, ay - 4); ctx.lineTo(ax, ay + 6); }
+      ctx.closePath(); if (dir < 0 || X === upX) ctx.fill();
+    });
     // головка: колпак с разрезом, приводной барабан, лента огибает барабан
     const hx = x + w / 2, hy = y + 46, hr = w / 2 - 2;
     ctx.beginPath(); ctx.moveTo(x + 2, y + 76); ctx.lineTo(x + 2, hy); ctx.arc(hx, hy, hr, Math.PI, 0); ctx.lineTo(x + w - 2, y + 76); ctx.closePath();
@@ -438,6 +506,7 @@
     if (e) { const boot = e.cells[0] + e.cells[1] + e.cells[2]; const fr = Math.min(1, boot / (e.cap * 3)); ctx.save(); ctx.beginPath(); ctx.rect(x + 8, by + 10, w - 16, 46); ctx.clip(); cavity(x + 8, by + 10, w - 16, 46); if (fr > 0.02) bulk(x + 8, w - 16, by + 56 - 44 * fr, by + 56, e.kinds[0], 8); ctx.restore(); cutFrame(x + 8, by + 10, w - 16, 46); }
     ctx.beginPath(); ctx.arc(x + w - 6, by + 33, 6, 0, TAU); ctx.fillStyle = "#e3b51e"; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = "#5b4508"; ctx.stroke();
     ctx.fillStyle = K.pat("concrete"); ctx.fillRect(x - 10, y + h, w + 20, 10); ctx.strokeStyle = "#5b5f60"; ctx.lineWidth = 1; ctx.strokeRect(x - 10, y + h, w + 20, 10);
+    if (run < 0.99) { ctx.fillStyle = `rgba(6,12,18,${0.32 * (1 - run)})`; [lx, rx].forEach((X) => ctx.fillRect(X - 3, y + 60, legW + 6, h - 126)); }
     if (f) faultFrame(x, y, w, h);
     led(x + w / 2, by + 33, n.id, 7);
   }
@@ -458,22 +527,43 @@
     const pad = small ? 7 : 16, wx = pad, ww = len - pad * 2, wh = h * (small ? 0.62 : 0.6), wy = -wh / 2;
     ctx.save(); ctx.beginPath(); ctx.rect(wx, wy, ww, wh); ctx.clip();
     cavity(wx, wy, ww, wh);
-    const ph = o.phase || 0;
+    const ph = o.phase || 0, sg = o.sgn || 1, floor = wy + wh;
+    // карман с продуктом: горка прижата к толкающей кромке (виток/скребок) и сползает вперёд;
+    // фактура сдвигается вместе с карманом — видно, как едет каждое зерно
+    const pocket = (xa, xb, push, hh, k, pr, mov) => {
+      if (hh < 0.6) return;
+      const xp = push, xf = push === xa ? xb : xa;
+      ctx.beginPath(); ctx.moveTo(xp, floor); ctx.lineTo(xp, floor - hh);
+      ctx.quadraticCurveTo(xp + (xf - xp) * 0.35, floor - hh * 1.02, xf, floor - hh * 0.35); ctx.lineTo(xf, floor); ctx.closePath();
+      ctx.save(); ctx.translate(mov, 0); ctx.fillStyle = matPat(k, pr); ctx.fill(); ctx.restore();
+      const g = ctx.createLinearGradient(0, floor - hh, 0, floor); g.addColorStop(0, "rgba(255,240,210,.12)"); g.addColorStop(1, "rgba(20,12,2,.4)"); ctx.fillStyle = g; ctx.fill();
+    };
     if (chain) {
       // нижняя (рабочая) ветвь цепи со скребками, продукт волочится по днищу
-      for (let X = wx; X <= wx + ww; X += 4) { const [q] = o.prod(X); if (q > 0.01) { ctx.fillStyle = prodPat(o.prod(X)[1]); ctx.fillRect(X, wy + wh - wh * 0.62 * q, 4.5, wh * 0.62 * q); } }
-      const pitch = 28, p0 = ((ph * pitch) % pitch + pitch) % pitch;
+      const pitch = 28, p0 = ((ph * pitch) % pitch + pitch) % pitch, mov = ph * pitch;
+      // рабочая (нижняя) ветвь: продукт волочится по днищу перед скребком по ходу движения
+      for (let X = wx - pitch + p0; X < wx + ww + pitch; X += pitch) {
+        const [q, k, pr] = o.prod(X + pitch / 2);
+        if (q > 0.01) pocket(X + 2, X + 2 + sg * pitch * 0.92, X + 2, wh * 0.66 * Math.min(1, q * 1.25), k, pr, mov);
+      }
       for (let X = wx - pitch + p0; X < wx + ww + pitch; X += pitch) {
         ctx.fillStyle = "#1e2428"; ctx.fillRect(X, wy + wh * 0.42, pitch * 0.55, 4); ctx.fillRect(X + pitch * 0.45, wy + wh * 0.42 + 1, pitch * 0.55, 2);
-        ctx.fillStyle = "#c8cfd3"; ctx.fillRect(X, wy + wh * 0.3, 4, wh * 0.66);   // скребок (UHMW)
-        ctx.fillStyle = "#1e2428"; ctx.fillRect(X - pitch * 0.2, wy + 3, pitch * 0.55, 3);   // холостая ветвь
+        ctx.fillStyle = "#c8cfd3"; ctx.fillRect(X, wy + wh * 0.3, 4, wh * 0.66); ctx.fillStyle = "rgba(40,50,58,.6)"; ctx.fillRect(X + (sg > 0 ? 3 : 0), wy + wh * 0.3, 1, wh * 0.66);
       }
+      // холостая (верхняя) ветвь идёт обратно
+      const r0 = ((-ph * pitch) % pitch + pitch) % pitch;
+      for (let X = wx - pitch + r0; X < wx + ww + pitch; X += pitch) { ctx.fillStyle = "#1e2428"; ctx.fillRect(X, wy + 3, pitch * 0.55, 3); ctx.fillStyle = "#8d969b"; ctx.fillRect(X, wy + 1, 3, 7); }
     } else {
       // шнек: задняя кромка витка (тёмная) → продукт → передняя кромка (светлая) → вал
       const pitch = small ? 12 : o.pitch || 22, p0 = ((ph * pitch) % pitch + pitch) % pitch;
       ctx.strokeStyle = "#56626a"; ctx.lineWidth = small ? 1.5 : 2.2;
       for (let X = wx - pitch + p0; X < wx + ww + pitch; X += pitch) { ctx.beginPath(); ctx.moveTo(X + pitch * 0.5, wy + wh); ctx.quadraticCurveTo(X + pitch * 0.75, wy + wh / 2, X + pitch, wy); ctx.stroke(); }
-      for (let X = wx; X <= wx + ww; X += 4) { const [q, k] = o.prod(X); if (q > 0.01) { ctx.fillStyle = prodPat(k); ctx.fillRect(X, wy + wh - wh * 0.8 * q, 4.5, wh * 0.8 * q); } }
+      // продукт в межвитковых карманах: виток толкает его по ходу, карман едет со скоростью шага
+      const mov = ph * pitch;
+      for (let X = wx - pitch + p0; X < wx + ww + pitch; X += pitch) {
+        const [q, k, pr] = o.prod(X + pitch / 2);
+        if (q > 0.01) { const xa = X + pitch * 0.5, xb = X + pitch * 1.5; pocket(xa, xb, sg > 0 ? xa : xb, wh * 0.82 * Math.min(1, q * 1.2), k, pr, mov); }
+      }
       for (let X = wx - pitch + p0; X < wx + ww + pitch; X += pitch) {
         ctx.beginPath(); ctx.moveTo(X, wy); ctx.quadraticCurveTo(X + pitch * 0.25, wy + wh / 2, X + pitch * 0.5, wy + wh);
         ctx.strokeStyle = "#cfd8de"; ctx.lineWidth = small ? 2 : 3; ctx.stroke(); ctx.strokeStyle = "rgba(40,50,58,.6)"; ctx.lineWidth = 0.8; ctx.stroke();
@@ -491,14 +581,15 @@
     const small = n.small, h = small ? 22 : n.h, cy = n.cy, x = n.x, w = n.w;
     m._ph = (m._ph || 0) + run * 0.22 * (n.reverse ? (V.GoR_Tr1 ? 1 : -1) : n.dir);
     const prod = (X) => {
-      if (e) { const tt = n.dir > 0 ? X / w : 1 - X / w; return [Math.min(1, cellAt(e, tt) / (e.cap || 1)), e.kinds[Math.floor(e.N / 2)]]; }
-      if (n.dozer && run > 0.05) return [0.45, n.bunk > 200 ? "add" : "grain"];
+      if (e) { const tt = n.dir > 0 ? X / w : 1 - X / w; return [Math.min(1, cellAt(e, tt) / (e.cap || 1)), e.kinds[Math.max(0, Math.min(e.N - 1, Math.floor(tt * e.N)))], e.prod]; }
+      if (n.dozer && run > 0.05) { const c = CT["b" + n.bunk]; return [0.45, n.bunk > 200 ? "add" : "grain", c && c.prod]; }
       return [0, "grain"];
     };
     // опоры
     if (!small) [x + 30, x + w - 34].forEach((X) => { ctx.fillStyle = "#56636c"; ctx.fillRect(X, cy + h / 2, 6, 14); ctx.fillRect(X - 6, cy + h / 2 + 12, 18, 4); });
     ctx.save(); ctx.translate(x, cy);
-    conveyorBody(w, h, { chain: n.chain, small, phase: m._ph, prod });
+    conveyorBody(w, h, { chain: n.chain, small, phase: m._ph, prod, sgn: n.reverse ? (V.GoR_Tr1 ? 1 : -1) : n.dir });
+    if (run < 0.99) { K.rr(-3, -h / 2 - 3, w + 6, h + 6, small ? 4 : 6); ctx.fillStyle = `rgba(6,12,18,${0.32 * (1 - run)})`; ctx.fill(); }
     ctx.restore();
     // патрубки загрузки / выгрузки
     if (!small && !n.chain) {
@@ -518,9 +609,10 @@
     const m = M[n.id], e = EL[n.id], f = faulty(n.id), t = T(), run = m ? m.spin : 0;
     const { x1, y1, x2, y2 } = n, ang = Math.atan2(y2 - y1, x2 - x1), len = Math.hypot(x2 - x1, y2 - y1), h = 40;
     m._ph = (m._ph || 0) + run * 0.22;
-    const prod = (X) => (e ? [Math.min(1, cellAt(e, X / len) / (e.cap || 1)), e.kinds[Math.floor(e.N / 2)]] : [0, "grain"]);
+    const prod = (X) => (e ? [Math.min(1, cellAt(e, X / len) / (e.cap || 1)), e.kinds[Math.max(0, Math.min(e.N - 1, Math.floor(X / len * e.N)))], e.prod] : [0, "grain"]);
     ctx.save(); ctx.translate(x1, y1); ctx.rotate(ang);
-    conveyorBody(len, h, { chain: !n.screwType, phase: m._ph, prod, pitch: 26 });
+    conveyorBody(len, h, { chain: !n.screwType, phase: m._ph, prod, pitch: 26, sgn: 1 });
+    if (run < 0.99) { K.rr(-3, -h / 2 - 3, len + 6, h + 6, 4); ctx.fillStyle = `rgba(6,12,18,${0.32 * (1 - run)})`; ctx.fill(); }
     ctx.restore();
     K.gearMotor(x2 + Math.cos(ang) * 10, y2 + Math.sin(ang) * 10 - 4, 0.66, { dir: Math.cos(ang) >= 0 ? 1 : -1, run, t });
     if (f) faultFrame(Math.min(x1, x2), Math.min(y1, y2) - h / 2, Math.abs(x2 - x1), Math.abs(y2 - y1) + h);
@@ -1043,18 +1135,19 @@
   function truckX(id) { const t = S.trucks[id]; return t ? t.x * 420 * (ND[id].flip ? 1 : -1) : 0; }
   function drawTruck(n) {
     const t = S.trucks[n.id]; if (!t || t.phase === "away") return;
-    const im = IMG[n.flip ? "truck_flip" : "truck"]; const x = n.x + truckX(n.id), y = n.y;
+    const fl = n.id === "truck_in" ? n.flip : t.phase === "leave";
+    const im = IMG[fl ? "truck_flip" : "truck"]; const x = n.x + truckX(n.id) - (n.id !== "truck_in" && !fl ? n.w * 0.38 : 0), y = n.y;
     ctx.save();
     if (n.id === "truck_in" && t.tilt) { ctx.translate(x + n.w * 0.85, y + n.h * 0.8); ctx.rotate(-0.08 * t.tilt); ctx.translate(-(x + n.w * 0.85), -(y + n.h * 0.8)); }
     if (im) ctx.drawImage(im, x, y, n.w, n.w * im.height / im.width);
     const load = Math.max(0, Math.min(1, t.load || 0));
     if (load > 0.01) {
-      const bx = n.flip ? x + n.w * 0.02 : x + n.w * 0.40, bw = n.w * 0.58, by = y + n.h * 0.13;
+      const bx = fl ? x + n.w * 0.02 : x + n.w * 0.40, bw = n.w * 0.58, by = y + n.h * 0.13;
       ctx.fillStyle = n.id === "truck_in" ? K.material(t.material || "Пшеница", "grain", KIND.grain) : prodPat(t.silo === 9 ? "pellet" : "mash");
       ctx.beginPath(); ctx.moveTo(bx, by); ctx.quadraticCurveTo(bx + bw / 2, by - 28 * load, bx + bw, by); ctx.closePath(); ctx.fill();
     }
     ctx.restore();
-    if (t.phase !== "away" && n.id !== "truck_in") badge(`${(t.load * 20).toFixed(1)} т`, x + n.w / 2, y + n.h + 14, { size: 14 });
+    if (t.phase !== "away" && n.id !== "truck_in") badge(`${(t.load * 20).toFixed(1)} т` + (t.phase === "arrive" ? " · подъезд" : t.phase === "load" ? " · погрузка" : " · выезд"), x + n.w / 2, y + n.h + 14, { size: 14 });
   }
   function drawMagnet(n) { const im = IMG.magnet; if (im) ctx.drawImage(im, n.x, n.y, n.w, n.w * im.height / im.width); }
 
@@ -1469,9 +1562,9 @@
     boiler: { win: [[0.40, 0.357], [0.74, 0.357], [0.74, 0.66], [0.40, 0.66]], pts: { steam: [0.55, 0.0] } },
     tank: { win: [[0.393, 0.164], [0.679, 0.164], [0.679, 0.526], [0.393, 0.526]], pts: {} },
     compressor: { pts: {} },
-    noria_head: { win: [[0.34, 0.27], [0.70, 0.27], [0.70, 0.72], [0.34, 0.72]], pul: [0.52, 0.39, 0.12], legs: [0.374, 0.682], pts: { out: [0.965, 0.66], asp: [0.63, 0.0] } },
+    noria_head: { win: [[0.34, 0.27], [0.70, 0.27], [0.70, 0.72], [0.34, 0.72]], pul: [0.52, 0.39, 0.12], legs: [0.374, 0.682], pts: { out: [0.935, 0.635], asp: [0.63, 0.0] } },
     noria_boot: { win: [[0.333, 0.27], [0.728, 0.27], [0.728, 0.79], [0.333, 0.79]], pul: [0.533, 0.65, 0.14], legs: [0.322, 0.731], pts: { in: [0.03, 0.22], asp: [0.9, 0.49] } },
-    cyclone: { win: [[0.42, 0.27], [0.58, 0.27], [0.58, 0.40], [0.42, 0.40]], pts: { in: [0.03, 0.13], air: [0.46, 0.0], out: [0.44, 0.87] } },
+    cyclone: { win: [[0.42, 0.27], [0.58, 0.27], [0.58, 0.40], [0.42, 0.40]], pts: { in: [0.03, 0.155], air: [0.46, 0.0], out: [0.44, 0.87] } },
     filter: { win: [[0.2, 0.25], [0.8, 0.25], [0.8, 0.62], [0.2, 0.62]], pts: { in: [0.49, 0.0], out: [0.5, 0.95] } },
     sluice: { circle: [0.40, 0.445, 0.2], pts: { in: [0.40, 0.0], out: [0.40, 0.88] } },
     diverter: { win: [[0.29, 0.24], [0.69, 0.24], [0.69, 0.58], [0.29, 0.58]], pts: { in: [0.46, 0.0], o1: [0.03, 0.74], o2: [0.92, 0.74] } },
@@ -1532,7 +1625,7 @@
     const names = Object.keys(MSPR); let left = names.length;
     names.forEach((nm) => {
       const im = new Image();
-      im.onload = () => { IMG["m_" + nm] = im; IMG["m_" + nm + "_flip"] = flip(im); if (--left === 0) done(); };
+      im.onload = () => { IMG["m_" + nm] = im; IMG["m_" + nm + "_flip"] = flip(im); IMG["m_" + nm + "_dk"] = dark(im); IMG["m_" + nm + "_flip_dk"] = dark(IMG["m_" + nm + "_flip"]); if (--left === 0) done(); };
       im.onerror = () => { if (--left === 0) done(); };
       im.src = "assets/mach/" + nm + ".webp";
     });
@@ -1616,6 +1709,21 @@
         A.TrHole.in[0] = sc.x1; A.TrHole.in[1] = sc.y1 - 14;
       }
     }
+    // магнитные сепараторы — на течке питатель → дробилка
+    [["mag1", "Pit1"], ["mag2", "Pit2"]].forEach(([mg, p]) => {
+      const g = ND[mg], o = A[p] && A[p].out, im = IMG.magnet; if (!g || !o) return;
+      g.w = 50; g.h = im ? g.w * im.height / im.width : 56; g.x = o[0] - g.w / 2; g.y = o[1] + 18;
+    });
+    // биг-бэг: загрузочная головка точно под выпуском бункера 310
+    if (ND.Leb && ND.Leb._spr && A.Torba && A.Torba.out) {
+      const n = ND.Leb, z = n._spr, dx = A.Torba.out[0] - z.P(MSPR.bigbag.pts.in)[0];
+      z.ox += dx; n.x += dx; const P0 = z.P; z.P = (f) => { const q = P0(f); return [q[0] + dx, q[1]]; };
+      A.Leb = A.Leb || {}; for (const [k, f] of Object.entries(MSPR.bigbag.pts)) A.Leb[k] = z.P(f);
+    }
+    // боковой загрузочный носок башмака нории 50300 — для ТЦ 51200 (подход справа)
+    if (ND.Nor4 && ND.Nor4._nb) A.Nor4.sin = ND.Nor4._nb.P([0.97, 0.66]);
+    // нижняя головка ТЦ 51100 — под правым выходом ПП 40960
+    if (A.PP2 && A.PP2.o2 && ND.Tr51100) { const sc = ND.Tr51100; sc.x1 = A.PP2.o2[0] + 52; sc.y1 = A.PP2.o2[1] + 72; A.Tr51100.in[0] = sc.x1; A.Tr51100.in[1] = sc.y1 - 14; sc.x = Math.min(sc.x1, sc.x2); sc.y = Math.min(sc.y1, sc.y2) - 20; sc.w = Math.abs(sc.x2 - sc.x1); sc.h = Math.abs(sc.y2 - sc.y1) + 40; }
     // концы воздуховодов аспирации — на патрубки машин
     const dEnd = (x0, pts) => DUCTS.find((d) => d.pts[d.pts.length - 1][0] === x0 && (d.pts = pts));
     if (A.Ohl.duct) { const [dx, dy] = A.Ohl.duct, yy = dy - 46; dEnd(2896, [[3014, 1409], [3072, 1409], [3072, yy], [dx, yy], [dx, dy]]); }
@@ -1636,7 +1744,29 @@
     mainFrom("Asp1"); mainFrom("Asp2");
     const dg = DUCTS.find((d) => d.id === "AspGr"); if (dg && A.AspGr.in) { dg.pts[0] = [A.AspGr.in[0], A.AspGr.in[1]]; dg.pts[1] = [3072, A.AspGr.in[1]]; }
     if (IMG.m_gearmotor) K.setGearMotor((w, flip) => mipImg("m_gearmotor" + (flip ? "_flip" : ""), w), IMG.m_gearmotor.naturalHeight / IMG.m_gearmotor.naturalWidth, MSPR.gearmotor);
-    LINKS.length = 0; buildLinks();
+    LINKS.length = 0; buildLinks(); fitLinks();
+  }
+  // Стыки течек с патрубками: из головки нории — по оси наклонного патрубка, в башмак —
+  // по оси загрузочного носка, из переключателя — горизонтально из бокового фланца, в верх — вертикально.
+  function fitLinks() {
+    const near = (p, q) => q && Math.hypot(p[0] - q[0], p[1] - q[1]) < 2;
+    for (const L of LINKS) {
+      const P = L.pts; if (P.length < 2) continue;
+      for (const n of Object.values(ND)) {
+        const a = A[n.id]; if (!a) continue;
+        if (n.kind === "noria" && n._nh) {
+          if (near(P[0], a.out)) P.splice(1, 0, [a.out[0] + 16, a.out[1] + 15]);
+          if (near(P[P.length - 1], a.in)) P.splice(P.length - 1, 0, [a.in[0] - 16, a.in[1] - 16]);
+          if (near(P[P.length - 1], a.sin)) P.splice(P.length - 1, 0, [a.sin[0] + 18, a.sin[1] - 16]);
+        }
+        if (n.kind === "diverter" && n._spr) {
+          const cx = n.x + n.w / 2;
+          ["o1", "o2"].forEach((k) => { if (near(P[0], a[k])) P.splice(1, 0, [a[k][0] + (a[k][0] < cx ? -14 : 14), a[k][1]]); });
+          if (near(P[P.length - 1], a.in) && Math.abs(P[P.length - 2][0] - a.in[0]) > 1) P.splice(P.length - 1, 0, [a.in[0], a.in[1] - 18]);
+        }
+      }
+      L._sg = null;
+    }
   }
   // контур окна разреза в мировых координатах
   function machWin(n) {
@@ -1863,12 +1993,19 @@
       ctx.beginPath(); ctx.arc(wn.cx, wn.cy, wn.r * 0.2, 0, TAU); ctx.fillStyle = K.pat("brushed"); ctx.fill(); ctx.strokeStyle = "#1c252b"; ctx.lineWidth = 1; ctx.stroke();
     },
     diverter(n, wn, run, t) {
-      const m = M[n.id], pos = m ? m.pos : 0, z = n._spr, [px, py] = z.P([0.48, 0.47]);
+      // заслонка на оси в развилке: прижата к стенке закрытого выхода, продукт
+      // скатывается по ней в открытый. pos 0 → выход o1, pos 1 → выход o2.
+      const m = M[n.id], pos = m ? m.pos : 0, z = n._spr, sg = z.flip ? -1 : 1;
+      const px = wn.x + wn.w / 2, py = wn.y + wn.h - 3, L = wn.h * 0.92;
       dim(wn, 0.82);
-      // заслонка: из оси к верхнему углу окна со стороны закрытого выхода
-      const ang = -Math.PI / 2 + (pos - 0.5) * 1.1 * (z.flip ? -1 : 1), L = wn.h * 0.85;
-      const flow = (EL[n.id] && EL[n.id].flow > 0.05) || false;
-      if (flow) { ctx.fillStyle = kc("grain", 0); const side = pos > 0.5 ? 1 : -1; for (let k = 0; k < 16; k++) { const s2 = (t * 2 + k / 16) % 1; ctx.fillRect(px + side * s2 * wn.w * 0.4 + (k % 3) * 2, wn.y + s2 * wn.h, 2.4, 3); } }
+      const ang = (0.5 - pos) * 1.15 * sg;            // 0 → к стенке o2, 1 → к стенке o1
+      const o = z.P(pos < 0.5 ? z.sp.pts.o1 : z.sp.pts.o2), dir = Math.sign(o[0] - px) || 1;
+      const src = EL[{ DVPT: "NorHole", PP1: "Nor6", PP2: "Pros", PP3: "Tr51100" }[n.id]], flow = !!src && src.flow > 0.05;
+      const open = pos < 0.02 || pos > 0.98;
+      if (flow && open) {
+        const cols = KIND.grain;
+        for (let k = 0; k < 18; k++) { const s2 = (t * 2.2 + k / 18) % 1, X = px - dir * L * 0.55 * (1 - s2) + dir * s2 * wn.w * 0.42, Y = wn.y + 2 + s2 * (wn.h - 4); ctx.fillStyle = cols[k % 3]; ctx.fillRect(X + (k % 3) * 2 - 2, Y, 2.4, 3); }
+      }
       ctx.save(); ctx.translate(px, py); ctx.rotate(ang);
       ctx.fillStyle = K.pat("brushed"); ctx.fillRect(-3, -L, 6, L); ctx.strokeStyle = "#1c252b"; ctx.lineWidth = 0.8; ctx.strokeRect(-3, -L, 6, L);
       ctx.restore();
@@ -1912,6 +2049,8 @@
       ctx.strokeStyle = "rgba(200,120,70,.9)"; ctx.lineWidth = 3; ctx.beginPath(); for (let k = 0; k <= 5; k++) { const X = wn.x + wn.w * (0.45 + k * 0.09); ctx.moveTo(X, wn.y + wn.h * 0.35); ctx.lineTo(X, wn.y + wn.h * 0.92); } ctx.stroke();
     },
   };
+  // без привода — не гасятся
+  const PASSIVE = new Set(["pit", "diverter", "bigbag", "cabinet", "tank", "oilscale", "trash", "filter", "sluice"]);
   function drawMach(n) {
     const z = n._spr, im = IMG[z.img], t = T(), m = M[n.id === "Pros" ? "Pros1" : n.id];
     const run = n.id === "Pros" ? Math.max(M.Pros1.spin, M.Pros2.spin) : m ? m.spin : 0;
@@ -1921,7 +2060,7 @@
     if (n.kind === "compressor" && running("compr")) { jy = Math.sin(t * 90) * 0.6; }
     ctx.save(); ctx.translate(jx, jy);
     ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(mipImg(z.img, z.W), z.ox, z.oy, z.W, z.H);
+    drawLit(z.img, z.W, z.ox, z.oy, z.H, PASSIVE.has(n.kind) ? 1 : run);
     const wn = machWin(n), f = INSIDE[z.name];
     if (wn && f) { ctx.save(); clipWin(wn); f(n, wn, run, t); ctx.restore(); }
     ctx.restore();
@@ -1929,40 +2068,56 @@
   }
   function noriaPart(n, z, run, t, ph, head) {
     const im = IMG[z.img]; if (!im) return;
-    ctx.drawImage(mipImg(z.img, z.W), z.ox, z.oy, z.W, z.H);
-    const pts = z.sp.win.map(z.P), [cx, cy] = z.P(z.sp.pul), r = z.sp.pul[2] * z.W, c = CT[n.id], load = c ? Math.min(1, c.mass / Math.max(1, c.cap * 0.25)) : 0;
+    drawLit(z.img, z.W, z.ox, z.oy, z.H, run);
+    const pts = z.sp.win.map(z.P), [cx, cy] = z.P(z.sp.pul), r = z.sp.pul[2] * z.W, c = CT[n.id], e = EL[n.id];
+    const load = c ? Math.min(1, c.mass / Math.max(1, c.cap * 0.25)) : 0, kind = (c && c.kind) || (e && e.kinds[0]) || "grain", prod = e && e.prod;
     ctx.save(); K.path(pts, true); ctx.clip();
     ctx.fillStyle = "rgba(10,16,24,.82)"; ctx.fillRect(z.ox, z.oy, z.W, z.H);
-    // лента огибает барабан; ковши идут вверх слева, вниз справа (и наоборот у башмака)
-    const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]), y0 = Math.min(...ys) - 4, y1 = Math.max(...ys) + 4;
-    ctx.strokeStyle = "#2b2f33"; ctx.lineWidth = 3.5;
-    ctx.beginPath(); ctx.moveTo(cx - r, head ? y1 : y0); ctx.lineTo(cx - r, cy); ctx.arc(cx, cy, r, Math.PI, 0, !head); ctx.lineTo(cx + r, head ? y1 : y0); ctx.stroke();
-    const L = 2 * (Math.abs((head ? y1 : y0) - cy)) + Math.PI * r, step = 15, off = (ph * 26) % step;
+    const ys = pts.map((q) => q[1]), y0 = Math.min(...ys) - 4, y1 = Math.max(...ys) + 4;
+    // насыпь в башмаке: продукт с загрузочного носка, ковши черпают её снизу
+    let heapTop = y1;
+    if (!head && e) {
+      const fr = Math.min(1, (e.cells[0] + e.cells[1]) / (e.cap * 2.2));
+      if (fr > 0.02) {
+        const xs = pts.map((q) => q[0]), xa = Math.min(...xs), xb = Math.max(...xs); heapTop = y1 - (y1 - cy) * 1.6 * fr;
+        ctx.beginPath(); ctx.moveTo(xa, y1); ctx.lineTo(xa, heapTop - 6); ctx.quadraticCurveTo((xa + xb) / 2, heapTop + 4, xb, heapTop + 8); ctx.lineTo(xb, y1); ctx.closePath();
+        ctx.fillStyle = matPat(kind, prod); ctx.fill(); ctx.fillStyle = "rgba(20,12,2,.3)"; ctx.fill();
+      }
+    }
+    // лента: у головки вверх слева → через верх → вниз справа; у башмака вниз справа → под барабаном → вверх слева
+    const seg = head ? y1 - cy : cy - y0;
+    ctx.strokeStyle = "#2b2f33"; ctx.lineWidth = 3.5; ctx.beginPath();
+    if (head) { ctx.moveTo(cx - r, y1); ctx.lineTo(cx - r, cy); ctx.arc(cx, cy, r, Math.PI, TAU, false); ctx.lineTo(cx + r, y1); }
+    else { ctx.moveTo(cx + r, y0); ctx.lineTo(cx + r, cy); ctx.arc(cx, cy, r, 0, Math.PI, false); ctx.lineTo(cx - r, y0); }
+    ctx.stroke();
+    const L = 2 * seg + Math.PI * r, step = 15, off = (ph * 26) % step;
     for (let d = -off; d < L; d += step) {
-      let bx, by, ang; const seg = Math.abs((head ? y1 : y0) - cy);
-      if (d < seg) { bx = cx - r; by = head ? y1 - d : y0 + d; ang = Math.PI; }
-      else if (d < seg + Math.PI * r) { const a = (d - seg) / r; ang = head ? Math.PI + a : Math.PI - a; bx = cx + Math.cos(ang) * r; by = cy + Math.sin(ang) * r; }
-      else { bx = cx + r; by = head ? cy + (d - seg - Math.PI * r) : cy - (d - seg - Math.PI * r); ang = 0; }
+      let bx, by, ang, full;
+      if (d < seg) { if (head) { bx = cx - r; by = y1 - d; ang = Math.PI; full = true; } else { bx = cx + r; by = y0 + d; ang = 0; full = false; } }
+      else if (d < seg + Math.PI * r) { const a = (d - seg) / r; ang = head ? Math.PI + a : a; bx = cx + Math.cos(ang) * r; by = cy + Math.sin(ang) * r; full = head ? a < Math.PI * 0.55 : a > Math.PI * 0.45 && by + 4 > heapTop - 2 || a > Math.PI * 0.7 && load > 0.03; }
+      else { const dd = d - seg - Math.PI * r; if (head) { bx = cx + r; by = cy + dd; ang = 0; full = false; } else { bx = cx - r; by = cy - dd; ang = Math.PI; full = load > 0.03; } }
       ctx.save(); ctx.translate(bx, by); ctx.rotate(ang + Math.PI / 2);
       ctx.fillStyle = "#e0782a"; ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(6, 0); ctx.lineTo(4, 7); ctx.lineTo(-4, 7); ctx.closePath(); ctx.fill();
       ctx.strokeStyle = "#7a3a10"; ctx.lineWidth = 0.6; ctx.stroke();
-      const full = head ? bx < cx || by < cy : bx < cx;
-      if (load > 0.03 && run > 0.2 && full) { ctx.fillStyle = kc(c && c.kind || "grain", 0); ctx.fillRect(-4, 0.5, 8, 3); }
+      if (load > 0.03 && run > 0.1 && full) { ctx.fillStyle = matPat(kind, prod); ctx.fillRect(-4.5, 0.3, 9, 3.6); }
       ctx.restore();
     }
-    // барабан со спицами
+    // барабан со спицами: вращается по часовой — как и лента
     ctx.beginPath(); ctx.arc(cx, cy, r * 0.92, 0, TAU); ctx.fillStyle = K.pat("brushed"); ctx.fill(); ctx.strokeStyle = "#1c252b"; ctx.lineWidth = 1; ctx.stroke();
     ctx.strokeStyle = "#39434a"; ctx.lineWidth = 2.2;
-    for (let k = 0; k < 6; k++) { const a = ph * (head ? 1 : -1) + k * TAU / 6; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * r * 0.2, cy + Math.sin(a) * r * 0.2); ctx.lineTo(cx + Math.cos(a) * r * 0.82, cy + Math.sin(a) * r * 0.82); ctx.stroke(); }
+    for (let k = 0; k < 6; k++) { const a = ph * 26 / r + k * TAU / 6; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * r * 0.2, cy + Math.sin(a) * r * 0.2); ctx.lineTo(cx + Math.cos(a) * r * 0.82, cy + Math.sin(a) * r * 0.82); ctx.stroke(); }
     ctx.beginPath(); ctx.arc(cx, cy, r * 0.2, 0, TAU); ctx.fillStyle = "#2a343b"; ctx.fill();
-    // сброс продукта из ковшей в выпускной патрубок головки
-    if (head && load > 0.03 && run > 0.2) { ctx.fillStyle = kc(c && c.kind || "grain", 1); for (let k = 0; k < 16; k++) { const s2 = (t * 2.4 + k / 16) % 1; ctx.fillRect(cx + r * 0.4 + s2 * r * 1.6, cy - r * 0.6 + s2 * s2 * r * 2.2 + (k % 3) * 2, 2.4, 3); } }
+    // сброс: ковши, переваливая через барабан, выбрасывают продукт в выпускной патрубок
+    if (head && load > 0.03 && run > 0.3) {
+      const cols = (K.matSpec(prod, kind) || {}).cols || KIND[kind] || KIND.grain;
+      for (let k = 0; k < 22; k++) { const s2 = (t * 2.2 * run + k / 22) % 1, a0 = -Math.PI * 0.35; const X = cx + Math.cos(a0) * r + s2 * r * 1.9, Y = cy + Math.sin(a0) * r + s2 * s2 * r * 2.4 + (k % 3) * 2; ctx.fillStyle = cols[k % 3]; ctx.save(); ctx.translate(X, Y); ctx.rotate(k + t * 6); ctx.fillRect(-1.6, -1, 3.2, 2); ctx.restore(); }
+    }
     ctx.restore();
   }
   function drawNoriaSpr(n) {
     DRAW.noria(n);
     const m = M[n.id], run = m ? m.spin : 0, t = T();
-    if (m) m._ph = (m._ph || 0) + run * 0.16;
+    if (m) m._ph = (m._ph || 0) + run * 0.115;
     const ph = m ? m._ph : 0;
     noriaPart(n, n._nb, run, t, ph, false);
     noriaPart(n, n._nh, run, t, ph, true);
@@ -2051,7 +2206,9 @@
       }
       case "filter": led(...z.P([0.86, 0.3]), n.id, 5); return;
       case "sluice": led(...z.P([0.86, 0.15]), n.id, 5); return;
-      case "diverter": { const m = M[n.id]; badge(m && m.pos > 0.5 ? "▶" : "◀", ...z.P([0.5, 0.86]), { size: 11 }); if (faulty(n.id)) faultFrame(x, y, w, h); return; }
+      case "diverter": {
+        const m = M[n.id], pos = m ? m.pos : 0, mid = pos > 0.02 && pos < 0.98, o = z.P(pos < 0.5 ? z.sp.pts.o1 : z.sp.pts.o2);
+        badge(mid ? "⇄" : o[0] > x + w / 2 ? "▶" : "◀", ...z.P([0.5, 0.86]), { size: 11, edge: mid ? "#f0c040" : undefined }); if (faulty(n.id)) faultFrame(x, y, w, h); return; }
       case "box": label(n.label + " " + Math.round(CT.trash.mass) + " кг", x + w / 2, y + h + 18, { size: 15, w: 700 }); return;
       case "pit": {
         const c = CT.pit, gy = z.oy + z.sp.grate * h, [wl, wr] = z.sp.wall.map((f) => x + f * w), sc = ND.TrHole;
@@ -2180,6 +2337,24 @@
   const ORDER = ["bunker", "pit", "box", "tank", "boiler", "cabinet", "compressor", "scale", "noria", "scraper", "screw", "crusher", "mixer",
     "scalp", "magnet", "conditioner", "press", "cooler", "sifter", "bigbag", "cyclone", "filter", "oilscale", "sluice", "diverter", "shiber", "gate", "vibr", "truck"];
   let last = 0;
+  // Плавный пуск: пока привод разгоняется (или выбегает), над ним шкала скорости.
+  const NO_RAMP = new Set(["shiber", "gate", "diverter", "truck", "bunker", "scale", "tank", "box", "pit", "magnet"]);
+  function drawRamp() {
+    for (const [id, m] of Object.entries(M)) {
+      const n = ND[id === "Pros1" || id === "Pros2" ? "Pros" : id]; if (!n || NO_RAMP.has(n.kind)) continue;
+      const s = m.spin || 0;
+      const fb = plc.fbs[id], pch = fb && (fb.kind === "dozator" || /^Pit/.test(id));
+      if (Math.abs(s - (m._rs || 0)) > 1e-4) { m._rdir = s > (m._rs || 0) ? 1 : -1; m._rs = s; if (!m._r0) m._r0 = T(); m._rt = T(); }
+      if (T() - (m._rt || 0) > 0.6) m._r0 = 0;
+      // приводы с ПЧ меняют скорость по заданию постоянно — шкалу показываем только при пуске с нуля
+      if (pch && !(m._r0 && s < 0.9 && m._rdir > 0 && (m._r0 && T() - m._r0 < 4))) continue;
+      if (s <= 0.02 || s >= 0.985 || !m._r0) continue;
+      const up = m._rdir > 0, bx = n.x + n.w / 2 + (id === "Pros2" ? 70 : 0), by = (n.kind === "screw" ? n.cy - n.h / 2 : n.y) - 22, W = 64;
+      badge(`${up ? "разгон" : "выбег"} ${Math.round(s * 100)}%`, bx, by - 14, { size: 11, color: up ? "#ffe08a" : "#bcd0dc", edge: up ? "#f0c040" : "#7f97a8" });
+      ctx.fillStyle = "rgba(10,16,24,.8)"; ctx.fillRect(bx - W / 2, by - 3, W, 6);
+      ctx.fillStyle = up ? "#f0c040" : "#7f97a8"; ctx.fillRect(bx - W / 2 + 1, by - 2, (W - 2) * s, 4);
+    }
+  }
   function render(now) {
     if (!cv) return;
     const dt = last ? (now - last) / 1000 : 0.016; last = now;
@@ -2195,6 +2370,7 @@
     const nodes = Object.values(ND).sort((a, b) => ORDER.indexOf(a.kind) - ORDER.indexOf(b.kind));
     for (const n of nodes) { const f = n._spr && IMG[n._spr.img] ? drawMach : n._nh ? drawNoriaSpr : DRAW[n.kind]; if (f) { try { f(n); } catch (e) { if (!render._err) { render._err = 1; console.error(n.id, e); } } } }
     drawParticles();
+    drawRamp();
     drawLabels();
     drawSelection();
   }

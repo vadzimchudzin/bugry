@@ -109,9 +109,9 @@
   N("PP1", { kind: "diverter", drive: "PP1", x: 3930, y: 1345, w: 64, h: 64, poz: "40910" });
   N("Pros", { kind: "sifter", drive: "Pros1", drive2: "Pros2", x: 3990, y: 1440, w: 330, h: 180, poz: "40950" });
   N("PP2", { kind: "diverter", drive: "PP2", x: 4268, y: 1640, w: 64, h: 64, poz: "40960" });
-  scraper("Tr51100", 4330, 1750, 4600, 1310, { poz: "51100" });
-  N("PP3", { kind: "diverter", drive: "PP3", x: 4600, y: 1240, w: 64, h: 64, poz: "51110" });
-  scraper("Tr51200", 4590, 1205, 3690, 1205, { poz: "51200" });
+  scraper("Tr51100", 4364, 1738, 4612, 1052, { poz: "51100" });
+  N("PP3", { kind: "diverter", drive: "PP3", x: 4600, y: 1097, w: 64, h: 64, poz: "51110" });
+  scraper("Tr51200", 4575, 1185, 3790, 1185, { poz: "51200" });
   bunker("Torba", 4220, 1780, 2080, 150, { poz: "51300", num: 310, label: "Биг-бег", level: "s10", kindB: "torba" });
   N("Leb", { kind: "bigbag", drive: "Leb", x: 4150, y: 2090, w: 290, h: 200, poz: "51300" });
   noria("Nor7", 4700, 1300, 2340, "50100г");
@@ -188,7 +188,7 @@
   };
 
   /* ---------------------------------------------- приводы: разгон, выбег, наработка */
-  const RAMP = { noria: [4, 9], transporter: [2.5, 5], reverse: [2.5, 5], meh: [6, 14], zatvor: [1.5, 3], asp: [6, 18], vibr: [0.3, 0.6], dozator: [0.8, 1.2], ohl: [1, 1], leb: [1, 1] };
+  const RAMP = { noria: [6, 12], transporter: [3.5, 6], reverse: [3.5, 6], meh: [9, 16], zatvor: [1.5, 3], asp: [9, 20], vibr: [0.3, 0.6], dozator: [0.8, 1.2], ohl: [1, 1], leb: [1, 1] };
   function mkMachine(id) {
     const [name, poz] = NAMES[id] || [id, ""];
     const fb = plc.fbs[id] || {};

@@ -11,7 +11,7 @@
   const plc = PLC.createPLC();
   const V = plc.v;
 
-  const W = 5200, H = 2420;
+  const W = 5200, H = 2500;
 
   /* ============================================================ узлы схемы */
   // Геометрия задаётся в координатах мира. kind определяет рисунок и точки
@@ -51,10 +51,10 @@
   screw("Pit2", 2550, 2455, 530, { poz: "30220", small: true, pch: true });
   N("mag1", { kind: "magnet", x: 2335, y: 552, w: 46, h: 54, poz: "30310" });
   N("mag2", { kind: "magnet", x: 2420, y: 552, w: 46, h: 54, poz: "30320" });
-  N("Drob1", { kind: "crusher", drive: "Drob1", x: 2215, y: 620, w: 165, h: 175, poz: "30410", motor: "left" });
-  N("Drob2", { kind: "crusher", drive: "Drob2", x: 2420, y: 620, w: 165, h: 175, poz: "30420", motor: "right" });
-  screw("TrDrob", 2210, 2700, 860, { poz: "30500" });
-  noria("Nor3", 2700, 120, 920, "30600");
+  N("Drob1", { kind: "crusher", drive: "Drob1", x: 2140, y: 640, w: 230, h: 320, poz: "30410", motor: "left", hx: 2300 });
+  N("Drob2", { kind: "crusher", drive: "Drob2", x: 2430, y: 640, w: 230, h: 320, poz: "30420", motor: "right", hx: 2500 });
+  screw("TrDrob", 2210, 2700, 1000, { poz: "30500" });
+  noria("Nor3", 2700, 120, 1060, "30600");
 
   // ---------------- добавки (средние весы), масло, смеситель
   const DK = [];
@@ -72,7 +72,7 @@
   bunker("DownBunk", 2972, 866, 1010, 170, { poz: "ПСБ", label: "Подсмесительный бункер", level: "DownBunk", kindB: "hopper2" });
   N("tankOil", { kind: "tank", x: 3200, y: 470, w: 200, h: 120, poz: "ВЖД4", label: "Масло", level: "tankOil" });
   N("Jir", { kind: "oilscale", drive: "Jir", x: 3215, y: 640, w: 80, h: 92, poz: "21700", label: "УДЖК", level: "Jir" });
-  N("compr", { kind: "compressor", x: 3330, y: 650, w: 110, h: 80, label: "Компрессор" });
+  N("compr", { kind: "compressor", x: 3410, y: 650, w: 110, h: 80, label: "Компрессор" });
   screw("TrSms", 2890, 3590, 1062, { poz: "30800", pch: true });
   N("ShTrSms", { kind: "shiber", drive: "ShTrSms", x: 3130, y: 1082, w: 44, h: 24, poz: "40110" });
 
@@ -90,37 +90,37 @@
   N("truck_g2", { kind: "truck", x: 4310, y: 880, w: 330, h: 145, serves: [5, 6, 7, 8], flip: true });
 
   // ---------------- линия гранулирования
-  screw("Tr40100", 2840, 3150, 2292, { poz: "40100" });
-  noria("Nor5", 3160, 1300, 2340, "40200");
-  N("FiltNor5", { kind: "filter", drive: "FiltNor5", x: 3080, y: 1250, w: 60, h: 90, poz: "40210" });
-  screw("Tr40300", 3270, 3520, 1335, { poz: "40300" });
-  bunker("PBGran", 3500, 1370, 1590, 170, { poz: "40400", label: "БО-5", level: "PBGran", kindB: "hopper2" });
-  N("VibrG1", { kind: "vibr", drive: "VibrG1", x: 3400, y: 1440, w: 24, h: 30 });
-  N("VibrG2", { kind: "vibr", drive: "VibrG2", x: 3576, y: 1440, w: 24, h: 30 });
-  screw("PitGr", 3445, 3560, 1618, { poz: "40501", small: true, pch: true });
-  N("KondGr", { kind: "conditioner", drive: "KondGr", x: 3380, y: 1645, w: 250, h: 62, poz: "40502" });
-  N("Gran", { kind: "press", drive: "Gran", x: 3410, y: 1725, w: 230, h: 220, poz: "40500" });
-  N("ZatvOhl", { kind: "sluice", drive: "ZatvOhl", x: 3505, y: 1950, w: 40, h: 34, poz: "40601" });
-  N("Ohl", { kind: "cooler", drive: "Ohl", x: 3430, y: 1990, w: 190, h: 260, poz: "40600", level: "Ohl" });
-  N("AspGr", { kind: "cyclone", drive: "AspGr", x: 3670, y: 1640, w: 110, h: 290, poz: "60100" });
-  screw("Tr40700", 3440, 3770, 2292, { poz: "40700", chain: true });
+  screw("Tr40100", 3175, 2350, 2400, { poz: "40100" });
+  noria("Nor5", 2240, 1300, 2440, "40200");
+  N("FiltNor5", { kind: "filter", drive: "FiltNor5", x: 2160, y: 1250, w: 60, h: 90, poz: "40210" });
+  screw("Tr40300", 2380, 2616, 1380, { poz: "40300" });
+  bunker("PBGran", 2600, 1410, 1610, 170, { poz: "40400", label: "БО-5", level: "PBGran", kindB: "hopper2" });
+  N("VibrG1", { kind: "vibr", drive: "VibrG1", x: 2486, y: 1450, w: 24, h: 30 });
+  N("VibrG2", { kind: "vibr", drive: "VibrG2", x: 2690, y: 1450, w: 24, h: 30 });
+  screw("PitGr", 2640, 2480, 1638, { poz: "40501", small: true, pch: true });
+  N("KondGr", { kind: "conditioner", drive: "KondGr", x: 2440, y: 1668, w: 360, h: 64, poz: "40502" });
+  N("Gran", { kind: "press", drive: "Gran", x: 2680, y: 1768, w: 370, h: 250, poz: "40500" });
+  N("ZatvOhl", { kind: "sluice", drive: "ZatvOhl", x: 2758, y: 2022, w: 44, h: 36, poz: "40601" });
+  N("Ohl", { kind: "cooler", drive: "Ohl", x: 2680, y: 2062, w: 200, h: 218, poz: "40600", level: "Ohl" });
+  N("AspGr", { kind: "cyclone", drive: "AspGr", x: 2880, y: 1380, w: 110, h: 290, poz: "60100" });
+  screw("Tr40700", 2740, 3770, 2304, { poz: "40700", chain: true });
   noria("Nor6", 3780, 1300, 2340, "40900");
   N("FiltNor6", { kind: "filter", drive: "FiltNor6", x: 3880, y: 1250, w: 60, h: 90, poz: "40920" });
   N("PP1", { kind: "diverter", drive: "PP1", x: 3930, y: 1345, w: 64, h: 64, poz: "40910" });
-  N("Pros", { kind: "sifter", drive: "Pros1", drive2: "Pros2", x: 3990, y: 1450, w: 300, h: 110, poz: "40950" });
-  N("PP2", { kind: "diverter", drive: "PP2", x: 4250, y: 1590, w: 64, h: 64, poz: "40960" });
-  scraper("Tr51100", 4300, 1700, 4600, 1310, { poz: "51100" });
+  N("Pros", { kind: "sifter", drive: "Pros1", drive2: "Pros2", x: 3990, y: 1440, w: 330, h: 180, poz: "40950" });
+  N("PP2", { kind: "diverter", drive: "PP2", x: 4268, y: 1640, w: 64, h: 64, poz: "40960" });
+  scraper("Tr51100", 4330, 1750, 4600, 1310, { poz: "51100" });
   N("PP3", { kind: "diverter", drive: "PP3", x: 4600, y: 1240, w: 64, h: 64, poz: "51110" });
   scraper("Tr51200", 4590, 1205, 3690, 1205, { poz: "51200" });
-  bunker("Torba", 4220, 1760, 2080, 150, { poz: "51300", num: 310, label: "Биг-бег", level: "s10", kindB: "torba" });
+  bunker("Torba", 4220, 1780, 2080, 150, { poz: "51300", num: 310, label: "Биг-бег", level: "s10", kindB: "torba" });
   N("Leb", { kind: "bigbag", drive: "Leb", x: 4150, y: 2090, w: 290, h: 200, poz: "51300" });
   noria("Nor7", 4700, 1300, 2340, "50100г");
   N("FiltNor7", { kind: "filter", drive: "FiltNor7", x: 4800, y: 1250, w: 60, h: 90, poz: "50110" });
   bunker("b309", 4930, 1400, 1960, 150, { num: 309, level: "s9", kindB: "gp" });
   N("ShO9", { kind: "shiber", drive: "ShO9", x: 4908, y: 1968, w: 44, h: 22, vertical: true, poz: "50300*" });
   N("truck_g3", { kind: "truck", x: 4810, y: 2040, w: 330, h: 145, serves: [9], flip: true });
-  screw("Tr40800", 4230, 2860, 2370, { poz: "40800" });
-  N("boiler", { kind: "boiler", x: 2900, y: 1520, w: 210, h: 150, label: "Паровой котёл" });
+  screw("Tr40800", 4100, 3200, 2400, { poz: "40800" });
+  N("boiler", { kind: "boiler", x: 1560, y: 1500, w: 540, h: 300, label: "Паровой котёл" });
   N("cab", { kind: "cabinet", x: 140, y: 1300, w: 420, h: 260, label: "Шкафы управления ШУ / ШЧ / ШД" });
   N("Asp1", { kind: "cyclone", drive: "Asp1", x: 300, y: 120, w: 110, h: 300, poz: "АС-1" });
   N("Asp2", { kind: "cyclone", drive: "Asp2", x: 4980, y: 110, w: 110, h: 300, poz: "АС-2" });
@@ -147,14 +147,16 @@
   A.pit.out = [258, 1012];
   A.Scalp.in = [690, 478]; A.Scalp.out = [860, 600]; A.Scalp.waste = [705, 620];
   A.scale1.out = [1545, 1020];
-  A.Drob1.in = [2300, 622]; A.Drob1.out = [2300, 795];
-  A.Drob2.in = [2500, 622]; A.Drob2.out = [2500, 795];
+  A.Drob1.in = [2300, 652]; A.Drob1.out = [2300, 958];
+  A.Drob2.in = [2500, 652]; A.Drob2.out = [2500, 958];
   A.Sms.in = [2960, 714]; A.Sms.out = [2972, 842]; A.Sms.oil = [3100, 716];
-  A.KondGr.in = [3420, 1648]; A.KondGr.out = [3600, 1705];
-  A.Gran.in = [3600, 1728]; A.Gran.out = [3525, 1945];
-  A.Ohl.in = [3525, 1992]; A.Ohl.out = [3525, 2250]; A.Ohl.duct = [3620, 2010];
-  A.AspGr.in = [3672, 1700]; A.AspGr.out = [3725, 1930];
-  A.Pros.in = [4010, 1452]; A.Pros.out = [4285, 1560]; A.Pros.waste = [4150, 1560];
+  A.KondGr.in = [2496, 1670]; A.KondGr.out = [2780, 1732]; A.KondGr.steam = [2740, 1668];
+  A.Gran.in = [2780, 1772]; A.Gran.out = [2780, 2020];
+  A.Ohl.in = [2780, 2064]; A.Ohl.out = [2780, 2280]; A.Ohl.duct = [2880, 2090];
+  A.AspGr.in = [2882, 1440]; A.AspGr.out = [2935, 1670];
+  A.Pros.in = [4040, 1448]; A.Pros.out = [4300, 1622]; A.Pros.waste = [4090, 1622];
+  A.Nor5.in = [ND.Nor5.x + ND.Nor5.w - 4, ND.Nor5.y + ND.Nor5.h - 46];
+  A.boiler.steam = [1990, 1500];
   A.Leb.in = [4295, 2100];
 
   /* ============================================================ имена механизмов */

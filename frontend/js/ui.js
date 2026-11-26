@@ -859,7 +859,8 @@
       setRow("Подписи механизмов", setChk(() => R.options.labels, (v) => { R.options = { labels: v }; })),
       setRow("Аспирационные воздуховоды", setChk(() => R.options.pipes, (v) => { R.options = { pipes: v }; })),
       setRow("Значки ручного режима «Р»", setChk(() => R.options.tags, (v) => { R.options = { tags: v }; })),
-      setRow("Лампы ДВУ / ДНУ на бункерах", setChk(() => R.options.levels, (v) => { R.options = { levels: v }; })));
+      setRow("Лампы ДВУ / ДНУ на бункерах", setChk(() => R.options.levels, (v) => { R.options = { levels: v }; })),
+      setRow("Новогодняя гирлянда по периметру схемы", setChk(() => R.garland.show, (v) => { R.garland.show = v; })));
     const tc = h("section", { class: "panel wide" }, h("h3", {}, "Время очистки механизмов"), h("p", { class: "muted" }, "Сколько механизм работает после пропадания условия пуска (выгрузка тракта), с. Переменные tc* окна «Настройки» SCADA."),
       h("div", { class: "set-grid" }, Object.keys(window.PLC.TC_DEFAULT).map((k) => setRow(k.replace(/^tc/, ""), setNum(k)))));
     body.append(drob, dos, gran, model, tc);
@@ -951,6 +952,8 @@
 
   /* ================================================================ холст */
   function tipFor(id) {
+    if (id === "@garland-start") return "<b>Гирлянда</b><br>ПУСК — включить";
+    if (id === "@garland-stop") return "<b>Гирлянда</b><br>СТОП — выключить";
     const n = S.ND[id];
     if (n.dozer) { const [t] = drvState(id); return `<b>${esc(title(id))}</b><br>${esc(t)}`; }
     if (id === "Pros") return `<b>${esc(title("Pros1"))}</b><br>${esc(drvState("Pros1")[0])} · №2: ${esc(drvState("Pros2")[0])}`;
@@ -983,7 +986,7 @@
     });
     cv.addEventListener("pointerup", (e) => {
       const was = drag; drag = null; cv.classList.remove("grab");
-      if (was && !was.moved) { const [wx, wy] = R.toWorld(e.clientX, e.clientY), id = R.hitAt(wx, wy); if (id) openNode(id); }
+      if (was && !was.moved) { const [wx, wy] = R.toWorld(e.clientX, e.clientY), id = R.hitAt(wx, wy); if (id === "@garland-start" || id === "@garland-stop") R.garland.run = id === "@garland-start"; else if (id) openNode(id); }
     });
     cv.addEventListener("pointerleave", () => { R.setHover(null); tip.style.display = "none"; });
     cv.addEventListener("wheel", (e) => { e.preventDefault(); R.zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.15 : 1 / 1.15); }, { passive: false });

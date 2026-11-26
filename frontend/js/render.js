@@ -791,8 +791,8 @@
   // Перекрытие под просеивателем 40950: машина стоит на нём опорами рамы,
   // трубы выпусков проходят сквозь проёмы. Справа — линия обрыва (перекрытие продолжается).
   function drawSifterFloor() {
-    const n = ND.Pros, nr = ND.Nor6; if (!n || !nr || !n._box) return;
-    const y = SIFT.FLOOR, x0 = nr.x + nr.w / 2, x1 = n.x + n.w + 40, th = 18;
+    const n = ND.Pros, z = n && n._spr, nr = ND.Nor6; if (!z || !nr) return;
+    const y = z.P([0.5, 1])[1], x0 = nr.x + nr.w / 2, x1 = z.P([1, 1])[0] + 26, th = 18;
     ctx.fillStyle = "#4b555c"; ctx.fillRect(x0, y + th, x1 - x0, 7); ctx.fillStyle = "#6e7a82"; ctx.fillRect(x0, y + th, x1 - x0, 2);   // балка перекрытия
     for (let X = x0 + 30; X < x1 - 10; X += 46) { ctx.fillStyle = "#56626a"; ctx.fillRect(X, y + th, 3, 7); }
     ctx.fillStyle = K.pat("concrete") || "#8d9297"; ctx.fillRect(x0, y, x1 - x0, th);
@@ -1572,165 +1572,65 @@
     led(x + 16, y + h - 10, "Ohl", 6);
   }
 
-  // Вибропросеиватель гранул 40950 (рисуется в коде, без спрайта).
-  // Короб на пружинных опорах наклонён к выпуску гранул. Внутри: верхняя дека —
-  // сетка, по которой гранулы подскоками идут к выпуску; под ней — резиновые
-  // шарики очистки сита на опорной решётке; ниже — поддон с обратным уклоном:
-  // крошка, провалившаяся сквозь сетку, съезжает по нему к выпуску отходов.
-  // Колебания создают два вибродвигателя с дебалансами на балке сверху.
-  const SIFT = { X0: 3995, TOP: 1470, BW: 272, BH: 92, tilt: 0.05, FLOOR: 1649, inX: 45, wasteX: 71, outX: 217, D: 40 };
-  const siftW = (lx, ly) => { const c = Math.cos(SIFT.tilt), s = Math.sin(SIFT.tilt); return [SIFT.X0 + lx * c - ly * s, SIFT.TOP + lx * s + ly * c]; };
-  function layoutSifter() {
-    const n = ND.Pros; if (!n || !A.Pros) return;
-    n._box = n._box || { x: n.x, y: n.y, w: n.w, h: n.h };
-    n.x = SIFT.X0 - 24; n.y = SIFT.TOP - 46; n.w = SIFT.BW + 48; n.h = SIFT.FLOOR - n.y;
-    const set = (k, p) => { if (!A.Pros[k]) A.Pros[k] = [0, 0]; A.Pros[k][0] = p[0]; A.Pros[k][1] = p[1]; };
-    set("in", [siftW(SIFT.inX, 0)[0], 1448]);
-    set("waste", [siftW(SIFT.wasteX, SIFT.BH)[0], 1606]);
-    set("out", [siftW(SIFT.outX, SIFT.BH)[0], 1611]);
-  }
-  // вибродвигатель сбоку: оребрённый корпус, лапы, торцевые кожухи дебалансов;
-  // в смотровом окне кожуха видно, как вращается груз-дебаланс
-  function vibMotor(x, y, len, dia, a, rear) {
-    ctx.fillStyle = rear ? "#1d3f69" : "#24548f"; ctx.fillRect(x + len * 0.3, y + dia - 1, len * 0.4, 5);
-    ctx.strokeStyle = "#13253b"; ctx.lineWidth = 0.8; ctx.strokeRect(x + len * 0.3, y + dia - 1, len * 0.4, 5);
-    K.rr(x + 8, y, len - 16, dia, 4); K.skin("paint", K.shadeCyl(0, y, 0, y + dia), "#142a46", 1.3);
-    ctx.lineWidth = 1;
-    for (let k = 1; k < 6; k++) { const Y = y + dia * k / 6; ctx.strokeStyle = "rgba(8,20,40,.55)"; ctx.beginPath(); ctx.moveTo(x + 11, Y); ctx.lineTo(x + len - 11, Y); ctx.stroke(); }
-    [x, x + len - 10].forEach((X) => { K.rr(X, y + 1, 10, dia - 2, 4); K.skin("galv", K.shadeCyl(0, y, 0, y + dia), "#26323a", 1.1); });
-    if (rear) { ctx.fillStyle = "rgba(10,16,24,.25)"; K.rr(x, y, len, dia, 4); ctx.fill(); return; }
-    const ex = x + len - 5, ey = y + dia / 2, r = dia * 0.34;
-    ctx.beginPath(); ctx.arc(ex, ey, r + 1.5, 0, TAU); ctx.fillStyle = "#1b252c"; ctx.fill();
-    ctx.beginPath(); ctx.moveTo(ex, ey); ctx.arc(ex, ey, r, a, a + 2.3); ctx.closePath(); ctx.fillStyle = "#e0b21c"; ctx.fill();
-    ctx.beginPath(); ctx.arc(ex, ey, 1.6, 0, TAU); ctx.fillStyle = "#8d989f"; ctx.fill();
-    ctx.fillStyle = "#d8dde0"; ctx.fillRect(x + len * 0.42, y + dia * 0.55, len * 0.16, dia * 0.24);
-  }
+  // Вибропросеиватель: короб с наклонной ситовой декой на пружинных опорах,
+  // два вибродвигателя по бортам. Гранулы идут по сетке к выпуску, мелочь
+  // проваливается в поддон и уходит на возврат.
   function drawSifter(n) {
-    const t = T(), run = Math.max(M.Pros1.spin, M.Pros2.spin), e = EL.Pros, q = Math.min(1, elMass("Pros") / 12);
-    const { BW, BH, D, inX, wasteX, outX, FLOOR } = SIFT, prod = e && e.prod;
-    const cols = (K.matSpec(prod, "pellet") || {}).cols || KIND.pellet, fcol = KIND.fines;
-    const st = n._sift || (n._sift = { ps: [], t: t - 99, acc: 0, ph1: 0, ph2: 0 });
-    const gapT = t - st.t; st.t = t;
-    st.ph1 += Math.min(0.05, gapT) * M.Pros1.spin * 9; st.ph2 += Math.min(0.05, gapT) * M.Pros2.spin * 9.3;
-    // колебания короба: круговые, малой амплитуды
-    const ax = run > 0.2 ? Math.cos(t * 75) * 1.5 * run : 0, ay = run > 0.2 ? Math.sin(t * 75) * 1.1 * run : 0;
-    const W = (lx, ly) => { const p = siftW(lx, ly); return [p[0] + ax, p[1] + ay]; };
-    // опорная рама: две стойки из двутавра на перекрытии, пружины до кронштейнов короба
-    const postTop = FLOOR - 56;
-    [[-12, BH - 17], [BW + 12, BH - 17]].forEach(([lx, ly]) => {
-      const [bx] = siftW(lx, ly), [, by] = W(lx, ly);
-      ctx.fillStyle = "#56626a"; ctx.fillRect(bx - 7, postTop, 14, FLOOR - postTop);
-      ctx.fillStyle = "#6e7a82"; ctx.fillRect(bx - 7, postTop, 2, FLOOR - postTop); ctx.fillRect(bx + 5, postTop, 2, FLOOR - postTop);
-      ctx.fillStyle = "#3e4a52"; ctx.fillRect(bx - 11, postTop - 4, 22, 5); ctx.fillRect(bx - 11, FLOOR - 4, 22, 4);
-      ctx.strokeStyle = "#1f282d"; ctx.lineWidth = 0.8; ctx.strokeRect(bx - 7, postTop, 14, FLOOR - postTop);
-      K.bolts(bx - 8, FLOOR - 2, bx + 8, FLOOR - 2, 2, 1.2);
-      ctx.fillStyle = "#2f383e"; ctx.fillRect(bx - 8, postTop - 9, 16, 5);                 // чашка пружины
-      K.spring(bx + ax * 0.5, by + 6, postTop - 9, 13, run > 0.2);
+    const m = M.Pros1, m2 = M.Pros2, x = n.x, y = n.y, w = n.w, h = n.h, t = T();
+    const run = Math.max(m.spin, m2.spin), q = Math.min(1, elMass("Pros") / 12);
+    const fy = y + h - 34;   // верх опорной рамы
+    // рама с опорами на фундаменте
+    ctx.fillStyle = K.pat("concrete"); ctx.fillRect(x - 6, y + h - 12, w + 12, 12);
+    [x + 14, x + w - 26].forEach((X) => { ctx.fillStyle = "#4f5c65"; ctx.fillRect(X, fy, 12, 22); });
+    ctx.fillStyle = "#3e4a52"; ctx.fillRect(x, fy - 4, w, 8);
+    // колебания короба: по кругу с малой амплитудой
+    const ax = run > 0.2 ? Math.cos(t * 75) * 2.2 * run : 0, ay = run > 0.2 ? Math.sin(t * 75) * 1.6 * run : 0;
+    const tilt = 0.05, bx = x + 6, by = y + 16, bw = w - 12, bht = 64;
+    // пружины (растягиваются вместе с коробом)
+    [bx + 26, bx + bw - 30].forEach((X, i) => K.spring(X, by + bht + (i ? bw * tilt : 0) * 0.9 + ay + 6, fy - 4, 14, run > 0.2));
+    ctx.save(); ctx.translate(bx + ax, by + ay); ctx.rotate(tilt);
+    // короб
+    K.rr(0, 0, bw, bht, 6); K.skin("galv", K.shadeFlat(0, 0, bw, bht), "#26323a", 2.2);
+    ctx.fillStyle = "#7d8a93"; ctx.fillRect(-3, -3, bw + 6, 6); K.bolts(4, 0, bw - 4, 0, 8, 1.3);
+    // разрез: дека-сито, гранулы над ней, мелочь под ней
+    const ix = 12, iy = 12, iw = bw - 24, ih = bht - 24, deck = iy + ih * 0.5;
+    ctx.save(); ctx.beginPath(); ctx.rect(ix, iy, iw, ih); ctx.clip(); cavity(ix, iy, iw, ih);
+    ctx.fillStyle = K.pat("mesh"); ctx.fillRect(ix, deck, iw, 4);
+    ctx.fillStyle = "#cfd8de"; ctx.fillRect(ix, deck + 4, iw, 1.5);
+    if (q > 0.02) {
+      const layer = 4 + 10 * q, speed = 55 * run;
+      ctx.save(); ctx.beginPath(); ctx.rect(ix, deck - layer, iw * (0.35 + 0.65 * q), layer); ctx.clip();
+      ctx.translate((t * speed) % 64, 0); ctx.fillStyle = prodPat("pellet"); ctx.fillRect(ix - 64, deck - layer - 4, iw + 128, layer + 4);
+      ctx.restore();
+      if (run > 0.2) { ctx.fillStyle = kc("fines", 1); for (let k = 0; k < 18; k++) { const X = ix + 10 + ((k * 41) % (iw - 20)), Y = deck + 6 + ((t * 70 + k * 11) % (ih * 0.5 - 8)); ctx.fillRect(X, Y, 2, 2); } }
+      ctx.fillStyle = prodPat("fines"); ctx.fillRect(ix, iy + ih - 5, iw, 5);
+    }
+    ctx.restore(); cutFrame(ix, iy, iw, ih, 2);
+    // крышка-кожух загрузки и лоток выпуска
+    K.rr(18, -16, 52, 16, 2); K.skin("galv", null, "#26323a", 1.2);
+    ctx.restore();
+    // вибродвигатели по бортам (вид с торца: корпус + дебалансы)
+    [[bx + bw * 0.34, M.Pros1, "Pros1"], [bx + bw * 0.62, M.Pros2, "Pros2"]].forEach(([X, mm, id]) => {
+      const Y = by + bht * 0.5 + (X - bx) * tilt + ay, Xc = X + ax, rr2 = 16;
+      ctx.beginPath(); ctx.arc(Xc, Y, rr2, 0, TAU); K.skin("paint", K.shadeCyl(Xc - rr2, Y - rr2, Xc + rr2, Y + rr2), "#142a46", 1.4);
+      for (let k = 0; k < 16; k++) { const a = k / 16 * TAU; ctx.beginPath(); ctx.moveTo(Xc + Math.cos(a) * (rr2 - 3), Y + Math.sin(a) * (rr2 - 3)); ctx.lineTo(Xc + Math.cos(a) * rr2, Y + Math.sin(a) * rr2); ctx.strokeStyle = "#163a66"; ctx.lineWidth = 1.5; ctx.stroke(); }
+      const a = mm.spin > 0.2 ? t * 75 : 0.4; ctx.beginPath(); ctx.moveTo(Xc, Y); ctx.arc(Xc, Y, rr2 * 0.62, a, a + 2.4); ctx.closePath(); ctx.fillStyle = "#e0b21c"; ctx.fill();
+      ctx.beginPath(); ctx.arc(Xc, Y, 3, 0, TAU); ctx.fillStyle = "#1b252c"; ctx.fill();
+      led(Xc, Y + rr2 + 12, id, 5);
     });
-    // гибкие рукава: вибрация не передаётся на трубы
+    // гибкие рукава (вибрация не передаётся на трубы): вход, выход гранул, сход мелочи
     const sleeve = (x0, y0, x1, y1, wd) => {
       const L = Math.hypot(x1 - x0, y1 - y0), a = Math.atan2(y1 - y0, x1 - x0);
       ctx.save(); ctx.translate(x0, y0); ctx.rotate(a);
       K.rr(0, -wd / 2, L, wd, 3); ctx.fillStyle = "#e9e4d3"; ctx.fill(); ctx.lineWidth = 1.2; ctx.strokeStyle = "#7d7562"; ctx.stroke();
-      ctx.strokeStyle = "rgba(120,110,90,.6)"; ctx.lineWidth = 1; for (let d = 4; d < L; d += 4) { ctx.beginPath(); ctx.moveTo(d, -wd / 2); ctx.lineTo(d, wd / 2); ctx.stroke(); }
+      ctx.strokeStyle = "rgba(120,110,90,.6)"; ctx.lineWidth = 1; for (let d = 4; d < L; d += 5) { ctx.beginPath(); ctx.moveTo(d, -wd / 2); ctx.lineTo(d, wd / 2); ctx.stroke(); }
       ctx.fillStyle = "#6c7880"; ctx.fillRect(-1, -wd / 2 - 2, 4, wd + 4); ctx.fillRect(L - 3, -wd / 2 - 2, 4, wd + 4);
       ctx.restore();
     };
-    const pIn = W(inX, -12), pW = W(wasteX, BH + 26), pO = W(outX, BH + 30);
-    sleeve(A.Pros.in[0], A.Pros.in[1], pIn[0], pIn[1], 20);
-    sleeve(pW[0], pW[1], A.Pros.waste[0], A.Pros.waste[1], 16);
-    sleeve(pO[0], pO[1], A.Pros.out[0], A.Pros.out[1], 22);
-    // ---- короб (локальные координаты: вдоль короба x, вниз y)
-    ctx.save(); const o = W(0, 0); ctx.translate(o[0], o[1]); ctx.rotate(SIFT.tilt);
-    // бункеры выпуска под коробом: мелочь (слева), гранулы (справа)
-    const hopper = (x0, x1, xc, hh, wd) => {
-      K.path([[x0, BH - 2], [x1, BH - 2], [xc + wd / 2, BH + hh], [xc - wd / 2, BH + hh]], true); K.skin("galv", K.shadeFlat(x0, BH, x1 - x0, hh), "#26323a", 1.4);
-      ctx.fillStyle = "#7d8a93"; ctx.fillRect(xc - wd / 2 - 4, BH + hh, wd + 8, 4); ctx.strokeStyle = "#26323a"; ctx.lineWidth = 0.8; ctx.strokeRect(xc - wd / 2 - 4, BH + hh, wd + 8, 4);
-    };
-    hopper(34, 108, wasteX, 26, 16); hopper(178, BW - 2, outX, 30, 22);
-    // кронштейны пружинных опор
-    [[-24, 0], [BW, BW + 24]].forEach(([a0, a1]) => {
-      const side = a0 < 0 ? a1 : a0, out = a0 < 0 ? a0 + 4 : a1 - 4;
-      K.path([[side, BH - 46], [side, BH - 22], [out, BH - 22]], true); ctx.fillStyle = "#6c7880"; ctx.fill(); ctx.strokeStyle = "#26323a"; ctx.lineWidth = 0.9; ctx.stroke();
-      ctx.fillStyle = "#56626a"; ctx.fillRect(a0, BH - 22, a1 - a0, 5); ctx.strokeRect(a0, BH - 22, a1 - a0, 5);
-      K.bolts(a0 + 5, BH - 19.5, a1 - 5, BH - 19.5, 2, 1.1);
-    });
-    // корпус
-    K.rr(0, 0, BW, BH, 3); K.skin("galv", K.shadeFlat(0, 0, BW, BH), "#26323a", 2);
-    ctx.fillStyle = "#7d8a93"; ctx.fillRect(-3, -3, BW + 6, 7); ctx.strokeStyle = "#26323a"; ctx.lineWidth = 0.9; ctx.strokeRect(-3, -3, BW + 6, 7); K.bolts(6, 0.5, BW - 6, 0.5, 14, 1.2);
-    ctx.fillStyle = "#7d8a93"; ctx.fillRect(-3, BH - 4, BW + 6, 6); ctx.strokeRect(-3, BH - 4, BW + 6, 6); K.bolts(6, BH - 1, BW - 6, BH - 1, 14, 1.1);
-    // загрузочный патрубок на крышке
-    K.rr(inX - 11, -14, 22, 12, 1); K.skin("galv", K.shadeCyl(inX - 11, 0, inX + 11, 0), "#26323a", 1.2);
-    ctx.fillStyle = "#7d8a93"; ctx.fillRect(inX - 14, -15, 28, 4);
-    // ---- окно разреза
-    const ix = 9, iy = 11, iw = BW - 18, ih = BH - 19;
-    ctx.save(); K.rr(ix, iy, iw, ih, 2); ctx.clip(); cavity(ix, iy, iw, ih);
-    const panY = (x) => 58 + (BW - 36 - x) * 2 * SIFT.tilt, panL = 112, deck0 = 14, deck1 = BW - 30, edge = BW - 13;
-    const bedTop = (x) => D - (q > 0.02 ? (1.5 + 5 * q) * Math.max(0.25, 1 - (x - deck0) / (edge - deck0) * 0.75) : 0);
-    // поддон с обратным уклоном и слой мелочи на нём
-    ctx.strokeStyle = "#9aa6ad"; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(BW - 36, panY(BW - 36) - 5); ctx.lineTo(BW - 36, panY(BW - 36)); ctx.lineTo(panL, panY(panL)); ctx.stroke();
-    if (q > 0.02) { ctx.fillStyle = "#cfc4a8"; ctx.beginPath(); ctx.moveTo(BW - 40, panY(BW - 40) - 1.2); ctx.lineTo(panL, panY(panL) - 4); ctx.lineTo(panL, panY(panL) - 1); ctx.lineTo(BW - 40, panY(BW - 40) - 1); ctx.closePath(); ctx.fill(); }
-    // перегородка лотка гранул и внутренняя течка загрузки
-    ctx.fillStyle = "#5c676f"; ctx.fillRect(BW - 40, panY(BW - 40) - 6, 3, BH);
-    ctx.fillStyle = "#4b565e"; ctx.fillRect(inX - 9, iy - 2, 3, 15); ctx.fillRect(inX + 6, iy - 2, 3, 15);
-    // опорная решётка с шариками очистки под сеткой
-    ctx.fillStyle = "#5c676f"; ctx.fillRect(deck0, D + 13, deck1 - deck0, 2.2);
-    for (let X = deck0; X <= deck1; X += 34) ctx.fillRect(X, D + 2, 2.2, 13);
-    for (let k = 0, X = deck0 + 17; X < deck1; k++, X += 34) {
-      const bx = X + Math.sin(t * 2.3 + k * 1.7) * 9 * (run > 0.2 ? 1 : 0), by = D + 10 - (run > 0.2 ? Math.abs(Math.sin(t * 15 + k * 2.1)) * 6.5 : 0);
-      ctx.beginPath(); ctx.arc(bx, by, 3, 0, TAU); ctx.fillStyle = "#c2412e"; ctx.fill(); ctx.fillStyle = "rgba(255,255,255,.45)"; ctx.beginPath(); ctx.arc(bx - 1, by - 1, 1, 0, TAU); ctx.fill();
-    }
-    // сетка верхней деки (проволока в разрезе) и сплошной порог перед сходом
-    ctx.fillStyle = "#c3ccd1"; ctx.fillRect(deck0, D, deck1 - deck0, 1.3); ctx.fillRect(deck0, D + 2.2, deck1 - deck0, 1);
-    ctx.fillStyle = "#e3e9ec"; for (let X = deck0; X < deck1; X += 2.6) ctx.fillRect(X, D - 0.4, 1.1, 3.4);
-    ctx.fillStyle = "#8d989f"; ctx.fillRect(deck1, D - 0.5, edge - deck1, 3.5);
-    // слой гранул на сетке
-    if (q > 0.02) {
-      ctx.beginPath(); ctx.moveTo(deck0, D); for (let X = deck0; X <= edge; X += 6) ctx.lineTo(X, bedTop(X) + (run > 0.2 ? Math.sin(X / 5 + t * 30) * 0.8 : 0)); ctx.lineTo(edge, D); ctx.closePath();
-      ctx.fillStyle = matPat("pellet", prod); ctx.fill(); ctx.fillStyle = "rgba(20,12,2,.25)"; ctx.fill();
-    }
-    // частицы: шаг модели отделён от отрисовки; когда машина появляется на экране
-    // после перерыва, поток прогоняется заранее — он сразу установившийся
-    const v0 = 26 * run;
-    const step = (dt, tt) => {
-    const ps = st.ps;
-    if (run > 0.2 && q > 0.02) {
-      st.acc += dt * (12 + 34 * q) * run;
-      while (st.acc >= 1 && ps.length < 220) {
-        st.acc -= 1; const fine = Math.random() < 0.28;
-        ps.push({ s: "drop", x: inX + (Math.random() - 0.5) * 9, y: iy + 10, vy: 20, fine, xf: deck0 + 24 + Math.random() * (deck1 - deck0 - 40), ph: Math.random() * 6, v: v0 * (0.8 + Math.random() * 0.4), col: fine ? fcol[(Math.random() * 3) | 0] : cols[(Math.random() * 3) | 0], a: (Math.random() - 0.5) * 0.6 });
-      }
-    } else st.acc = 0;
-    for (const p of ps) {
-      if (p.s === "drop") { p.vy += 500 * dt; p.y += p.vy * dt; if (p.y >= bedTop(p.x) - 1.5) { p.s = "deck"; p.y = bedTop(p.x) - 1.5; } }
-      else if (p.s === "deck") {
-        p.x += p.v * (run > 0.2 ? 1 : 0) * dt;
-        p.y = bedTop(p.x) - 1.5 - (run > 0.2 ? Math.abs(Math.sin(tt * 13 + p.ph)) * (p.fine ? 2 : 3) * run : 0);
-        if (p.fine && p.x >= p.xf && run > 0.2) { p.s = "thru"; p.y = D + 3; p.vy = 30; }
-        else if (p.x >= edge) { p.s = "over"; p.vy = 10; p.vx = p.v * 0.8; }
-      } else if (p.s === "thru") { p.vy += 500 * dt; p.y += p.vy * dt; if (p.y >= panY(p.x) - 1.5) { p.s = "pan"; p.y = panY(p.x) - 1.5; } }
-      else if (p.s === "pan") { p.x -= (run > 0.2 ? 20 : 3) * dt; p.y = panY(p.x) - 1.5 - (run > 0.2 ? Math.abs(Math.sin(tt * 13 + p.ph)) * 1.2 : 0); if (p.x <= panL) { p.s = "fout"; p.vy = 15; } }
-      else if (p.s === "over" || p.s === "fout") { p.vy += 500 * dt; p.y += p.vy * dt; if (p.vx) { p.x += p.vx * dt; p.vx *= 1 - 4 * dt; } if (p.y > BH + 6) p.s = "dead"; }
-    }
-    st.ps = ps.filter((p) => p.s !== "dead");
-    };
-    if (gapT > 0.5) { if (run > 0.2 && q > 0.02) for (let k = 0; k < 200; k++) step(0.05, t - 10 + k * 0.05); else step(0.05, t); }
-    else step(Math.max(0, gapT), t);
-    for (const p of st.ps) {
-      ctx.fillStyle = p.col;
-      if (p.fine) { ctx.fillStyle = "#e6dcc4"; ctx.fillRect(p.x - 1.1, p.y - 1.1, 2.2, 2.2); continue; }
-      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.a + (p.s === "over" ? p.y * 0.05 : 0)); K.rr(-2.8, -1.25, 5.6, 2.5, 1.2); ctx.fill(); ctx.restore();
-    }
-    ctx.restore(); cutFrame(ix, iy, iw, ih, 2);
-    // балка привода и вибродвигатели
-    const mx = 118, mw = 88;
-    ctx.fillStyle = "#4b565e"; ctx.fillRect(mx - 6, -10, mw + 12, 7); ctx.strokeStyle = "#1f282d"; ctx.lineWidth = 0.8; ctx.strokeRect(mx - 6, -10, mw + 12, 7);
-    [[mx - 4, -3], [mx + mw + 4, -3]].forEach(([X, Y]) => { K.path([[X - 5, Y], [X + 5, Y], [X, Y - 7]], true); ctx.fill(); });
-    vibMotor(mx + 10, -36, mw - 8, 22, st.ph2, true);
-    vibMotor(mx, -32, mw - 8, 22, st.ph1, false);
-    led(mx + mw * 0.2, -40, "Pros1", 4.5); led(mx + mw * 0.2 + 14, -40, "Pros2", 4.5);
-    ctx.restore();
-    if (faulty("Pros1") || faulty("Pros2")) faultFrame(n.x, n.y, n.w, n.h);
+    const boxY = (X) => by + ay + (X - bx) * tilt;
+    sleeve(A.Pros.in[0], A.Pros.in[1], A.Pros.in[0] + ax, boxY(A.Pros.in[0]) - 14, 20);
+    sleeve(x + w - 20 + ax, boxY(x + w - 20) + bht - 4, A.Pros.out[0], A.Pros.out[1], 22);
+    sleeve(A.Pros.waste[0] + ax, boxY(A.Pros.waste[0]) + bht - 4, A.Pros.waste[0], A.Pros.waste[1], 18);
   }
 
   // Станция биг-бегов: рама, тельфер на монорельсе, загрузочный рукав, мешок
@@ -1888,6 +1788,7 @@
     mixer: { win: [[0.149, 0.196], [0.787, 0.196], [0.787, 0.50], [0.149, 0.50]], pts: { in: [0.22, 0.0], oil: [0.655, 0.0], out: [0.47, 0.84], top: [0.5, 0.06] } },
     conditioner: { win: [[0.355, 0.33], [0.78, 0.33], [0.78, 0.62], [0.355, 0.62]], pts: { in: [0.21, 0.0], out: [0.935, 0.85], steam: [0.61, 0.06] } },
     cooler: { win: [[0.19, 0.225], [0.70, 0.225], [0.70, 0.622], [0.19, 0.622]], pts: { in: [0.485, 0.0], out: [0.485, 0.90], duct: [0.70, 0.09] } },
+    sifter: { win: [[0.17, 0.21], [0.71, 0.145], [0.71, 0.53], [0.17, 0.595]], pts: { in: [0.165, 0.0], waste: [0.237, 0.79], out: [0.63, 0.812] } },
     scalp: { win: [[0.355, 0.18], [0.773, 0.18], [0.773, 0.61], [0.355, 0.61]], pts: { in: [0.88, 0.0], out: [0.726, 0.915], waste: [0.98, 0.82], asp: [0.35, 0.0] } },
     boiler: { win: [[0.40, 0.357], [0.74, 0.357], [0.74, 0.66], [0.40, 0.66]], pts: { steam: [0.55, 0.0] } },
     tank: { win: [[0.393, 0.164], [0.679, 0.164], [0.679, 0.526], [0.393, 0.526]], pts: {} },
@@ -1917,6 +1818,7 @@
     ["Gran", { spr: "press", w: 390, at: "in" }],
     ["KondGr", { spr: "conditioner", w: 330, at: "out", to: ["Gran", "in", 0, -6] }],
     ["Ohl", { spr: "cooler", h: 290, at: "in" }],
+    ["Pros", { spr: "sifter", w: 360, at: "in" }],
     ["Scalp", { spr: "scalp", flip: true, h: 210, at: "in" }],
     ["boiler", { spr: "boiler", w: 520, at: "steam" }],
     ["tankOil", { spr: "tank", box: true }],
@@ -2080,7 +1982,6 @@
       c.y = Math.min(c.cy1, c.cy2) - c.h0 / 2; c.h = Math.abs(c.cy1 - c.cy2) + c.h0; c.w = c.cx2 - c.x1; }
     // ТЦ 51200 — хвост левее наклонного ТЦ 51100, чтобы корпуса не наезжали
     if (ND.Tr51200 && ND.Tr51100) { const c = ND.Tr51200; c.x1 = 4515; c.x = Math.min(c.x1, c.x2); c.w = Math.abs(c.x2 - c.x1); }
-    layoutSifter();
     chainAnchors();
     LINKS.length = 0; buildLinks(); fitLinks();
   }
@@ -2144,143 +2045,21 @@
     }
   }
   const INSIDE = {
-    // Молотковая дробилка в разрезе вдоль вала: ротор с шарнирными молотками,
-    // сверху рифлёная дека-отбойник с загрузочной горловиной, снизу — сито.
-    // Зерно падает из горловины на ротор, молотки разбивают его на осколки;
-    // осколки носятся по кругу вдоль сита и дробятся повторными ударами, пока
-    // не станут мельче отверстий, тогда проходят сквозь сито вниз — в бункер выпуска.
     crusher(n, wn, run, t) {
-      const c = CT[n.id], fill = c ? Math.min(1, c.mass / 6) : 0, dir = n._spr.flip ? -1 : 1;
-      const cols = (K.matSpec(c && c.prod, "grain") || {}).cols || KIND.grain, meal = KIND.meal;
-      const st = n._grind || (n._grind = { ps: [], t: t - 99, ph: 0, acc: 0, heap: 0 });
-      const gapT = t - st.t; st.t = t; let dt = Math.max(0, Math.min(0.05, gapT));
-      const S0 = Math.min(wn.w, wn.h), cx = wn.x + wn.w / 2, cy = wn.y + wn.h * 0.42;
-      const Rs = S0 * 0.4, Rt = S0 * 0.315, Rp = S0 * 0.19, Rd = S0 * 0.235, gap = Rs - Rt;
-      const sA0 = -0.1 * Math.PI, sA1 = 1.1 * Math.PI;                 // сито: нижние ~200°
-      const inW = S0 * 0.17;                                            // ширина горловины
-      st.ph += dt * run * 1.25 * TAU * dir;
-      const ph = st.ph, bot = wn.y + wn.h;
-      // камера
-      const g = ctx.createRadialGradient(cx, cy, Rd, cx, cy, S0 * 0.75);
-      g.addColorStop(0, "#222b32"); g.addColorStop(1, "#0b1116"); ctx.fillStyle = g; ctx.fillRect(wn.x - 2, wn.y - 2, wn.w + 4, wn.h + 4);
-      // насыпь муки на дне бункера под ситом
-      st.heap += ((run > 0.3 && fill > 0.02 ? 0.5 + fill * 0.5 : fill > 0.02 ? 0.25 : 0) - st.heap) * Math.min(1, dt * 0.8);
-      if (st.heap > 0.02) {
-        const hy = bot - wn.h * 0.14 * st.heap;
-        ctx.beginPath(); ctx.moveTo(wn.x - 2, bot + 2); ctx.lineTo(wn.x - 2, hy + 4);
-        ctx.quadraticCurveTo(cx, hy - 6 * st.heap, wn.x + wn.w + 2, hy + 4); ctx.lineTo(wn.x + wn.w + 2, bot + 2); ctx.closePath();
-        ctx.fillStyle = prodPat("meal"); ctx.fill(); ctx.fillStyle = "rgba(20,12,2,.28)"; ctx.fill();
-      }
-      // мучная взвесь в зоне помола
-      if (run > 0.3 && fill > 0.02) {
-        const hz = ctx.createRadialGradient(cx, cy, Rt * 0.9, cx, cy, Rs + 8);
-        hz.addColorStop(0, "rgba(236,222,180,0)"); hz.addColorStop(0.6, `rgba(236,222,180,${0.10 + 0.14 * fill * run})`); hz.addColorStop(1, "rgba(236,222,180,0)");
-        ctx.fillStyle = hz; ctx.beginPath(); ctx.arc(cx, cy, Rs + 8, 0, TAU); ctx.fill();
-      }
-      // дека-отбойник: рифлёные сегменты сверху, между ними — горловина
-      const gA = Math.asin(Math.min(0.95, inW / 2 / Rs)), up = 1.5 * Math.PI;
-      [[sA1, up - gA], [up + gA, sA0 + TAU]].forEach(([a0, a1]) => {
-        ctx.beginPath(); ctx.arc(cx, cy, Rs + 3, a0, a1); ctx.lineWidth = 6; ctx.strokeStyle = "#5c676f"; ctx.stroke();
-        ctx.fillStyle = "#7d8a93";
-        for (let a = a0 + 0.05; a < a1 - 0.03; a += 0.13) {                 // рифли
-          const p0 = [cx + Math.cos(a) * Rs, cy + Math.sin(a) * Rs], p1 = [cx + Math.cos(a + 0.065) * (Rs - 4), cy + Math.sin(a + 0.065) * (Rs - 4)], p2 = [cx + Math.cos(a + 0.13) * Rs, cy + Math.sin(a + 0.13) * Rs];
-          K.path([p0, p1, p2], true); ctx.fill();
-        }
-      });
-      // горловина: стенки и струя зерна
-      ctx.fillStyle = "#4b565e"; const gx0 = cx - inW / 2, gx1 = cx + inW / 2, gy = cy - Math.cos(gA) * Rs;
-      ctx.fillRect(gx0 - 4, wn.y - 2, 4, gy - wn.y + 4); ctx.fillRect(gx1, wn.y - 2, 4, gy - wn.y + 4);
-      // сито: перфорированная дуга
-      ctx.beginPath(); ctx.arc(cx, cy, Rs + 2.5, sA0, sA1); ctx.lineWidth = 5; ctx.strokeStyle = "#9aa6ad"; ctx.stroke();
-      ctx.beginPath(); ctx.arc(cx, cy, Rs, sA0, sA1); ctx.lineWidth = 1; ctx.strokeStyle = "#d8e0e4"; ctx.stroke();
-      ctx.fillStyle = "#11171c";
-      for (let a = sA0 + 0.02; a < sA1; a += 3.2 / Rs) for (const k of [1.4, 3.6]) { ctx.beginPath(); ctx.arc(cx + Math.cos(a + k * 0.01) * (Rs + k), cy + Math.sin(a + k * 0.01) * (Rs + k), 0.75, 0, TAU); ctx.fill(); }
-      // остановлена с продуктом: зерно лежит на сите
-      if (run < 0.3 && fill > 0.02) {
-        ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, Rs, 0, TAU); ctx.clip();
-        const hy = cy + Rs - gap * (0.6 + 1.6 * fill);
-        ctx.fillStyle = matPat("grain", c && c.prod); ctx.fillRect(cx - Rs, hy, 2 * Rs, Rs); ctx.fillStyle = "rgba(20,12,2,.25)"; ctx.fillRect(cx - Rs, hy, 2 * Rs, Rs);
-        ctx.restore();
-      }
-      // частицы: зерно → осколки → мука (шаг модели; после перерыва — прогон заранее)
-      const step = () => {
-      const ps = st.ps;
-      if (run > 0.3 && fill > 0.02) {
-        st.acc += dt * (14 + 46 * fill) * run;
-        while (st.acc >= 1 && ps.length < 240) { st.acc -= 1; ps.push({ s: "fall", x: cx + (Math.random() - 0.5) * inW * 0.7, y: wn.y - 4, vy: 60 + Math.random() * 50, z: 1, col: cols[(Math.random() * 3) | 0], rot: Math.random() * 3 }); }
-      } else st.acc = 0;
-      const out = [];
-      for (const p of ps) {
-        if (p.s === "fall") {
-          p.vy += 520 * dt; p.y += p.vy * dt;
-          const d = Math.hypot(p.x - cx, p.y - cy);
-          if (d <= Rt + 1 && run > 0.2) {                                  // удар молотка
-            const a = Math.atan2(p.y - cy, p.x - cx);
-            out.push({ s: "dust", x: p.x, y: p.y, life: 0.35, r: 2 });
-            for (let k = 0; k < 3; k++) out.push({ s: "circ", a: a + k * 0.07 * dir, r: Rt + 2 + Math.random() * (gap - 5), w: dir * (5.5 + Math.random() * 3) * run, z: 0.62 - k * 0.08, nx: 0.08 + Math.random() * 0.25, col: p.col });
-            p.s = "dead";
-          } else if (d <= Rd) p.s = "dead";
-        } else if (p.s === "circ") {
-          p.a += p.w * dt; p.r += (Rs - 2.5 - p.r) * Math.min(1, dt * 3);
-          if (Math.abs(p.w) < 3 * run) p.w = dir * 6 * run;                // снова подхвачен молотком
-          p.w *= 1 - 0.35 * dt; p.nx -= dt;
-          if (p.nx <= 0 && p.z > 0.3) {                                     // повторный удар
-            p.z *= 0.68; p.nx = 0.12 + Math.random() * 0.3;
-            if (ps.length + out.length < 260) out.push({ s: "circ", a: p.a - 0.05 * dir, r: p.r - 2, w: p.w * 1.1, z: p.z, nx: p.nx * 1.3, col: p.col });
-            if (Math.random() < 0.3) out.push({ s: "dust", x: cx + Math.cos(p.a) * p.r, y: cy + Math.sin(p.a) * p.r, life: 0.3, r: 1.5 });
-          }
-          const sa = Math.sin(p.a);
-          if (p.z <= 0.3 && sa > -0.2 && p.nx < 0 && Math.random() < dt * 5) {                       // мельче отверстий — сквозь сито
-            p.s = "out"; p.x = cx + Math.cos(p.a) * (Rs + 4); p.y = cy + sa * (Rs + 4);
-            p.vx = -Math.sin(p.a) * p.w * Rs * 0.25 + Math.cos(p.a) * 20; p.vy = Math.max(10, sa * 40); p.col = meal[(Math.random() * 3) | 0];
-          }
-          if (run < 0.15 && Math.abs(p.w) < 0.5) p.s = "dead";
-        } else if (p.s === "out") {
-          p.vy += 420 * dt; p.vx *= 1 - 3 * dt; p.x += p.vx * dt; p.y += p.vy * dt;
-          if (p.y > bot - wn.h * 0.14 * st.heap) p.s = "dead";
-        } else if (p.s === "dust") { p.life -= dt; p.r += dt * 18; if (p.life <= 0) p.s = "dead"; }
-      }
-      st.ps = ps.filter((p) => p.s !== "dead").concat(out);
-      };
-      if (gapT > 0.5 && run > 0.3 && fill > 0.02) { st.heap = 0.5 + fill * 0.5; dt = 0.04; for (let k = 0; k < 60; k++) step(); }
-      else step();
-      // осколки и мука позади ротора не видны — рисуем до ротора только «вылетевшие»
-      for (const p of st.ps) {
-        if (p.s === "out") { ctx.fillStyle = p.col; ctx.fillRect(p.x - 0.8, p.y - 0.8, 1.6, 1.6); }
-        else if (p.s === "dust") { ctx.fillStyle = `rgba(240,228,190,${0.45 * p.life / 0.35})`; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU); ctx.fill(); }
-      }
-      // ротор: диск, пальцы, молотки (на ходу — по радиусу, стоя — висят)
-      ctx.beginPath(); ctx.arc(cx, cy, Rd, 0, TAU);
-      const rg = ctx.createRadialGradient(cx - Rd * 0.3, cy - Rd * 0.3, 1, cx, cy, Rd); rg.addColorStop(0, "#c9d2d8"); rg.addColorStop(1, "#5b666e");
-      ctx.fillStyle = rg; ctx.fill(); ctx.lineWidth = 1.2; ctx.strokeStyle = "#1c252b"; ctx.stroke();
-      if (run > 0.4) {                                                       // размытый след молотков
-        ctx.beginPath(); ctx.arc(cx, cy, (Rp + Rt) / 2, 0, TAU); ctx.lineWidth = Rt - Rp; ctx.strokeStyle = `rgba(200,210,218,${0.12 * run})`; ctx.stroke();
-      }
-      const hang = Math.max(0, Math.min(1, (run - 0.15) / 0.35));
-      for (let i = 0; i < 4; i++) {
-        const a = ph + i * TAU / 4, px = cx + Math.cos(a) * Rp, py = cy + Math.sin(a) * Rp;
-        let ha = Math.PI / 2 + (((a - Math.PI / 2) % TAU + TAU + Math.PI) % TAU - Math.PI) * hang; // от «вниз» к радиальному
-        for (let gh = run > 0.5 ? 3 : 0; gh >= 0; gh--) {
-          const b = ha - gh * 0.16 * dir * run;
-          ctx.save(); ctx.translate(px, py); ctx.rotate(b); ctx.globalAlpha = gh ? 0.18 : 1;
-          K.rr(-3, -3.4, Rt - Rp + 3, 6.8, 2); ctx.fillStyle = gh ? "#c8d1d6" : K.pat("brushed"); ctx.fill();
-          if (!gh) { ctx.lineWidth = 0.9; ctx.strokeStyle = "#1c252b"; ctx.stroke(); ctx.fillStyle = "#3a444b"; ctx.fillRect(Rt - Rp - 3, -3.4, 3, 6.8); }
-          ctx.restore();
-        }
-        ctx.globalAlpha = 1;
-        ctx.beginPath(); ctx.arc(px, py, 2.6, 0, TAU); ctx.fillStyle = "#2a343b"; ctx.fill();
-      }
-      ctx.beginPath(); ctx.arc(cx, cy, Rd * 0.3, 0, TAU); ctx.fillStyle = "#39434a"; ctx.fill();
-      ctx.save(); ctx.translate(cx, cy); ctx.rotate(ph); ctx.fillStyle = "#1b2329"; ctx.fillRect(-1.5, -Rd * 0.3, 3, Rd * 0.14); ctx.restore();
-      // зерно в полёте и осколки у сита — поверх ротора
-      for (const p of st.ps) {
-        if (p.s === "fall") { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.col; ctx.beginPath(); ctx.ellipse(0, 0, 2.2, 1.3, 0, 0, TAU); ctx.fill(); ctx.restore(); }
-        else if (p.s === "circ") {
-          const L = Math.min(0.5, Math.abs(p.w) * 0.035), x0 = cx + Math.cos(p.a - L * dir) * p.r, y0 = cy + Math.sin(p.a - L * dir) * p.r, x1 = cx + Math.cos(p.a) * p.r, y1 = cy + Math.sin(p.a) * p.r;
-          ctx.strokeStyle = p.col; ctx.globalAlpha = 0.35; ctx.lineWidth = 1.6 * p.z + 0.4; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); ctx.globalAlpha = 1;
-          ctx.fillStyle = p.col; const s = 0.8 + 2 * p.z; ctx.fillRect(x1 - s / 2, y1 - s / 2, s, s);
-        }
-      }
+      const m = M[n.id], c = CT[n.id], z = n._spr, [rx, ry] = z.P(z.sp.rotor), fill = c ? Math.min(1, c.mass / 6) : 0;
+      if (m) m._ph = (m._ph || 0) + run * 0.75;
+      if (run > 0.15) {
+        dim(wn, 0.72);
+        const R = wn.h * 0.36, ph = m ? m._ph : 0;
+        // кольцо измельчаемого продукта у сита и вихрь частиц
+        if (fill > 0.02) { ctx.fillStyle = prodPat("meal"); ctx.globalAlpha = 0.85; ctx.fillRect(wn.x, wn.y + wn.h * (0.86 - 0.12 * fill), wn.w, wn.h); ctx.globalAlpha = 1; }
+        ctx.fillStyle = "rgba(200,210,216,.16)"; ctx.fillRect(wn.x, ry - R - 6, wn.w, 2 * R + 12);
+        ctx.fillStyle = K.pat("brushed"); ctx.fillRect(wn.x, ry - 6, wn.w, 12); ctx.strokeStyle = "#1c252b"; ctx.lineWidth = 0.8; ctx.strokeRect(wn.x, ry - 6, wn.w, 12);
+        shaftBlades(wn.x + 6, wn.x + wn.w - 6, ry, R, 6, ph, false, { step: 1.9, bw: 16, th: 9, arm: 4 });
+        shaftBlades(wn.x + 6, wn.x + wn.w - 6, ry, R, 6, ph, true, { step: 1.9, bw: 16, th: 9, arm: 4 });
+        if (fill > 0.02) { ctx.fillStyle = kc("grain", 0); for (let k = 0; k < 28; k++) { const X = wn.x + ((hash(k) * wn.w + t * 900 * (k % 2 ? 1 : -1)) % wn.w + wn.w) % wn.w, Y = ry + Math.sin(t * 30 + k) * R * 1.05; ctx.fillRect(wn.x + (X - wn.x), Y, 3, 2); } }
+        ctx.fillStyle = "rgba(220,205,160,.18)"; ctx.fillRect(wn.x, wn.y, wn.w, wn.h);   // мучная пыль
+      } else if (fill > 0.02) bulk(wn.x, wn.w, wn.y + wn.h - wn.h * 0.3 * fill, wn.y + wn.h, "grain", 6);
     },
     press(n, wn, run, t) {
       const m = M[n.id], flow = (S.granFlow || 0) > 0.05 && run > 0.3;
@@ -2335,6 +2114,18 @@
         const g = ctx.createLinearGradient(0, top, 0, wn.y + wn.h); g.addColorStop(0, `rgba(255,${Math.round(120 - 60 * tc)},40,${0.1 + 0.4 * tc})`); g.addColorStop(1, "rgba(30,20,10,.35)"); ctx.fillStyle = g; ctx.fill();
       }
       if (air) { ctx.strokeStyle = "rgba(200,225,255,.6)"; ctx.lineWidth = 1.6; for (let k = 0; k < 8; k++) { const X = wn.x + 10 + k * (wn.w - 20) / 7, s2 = (t * 0.7 + k * 0.13) % 1, Y = wn.y + wn.h - s2 * wn.h; ctx.beginPath(); ctx.moveTo(X, Y + 14); ctx.quadraticCurveTo(X + 4, Y + 7, X, Y); ctx.stroke(); } }
+    },
+    sifter(n, wn, run, t) {
+      const q = Math.min(1, elMass("Pros") / 12), z = n._spr;
+      if (q < 0.02) return;
+      // две наклонные деки спрайта: слой гранул движется к выпуску, мелочь сыплется вниз
+      [[0.30, 0.235, 0.36], [0.45, 0.385, 0.51]].forEach(([yl, yr, yb], i) => {
+        const [x0, y0] = z.P([0.18, yl]), [x1, y1] = z.P([0.70, yr]), lay = (i ? 5 : 8) + 10 * q;
+        ctx.save(); ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.lineTo(x1, y1 - lay); ctx.lineTo(x0, y0 - lay); ctx.closePath(); ctx.clip();
+        ctx.translate(((t * 50 * run) % 64), 0); ctx.fillStyle = prodPat(i ? "fines" : "pellet"); ctx.fillRect(Math.min(x0, x1) - 70, Math.min(y0, y1) - lay - 6, Math.abs(x1 - x0) + 140, Math.abs(y1 - y0) + lay + 12);
+        ctx.restore();
+      });
+      if (run > 0.2) { ctx.fillStyle = kc("fines", 1); for (let k = 0; k < 24; k++) { const X = wn.x + 8 + ((k * 41) % (wn.w - 16)), Y = wn.y + wn.h * 0.35 + ((t * 70 + k * 11) % (wn.h * 0.6)); ctx.fillRect(X, Y, 2, 2); } }
     },
     scalp(n, wn, run, t) {
       // барабанный скальператор: перфорированный цилиндр на горизонтальном валу.
@@ -2704,6 +2495,7 @@
         return;
       }
       case "sifter":
+        [["Pros1", 0.83, 0.3], ["Pros2", 0.83, 0.42]].forEach(([id, fx, fy]) => led(...z.P([fx + 0.12, fy]), id, 5));
         break;
       case "scalp": led(...z.P([0.25, 0.3]), n.id, 6); break;
       case "boiler": {

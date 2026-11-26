@@ -166,6 +166,7 @@
     // налив биг-бэга: мешок подвешен на позиции налива (поз. 1), опущен, затвор открыт
     S.bagFill = !!(S.bagValve && S.leb && V.Leb_Dn && V.Leb_Pol1 && S.bagOn && C.s10.mass > 0 && C.bigbag.mass < C.bigbag.cap);
     if (S.bagFill) { const a = takeFrom("s10", 2 * dt); C.s10.mass += a - accept("bigbag", a, "pellet", C.s10.prod); }
+    if (S.bagValve && C.bigbag.mass >= C.bigbag.cap - 0.5) { S.bagValve = false; P.log("Биг-бэг наполнен — затвор бункера 310 закрыт"); }
     // новый пустой мешок подвешивают, когда тележка вернулась на налив
     if (!S.bagOn && V.Leb_Pol1 && S.fork.phase === "away") S.bagOn = true;
     // погрузчик: мешок выдан на поз. 2 — подъезжает с той стороны, куда ушёл мешок,

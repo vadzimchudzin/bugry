@@ -12,7 +12,7 @@
   let cv, ctx, scale = 1, offX = 0, offY = 0, hover = null, selected = null;
   let fitScale = 1, zoom = 1, panX = 0, panY = 0;
   const IMG = {};
-  const SPRITES = ["truck", "magnet"];
+  const SPRITES = ["truck", "magnet", "logo"];
   const K = global.RKIT;
   let VOPT = { labels: true, pipes: true, tags: true, levels: true };
   const TAU = Math.PI * 2;
@@ -2521,6 +2521,12 @@
           label(tt, X + r * 2.2, Y + 6, { size: 15, w: 800, align: "left" });
         });
         if (V.EmerStopShkaf) { const [X, Y] = z.P(z.sp.pts.es); ctx.beginPath(); ctx.arc(X, Y, h * 0.09, 0, TAU); ctx.fillStyle = "rgba(255,80,60,.45)"; ctx.fill(); }
+        if (IMG.logo) {   // фирменная табличка SYSAT на средней дверце
+          const im = IMG.logo, [cx, cy] = z.P([0.502, 0.66]), pw = w * 0.15, ph = pw * im.height / im.width, px = cx - pw / 2, py = cy - ph / 2;
+          K.rr(px - 6, py - 5, pw + 12, ph + 10, 2.5); ctx.fillStyle = "#f6f7f4"; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = "#8d969b"; ctx.stroke();
+          ctx.drawImage(im, px, py, pw, ph);
+          [[px - 2.5, py - 1.5], [px + pw + 2.5, py - 1.5], [px - 2.5, py + ph + 1.5], [px + pw + 2.5, py + ph + 1.5]].forEach(([rx, ry]) => { ctx.beginPath(); ctx.arc(rx, ry, 1.4, 0, TAU); ctx.fillStyle = "#9aa1a5"; ctx.fill(); });
+        }
         const [hx, hy] = z.P(z.sp.pts.hmi); ctx.fillStyle = "rgba(90,200,255,.55)"; ctx.fillRect(hx - w * 0.04, hy - h * 0.04, w * 0.08, h * 0.08);
         label(n.label, x + w / 2, y - 14, { size: 18 }); return;
       }

@@ -45,10 +45,10 @@
 
   // ---------------- дробление
   noria("Nor2", 2040, 140, 1120, "20200");
-  screw("TrPBD", 2150, 2440, 210, { poz: "20300" });
-  bunker("PBD", 2400, 250, 470, 370, { poz: "30100", label: "НДБ", level: "PBD", kindB: "hopper2", outs: [2272, 2528] });
-  screw("Pit1", 2250, 2345, 530, { poz: "30210", small: true, pch: true });
-  screw("Pit2", 2550, 2455, 530, { poz: "30220", small: true, pch: true });
+  screw("TrPBD", 2150, 2420, 210, { poz: "20300" });
+  bunker("PBD", 2336, 250, 450, 150, { poz: "30100", label: "НДБ", level: "PBD", kindB: "hopper2", ecc: true });   // по ТС: скошенная воронка, выпуск у правой стенки
+  screw("Pit1", 2370, 2275, 530, { poz: "30210", small: true, pch: true, motorOut: true });   // по ТС: загрузка с внутреннего конца, выпуск — с наружного
+  screw("Pit2", 2430, 2525, 530, { poz: "30220", small: true, pch: true, motorOut: true });
   N("mag1", { kind: "magnet", x: 2335, y: 552, w: 46, h: 54, poz: "30310" });
   N("mag2", { kind: "magnet", x: 2420, y: 552, w: 46, h: 54, poz: "30320" });
   N("Drob1", { kind: "crusher", drive: "Drob1", x: 2140, y: 640, w: 230, h: 320, poz: "30410", motor: "left", hx: 2300 });

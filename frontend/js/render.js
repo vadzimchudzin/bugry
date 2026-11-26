@@ -258,7 +258,7 @@
     { const bi = A.Nor4.sin || [A.Nor4.in[0] + 120, A.Nor4.in[1]]; L(A.Tr51200.out, bi, flowOf("Tr51200"), () => "pellet", { pts: [A.Tr51200.out, [A.Tr51200.out[0], bi[1] - 10], [bi[0] + 6, bi[1] - 10], bi] }); }
     L(A.Nor7.out, A.b309.in, flowOf("Nor7"), () => "pellet", { pts: [A.Nor7.out, [4930, 1358], A.b309.in] });
     L([4930, 1990], [4930, 2060], () => (M.ShO9.pos > 0.3 && CT.s9.mass > 5 ? 5 : 0), () => "pellet", { w: 14 });
-    if (A.Leb && A.Leb.in) L(A.Torba.out, A.Leb.in, () => (V.Go_Leb && CT.Torba && CT.Torba.mass > 1 ? 2 : 0), () => "pellet", { pts: [A.Torba.out, A.Leb.in] });
+    if (A.Leb && A.Leb.in) L(A.Torba.out, A.Leb.in, () => (S.bagFill ? 2 : 0), () => "pellet", { pts: [A.Torba.out, A.Leb.in] });
     L(A.Tr40800.out, A.Tr40100.in, flowOf("Tr40800"), () => "fines", { pts: [[3200, 2400], [3175, 2400]] });
   }
   // аспирационные воздуховоды (пунктир)
@@ -1135,11 +1135,18 @@
   function truckX(id) { const t = S.trucks[id]; return t ? t.x * 420 * (ND[id].flip ? 1 : -1) : 0; }
   function drawTruck(n) {
     const t = S.trucks[n.id]; if (!t || t.phase === "away") return;
-    const fl = n.id === "truck_in" ? n.flip : t.phase === "leave";
-    const im = IMG[fl ? "truck_flip" : "truck"]; const x = n.x + truckX(n.id) - (n.id !== "truck_in" && !fl ? n.w * 0.38 : 0), y = n.y;
+    // самосвал ямы приезжает гружёным передом; машины отгрузки сдают пустыми задом под бункер
+    // и после погрузки уезжают передом обратно — через механизмы не едут
+    const fl = n.id === "truck_in" ? n.flip : true;
+    const im = IMG[fl ? "truck_flip" : "truck"]; const x = n.x + truckX(n.id), y = n.y;
     ctx.save();
     if (n.id === "truck_in" && t.tilt) { ctx.translate(x + n.w * 0.85, y + n.h * 0.8); ctx.rotate(-0.08 * t.tilt); ctx.translate(-(x + n.w * 0.85), -(y + n.h * 0.8)); }
-    if (im) ctx.drawImage(im, x, y, n.w, n.w * im.height / im.width);
+    if (im) {
+      // насыпь, нарисованная в картинке, срезается — груз рисуется по фактической загрузке
+      const ih = n.w * im.height / im.width, bx0 = fl ? x + n.w * 0.01 : x + n.w * 0.39;
+      ctx.save(); ctx.beginPath(); ctx.rect(x - 2, y - 40, n.w + 4, ih + 44); ctx.rect(bx0, y - 40, n.w * 0.61, 40 + ih * 0.132); ctx.clip("evenodd");
+      ctx.drawImage(im, x, y, n.w, ih); ctx.restore();
+    }
     const load = Math.max(0, Math.min(1, t.load || 0));
     if (load > 0.01) {
       const bx = fl ? x + n.w * 0.02 : x + n.w * 0.40, bw = n.w * 0.58, by = y + n.h * 0.13;
@@ -1571,7 +1578,8 @@
     trash: { win: [[0.07, 0.06], [0.93, 0.06], [0.9, 0.2], [0.1, 0.2]], pts: { in: [0.5, 0.03] } },
     pit: { win: [[0.12, 0.09], [0.88, 0.09], [0.60, 0.71], [0.40, 0.71]], pts: { in: [0.5, 0.05], out: [0.5, 0.885] }, grate: 0.046, wall: [0.90, 0.952], floor: 0.93 },
     oilscale: { win: [[0.33, 0.3], [0.58, 0.3], [0.58, 0.56], [0.33, 0.56]], pts: { in: [0.25, 0.0], out: [0.45, 0.85] } },
-    bigbag: { pts: { in: [0.38, 0.0], spout: [0.38, 0.35], out: [0.38, 0.95] } },
+    bigbag: { pts: { in: [0.395, 0.0], head: [0.395, 0.17], spout: [0.395, 0.37], out: [0.395, 0.95] }, roll: 0.795, rollL: 0.0, rollR: 0.665 },
+    forklift: { pts: {}, mast: 0.225, fork: 0.925 },
     fan: { circle: [0.64, 0.5, 0.15], pts: { in: [0.27, 0.49], out: [0.85, 0.0] } },
     gearmotor: { win: [[0.515, 0.1], [0.88, 0.1], [0.88, 0.85], [0.515, 0.85]], pul: [0.78, 0.48, 0.1], pts: { hub: [0.70, 0.48] } },
     cabinet: { pts: { lr: [0.502, 0.164], ly: [0.502, 0.273], lg: [0.502, 0.38], es: [0.823, 0.44], hmi: [0.175, 0.25] } },
@@ -2051,6 +2059,60 @@
   };
   // без привода — не гасятся
   const PASSIVE = new Set(["pit", "diverter", "bigbag", "cabinet", "tank", "oilscale", "trash", "filter", "sluice"]);
+  // ---------- станция биг-бэгов: мешок, рольганг выдачи, погрузчик
+  function bagGeo(n, z) {
+    const sp = z.sp, [sx] = z.P(sp.pts.spout), roll = z.oy + sp.roll * z.H, bw = z.W * 0.25, bh = z.H * 0.43;
+    const side = S.bagSide < 0 ? -1 : 1, ex = side < 0 ? z.ox - bw / 2 - 14 : z.ox + z.W + bw / 2 + 14;
+    return { sx, roll, bw, bh, side, ex, floor: z.oy + z.H };
+  }
+  function drawBagShape(cx, bottom, bw, bh, fr, t, hung) {
+    const bxx = cx - bw / 2, by = bottom - bh, k = 0.5 + 0.5 * fr;
+    ctx.beginPath(); ctx.moveTo(bxx + 6, by); ctx.lineTo(bxx + bw - 6, by);
+    ctx.quadraticCurveTo(bxx + bw + 6 * fr, by + bh * 0.5, bxx + bw - 3, bottom); ctx.lineTo(bxx + 3, bottom); ctx.quadraticCurveTo(bxx - 6 * fr, by + bh * 0.5, bxx + 6, by); ctx.closePath();
+    const gb = ctx.createLinearGradient(bxx, 0, bxx + bw, 0); gb.addColorStop(0, "#cfc8b2"); gb.addColorStop(0.45, "#f4f0e2"); gb.addColorStop(1, "#bdb59c"); ctx.fillStyle = gb; ctx.fill();
+    ctx.save(); ctx.clip();
+    if (fr > 0.01) { ctx.globalAlpha = 0.28; ctx.fillStyle = K.material("гранул", "pellet", KIND.pellet); ctx.fillRect(bxx, bottom - bh * fr, bw, bh * fr); ctx.globalAlpha = 1; ctx.fillStyle = "rgba(90,60,30,.25)"; ctx.fillRect(bxx, bottom - bh * fr, bw, 2); }
+    ctx.strokeStyle = "rgba(150,140,115,.35)"; ctx.lineWidth = 0.6; for (let yy = by; yy < bottom; yy += 3) { ctx.beginPath(); ctx.moveTo(bxx, yy); ctx.lineTo(bxx + bw, yy); ctx.stroke(); }
+    ctx.restore(); ctx.lineWidth = 1.2; ctx.strokeStyle = "#8d8573"; ctx.stroke();
+    ctx.fillStyle = "#2f6db5"; [bxx + 7, bxx + bw - 13].forEach((X) => ctx.fillRect(X, by - (hung ? 10 : 4), 6, bh * 0.4 + (hung ? 10 : 4)));   // стропы
+    ctx.fillStyle = "#e9e4d3"; ctx.fillRect(cx - bw * 0.12, by - 8, bw * 0.24, 10); ctx.strokeStyle = "#8d8573"; ctx.strokeRect(cx - bw * 0.12, by - 8, bw * 0.24, 10);   // загрузочный рукав
+  }
+  function bagBehind(n, z, t) {
+    if (!S.bagOn) return;
+    const g = bagGeo(n, z), lb = S.leb, c = CT.bigbag, fr = Math.min(1, c.mass / c.cap);
+    const cx = g.sx + (g.ex - g.sx) * (lb.x || 0), lift = (lb.x || 0) < 0.02 ? 30 * (1 - (lb.y || 0)) : 0;
+    drawBagShape(cx, g.roll - lift, g.bw, g.bh, fr, t, (lb.x || 0) < 0.02);
+  }
+  function rollers(x0, x1, roll, floor, ph) {
+    const a = Math.min(x0, x1), b = Math.max(x0, x1), H = 12;
+    ctx.fillStyle = "#4a555d"; ctx.fillRect(a, roll + 7, b - a, 8); ctx.fillStyle = "#2c353b"; ctx.fillRect(a, roll + 15, b - a, 2);
+    for (let X = a + 8; X < b - 4; X += 34) { ctx.fillStyle = "#39434a"; ctx.fillRect(X, roll + 17, 6, floor - roll - 21); ctx.fillStyle = "#1e2428"; ctx.fillRect(X - 4, floor - 6, 14, 6); }
+    for (let X = a + 6; X < b - 4; X += 11) {
+      const g2 = ctx.createLinearGradient(0, roll, 0, roll + H); g2.addColorStop(0, "#c9d1d6"); g2.addColorStop(0.5, "#7e8a92"); g2.addColorStop(1, "#3c464d");
+      ctx.beginPath(); ctx.arc(X, roll + 5, 5, 0, TAU); ctx.fillStyle = g2; ctx.fill(); ctx.strokeStyle = "#20292f"; ctx.lineWidth = 0.6; ctx.stroke();
+      const a2 = ph + X * 0.3; ctx.strokeStyle = "rgba(30,36,40,.7)"; ctx.beginPath(); ctx.moveTo(X, roll + 5); ctx.lineTo(X + Math.cos(a2) * 4, roll + 5 + Math.sin(a2) * 4); ctx.stroke();
+    }
+  }
+  function forklift(n, z, t) {
+    const f = S.fork, im = IMG.m_forklift; if (!im || f.phase === "away") return;
+    const g = bagGeo(n, z), side = f.side < 0 ? -1 : 1, FH = z.H * 0.62, FW = FH * im.width / im.height, sp = MSPR.forklift;
+    // вилы под мешком: острия до середины мешка; подъезд — с выбранной стороны
+    const drive = side * f.x * 520, tipX = g.ex - side * g.bw * 0.05 + drive, mastX = tipX + side * FW * 0.2, forkY = g.roll + 2 - f.lift * 26;
+    const left = side > 0 ? mastX - sp.mast * FW : mastX - (1 - sp.mast) * FW, top = g.floor - FH;
+    const key = side > 0 ? "m_forklift" : "m_forklift_flip";
+    ctx.save();
+    // родные вилы спрайта у пола вырезаем — вместо них каретка с вилами на нужной высоте
+    ctx.beginPath(); ctx.rect(left - 2, top - 2, FW + 4, FH + 4);
+    const fx0 = side > 0 ? left - 2 : left + (1 - sp.mast) * FW, fx1 = side > 0 ? left + sp.mast * FW : left + FW + 2;
+    ctx.rect(fx1, top + FH * 0.84, fx0 - fx1, FH * 0.17); ctx.clip("evenodd");
+    ctx.drawImage(mipImg(key, FW), left, top, FW, FH); ctx.restore();
+    ctx.fillStyle = "#2b3136"; ctx.fillRect(mastX - (side > 0 ? 3 : 0), forkY - 24, 4, 26);                          // каретка
+    ctx.fillStyle = "#3a4248"; ctx.fillRect(Math.min(mastX, tipX - side * 6), forkY, Math.abs(mastX - tipX) + 6, 4);   // вилы
+    ctx.fillStyle = "#5d676e"; ctx.fillRect(Math.min(mastX, tipX - side * 6), forkY, Math.abs(mastX - tipX) + 6, 1.2);
+    if (f.load > 0) drawBagShape(mastX - side * (g.bw / 2 + 2), forkY, g.bw, g.bh, Math.min(1, f.load / CT.bigbag.cap), t, false);
+    const st = { arrive: "погрузчик подъезжает", lift: "подъём мешка", leave: "вывоз мешка" }[f.phase];
+    if (st) badge(st, mastX + side * FW * 0.4, top - 12, { size: 11 });
+  }
   function drawMach(n) {
     const z = n._spr, im = IMG[z.img], t = T(), m = M[n.id === "Pros" ? "Pros1" : n.id];
     const run = n.id === "Pros" ? Math.max(M.Pros1.spin, M.Pros2.spin) : m ? m.spin : 0;
@@ -2060,6 +2122,7 @@
     if (n.kind === "compressor" && running("compr")) { jy = Math.sin(t * 90) * 0.6; }
     ctx.save(); ctx.translate(jx, jy);
     ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+    if (n.kind === "bigbag") bagBehind(n, z, t);
     drawLit(z.img, z.W, z.ox, z.oy, z.H, PASSIVE.has(n.kind) ? 1 : run);
     const wn = machWin(n), f = INSIDE[z.name];
     if (wn && f) { ctx.save(); clipWin(wn); f(n, wn, run, t); ctx.restore(); }
@@ -2236,17 +2299,26 @@
         label("УДЖК", x + w / 2, y - 12, { size: 16 }); led(...z.P([0.82, 0.12]), "Jir", 5); return;
       }
       case "bigbag": {
-        const lb = S.leb, c = CT.bigbag, fr = Math.min(1, c.mass / c.cap), [sx, sy] = z.P(z.sp.pts.spout);
-        const bx = sx + (lb.x || 0) * w * 0.45, by = sy + 8 + (lb.y || 0) * 30, bw = w * 0.26 + w * 0.05 * fr, bh = h * 0.42, bxx = bx - bw / 2;
-        ctx.beginPath(); ctx.moveTo(bxx + 6, by); ctx.lineTo(bxx + bw - 6, by);
-        ctx.quadraticCurveTo(bxx + bw + 5 * fr, by + bh * 0.5, bxx + bw - 4, by + bh); ctx.lineTo(bxx + 4, by + bh); ctx.quadraticCurveTo(bxx - 5 * fr, by + bh * 0.5, bxx + 6, by); ctx.closePath();
-        const gb = ctx.createLinearGradient(bxx, 0, bxx + bw, 0); gb.addColorStop(0, "#cfc8b2"); gb.addColorStop(0.45, "#f4f0e2"); gb.addColorStop(1, "#bdb59c"); ctx.fillStyle = gb; ctx.fill();
-        ctx.save(); ctx.clip();
-        if (fr > 0.01) { ctx.globalAlpha = 0.3; bulk(bxx, bw, by + bh - bh * fr, by + bh, "pellet", 10); ctx.globalAlpha = 1; }
-        ctx.strokeStyle = "rgba(150,140,115,.35)"; ctx.lineWidth = 0.6; for (let yy = by; yy < by + bh; yy += 3) { ctx.beginPath(); ctx.moveTo(bxx, yy); ctx.lineTo(bxx + bw, yy); ctx.stroke(); }
-        ctx.restore(); ctx.lineWidth = 1.2; ctx.strokeStyle = "#8d8573"; ctx.stroke();
-        ctx.fillStyle = "#2f6db5"; [bxx + 8, bxx + bw - 14].forEach((X) => ctx.fillRect(X, by - 6, 6, bh * 0.45));
-        if (V.Go_Leb && fr < 1 && !(lb.x > 0.05)) { ctx.fillStyle = kc("pellet", 1); for (let k = 0; k < 8; k++) ctx.fillRect(sx - 4 + (k % 3) * 3, sy + ((t * 80 + k * 5) % 16), 3, 5); }
+        const g = bagGeo(n, z), lbm = S.leb, ph = (lbm.x || 0) * 40;
+        rollers(g.side < 0 ? z.ox + z.W * z.sp.rollL + 4 : z.ox + z.W - 6, g.ex + g.side * (g.bw / 2 + 12), g.roll, g.floor, ph);
+        if (S.bagOn && (lbm.x || 0) > 0.02) {
+          const cx = g.sx + (g.ex - g.sx) * lbm.x, hid = g.side > 0 ? cx - g.bw / 2 < z.ox + z.W : cx + g.bw / 2 > z.ox;   // выходит из-за рамы
+          if (hid) { ctx.save(); ctx.beginPath(); g.side > 0 ? ctx.rect(z.ox + z.W, g.roll - g.bh - 20, 999, g.bh + 30) : ctx.rect(z.ox - 999, g.roll - g.bh - 20, 999, g.bh + 30); ctx.clip(); drawBagShape(cx, g.roll, g.bw, g.bh, Math.min(1, CT.bigbag.mass / CT.bigbag.cap), t, false); ctx.restore(); }
+          else drawBagShape(cx, g.roll, g.bw, g.bh, Math.min(1, CT.bigbag.mass / CT.bigbag.cap), t, false);
+        }
+        // течка: выпуск бункера 310 → задвижка → патрубок через балку → наливная головка
+        const [hx, hy] = z.P(z.sp.pts.head), to = A.Torba && A.Torba.out;
+        if (to) {
+          K.pipe([[to[0], to[1] - 4], [hx, hy + 2]], 16, { kind: "galv" });
+          K.flange(hx, hy - 1, 0, 1, 16); K.flange(hx, z.oy + 2, 0, 1, 18); K.flange(to[0], to[1] + 2, 0, 1, 16);
+          const gy = to[1] + 10, open = !!S.bagValve;
+          K.rr(to[0] - 15, gy, 30, 11, 2); K.skin("paint", null, "#1f2a30", 1); ctx.fillStyle = open ? "#47e07a" : "#c0392b"; ctx.fillRect(to[0] + 9, gy + 3, 4, 5);
+          ctx.strokeStyle = "#2a343b"; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(to[0] + 15, gy + 5); ctx.lineTo(to[0] + 26, gy + 5); ctx.stroke(); ctx.beginPath(); ctx.arc(to[0] + 29, gy + 5, 4, 0, TAU); ctx.stroke();
+          badge(open ? "затвор откр." : "затвор закр.", to[0] - 58, gy + 6, { size: 10, edge: open ? "#47e07a" : "#89a0b3", color: open ? "#5cf08a" : "#d7e5f0" });
+        }
+        forklift(n, z, t);
+        const [sx, sy] = z.P(z.sp.pts.spout);
+        if (S.bagFill) { const cols = (K.matSpec("гранул", "pellet") || {}).cols || KIND.pellet; for (let k = 0; k < 12; k++) { ctx.fillStyle = cols[k % 3]; ctx.fillRect(sx - 5 + (k % 4) * 3, sy + ((t * 70 + k * 5) % 18), 3, 5); } }
         led(...z.P([0.9, 0.4]), "Leb", 6); return;
       }
       case "cabinet": {
@@ -2296,6 +2368,7 @@
       if (id === "TrGP" || id === "Tr50300" || id === "Tr50400") y = n.cy - 24;
       if (n.kind === "diverter") { x = n.x - 8; y = n.y + 20; align = "right"; }
       if (id === "TrHole") { x = (n.x1 + n.x2) / 2 + 40; y = (n.y1 + n.y2) / 2 + 34; align = "left"; }
+      if (id === "Leb") { x = n.x + n.w * 0.83; y = n.y - 10; }
       if (id === "KondGr") { x = n.x - 12; y = n.y + n.h * 0.62; align = "right"; }
       if (id === "PitGr") { x = 2560; y = 1608; align = "right"; }
       if (id === "Tr40300") y = n.cy - 26;

@@ -311,8 +311,13 @@
           btn("btn-sw", "◀ Поз. 1", () => { x.to1 = true; x.to2 = false; }), btn("btn-sw", "Поз. 2 ▶", () => { x.to2 = true; x.to1 = false; })));
         b.append(row("Затвор бункера 51300 (наполнение мешка)", toggle(() => S.bagValve, (v) => { S.bagValve = v; }, up)));
         b.append(row("В мешке", val(() => fmtKg(C.bigbag.mass), up)));
-        b.append(row("Заменить мешок", h("button", { class: "btn-sw", type: "button", onclick: () => { C.bigbag.mass = 0; toast("Новый мешок подвешен"); } }, "Заменить")));
-        b.append(note("Наполнение идёт, когда мешок опущен (Leb_Dn) и открыт затвор бункера."));
+        b.append(row("Выдача мешка (поз. 2)", h("div", { class: "btn-row" },
+          btn("btn-sw", "◀ Влево", () => { S.bagSide = -1; }), btn("btn-sw", "Вправо ▶", () => { S.bagSide = 1; }))));
+        b.append(row("Сторона выдачи", val(() => (S.bagSide < 0 ? "влево" : "вправо"), up)));
+        b.append(row("Погрузчик", val(() => ({ away: "ожидает", arrive: "подъезжает", lift: "поднимает мешок", leave: "увозит мешок" })[S.fork.phase], up)));
+        b.append(row("Вывезено мешков", val(() => String(S.bagsOut), up)));
+        b.append(row("Заменить мешок", h("button", { class: "btn-sw", type: "button", onclick: () => { C.bigbag.mass = 0; S.bagOn = true; toast("Новый мешок подвешен"); } }, "Заменить")));
+        b.append(note("Поз. 1 — налив под головкой: мешок опущен и открыт затвор бункера 310. Поз. 2 — мешок уезжает по рольгангу в выбранную сторону, его забирает погрузчик. Новый мешок подвешивают, когда тележка вернётся в поз. 1."));
       },
     });
   }

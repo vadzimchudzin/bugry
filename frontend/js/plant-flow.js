@@ -163,7 +163,24 @@
     if (fan > 0.5 && S.granFlow > 0.05) accept("cyc", S.granFlow * 0.015 * dt, "fines");
     if ((M.AspGr.spinGw || 0) > 0.5 && C.cyc.mass > 0) { const a = takeFrom("cyc", 0.4 * dt); C.cyc.mass += a - feed(EL.Tr40800, a, "fines"); }
     // ---- биг-бег: затвор под бункером 51300
-    if (S.bagValve && S.leb && V.Leb_Dn && C.s10.mass > 0) { const a = takeFrom("s10", 2 * dt); C.s10.mass += a - accept("bigbag", a, "pellet", C.s10.prod); }
+    // налив биг-бэга: мешок подвешен на позиции налива (поз. 1), опущен, затвор открыт
+    S.bagFill = !!(S.bagValve && S.leb && V.Leb_Dn && V.Leb_Pol1 && S.bagOn && C.s10.mass > 0 && C.bigbag.mass < C.bigbag.cap);
+    if (S.bagFill) { const a = takeFrom("s10", 2 * dt); C.s10.mass += a - accept("bigbag", a, "pellet", C.s10.prod); }
+    // новый пустой мешок подвешивают, когда тележка вернулась на налив
+    if (!S.bagOn && V.Leb_Pol1 && S.fork.phase === "away") S.bagOn = true;
+    // погрузчик: мешок выдан на поз. 2 — подъезжает с той стороны, куда ушёл мешок,
+    // подводит вилы, поднимает и задним ходом увозит
+    const f = S.fork;
+    if (f.phase === "away" && S.bagOn && V.Leb_Pol2 && C.bigbag.mass >= 50) { f.phase = "arrive"; f.x = 1; f.side = S.bagSide; f.lift = 0; }
+    if (f.phase === "arrive") { f.x = Math.max(0, f.x - dt / 7); if (f.x <= 0) f.phase = "lift"; }
+    if (f.phase === "lift") {
+      f.lift = Math.min(1, f.lift + dt / 2.5);
+      if (f.lift >= 1) { f.load = C.bigbag.mass; f.prod = C.bigbag.prod; C.bigbag.mass = 0; S.bagOn = false; f.phase = "leave"; }
+    }
+    if (f.phase === "leave") {
+      f.x = Math.min(1, f.x + dt / 7);
+      if (f.x >= 1) { S.bagsOut++; P.log(`Биг-бэг ${(f.load / 1000).toFixed(2)} т вывезен погрузчиком (${f.side < 0 ? "влево" : "вправо"})`); f.phase = "away"; f.load = 0; f.lift = 0; }
+    }
     // ---- шлюзы аспираций АС-1/АС-2: пыль — в отходы
     ["Asp1", "Asp2"].forEach((k) => { M[k].dust = (M[k].dust || 0) + (M[k].spin > 0.5 ? dt * 0.002 : 0); });
     // ---- продвижение по элементам

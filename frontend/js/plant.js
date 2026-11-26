@@ -185,6 +185,8 @@
     alarms: [], archive: [], log: [],
     user: { login: "Оператор", role: "Оператор" },
     leb: { y: 0, x: 0 },
+    bagOn: true, bagSide: -1, bagsOut: 0,
+    fork: { phase: "away", x: 1, lift: 0, load: 0 },
   };
 
   /* ---------------------------------------------- приводы: разгон, выбег, наработка */

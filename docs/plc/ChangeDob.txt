@@ -1,0 +1,51 @@
+functionBlock ChangeDob
+VAR
+  input   Run : BOOL  // старт работы по замене
+  input   tpChange : WORD  // тип замены (2(1бит)-замена, 4(2бит)-пропуск один раз), 8(3бит)-выкинуть из рецепта
+  input   ChangeTo : WORD  // на какой бункер меняем
+  output  Done : BOOL  // флаг, что выполнено
+  local   ii : WORD
+  local   i0 : WORD
+END_VAR
+
+(* ST *)
+IF run THEN
+	IF tpChange.1 AND (ChangeTo>0) THEN  //заменить
+		i0:=0;
+		FOR ii:=1 TO LenOrd2 DO
+			IF Order2[ii]=ChangeTo THEN
+				i0:=ii;
+				EXIT;
+			END_IF
+		END_FOR
+		IF i0>0 THEN
+			FOR ii:=PosOrd2 TO LenOrd2-1 DO
+				Order2[ii]:=Order1[ii+1];			
+			END_FOR
+			IF i0<PosOrd2 THEN
+				PosOrd2:=i0;
+			END_IF
+			Order2[LenOrd2]:=0;
+			LenOrd2:=LenOrd2-1;
+		ELSE
+			Order2[PosOrd2]:=ChangeTo;
+		END_IF;
+		
+		VesCD[NumBunkD]:=0;
+		VesCD[ChangeTo]:=VesDD[NumBunkD];
+		VesPD[ChangeTo]:=VesPD[ChangeTo]+VesPD[NumBunkD];
+		VesPD[NumBunkD]:=0;
+		VesZD[ChangeTo]:=CurVesPortD*VesPD[ChangeTo]/100.0; 
+		VesZD[NumBunkD]:=0;
+		Done:=TRUE;		
+	ELSIF tpChange.2 THEN //пропустить один раз
+		VesCD[NumBunkD]:=VesZD[NumBunkD];
+		Done:=TRUE;
+	ELSIF tpChange.3 THEN  //удаляем из рецепта
+		DeleteFromRecipeD[NumBunkD]:=TRUE;
+		VesCD[NumBunkD]:=VesZD[NumBunkD];
+		Done:=TRUE;
+	END_IF
+ELSE
+	Done:=FALSE;
+END_IF

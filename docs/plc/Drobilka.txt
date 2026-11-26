@@ -1,0 +1,76 @@
+functionBlock Drobilka
+VAR
+  input   AZ : BOOL  // Защита двигателя
+  input   OpenDoor : BOOL  // Концевой выключатель безопасности
+  input   OffOpenDor : BOOL
+  input   HandMode : BOOL  // Приостановить работу в автоматическом режиме (режим не сбрасывается)
+  input   SlowHand : BOOL := FALSE  // можно плавно переходить из автоматического в ручной
+  input   next : BOOL  // Следующий механизм. После его запуска будет запущена нория в автоматическом режиме через время timeBeforeStart
+  input   prev : BOOL  // Предыдущий механизм. После его остановки будет остановлена нория в автоматическом режиме через время timeToStop
+  input   canRunAuto : BOOL  // Условие для запуска в автоматическом режиме
+  input   timeBeforeStart : TIME := TIME#5s0ms  // Пауза перед запуском в автоматическом режиме
+  input   timeToStop : TIME := TIME#20s0ms  // Время на выгрузку из нории при остановке автоматического режима
+  input   yHand : BOOL
+  output  Run : BOOL  // Включение
+  output  da : BOOL  // Авария
+  output  ErrAz : BOOL
+  output  ErrOpenDoor : BOOL
+  output  yHandOut : BOOL
+  output  state : WORD
+  local   rr : BOOL  // Готовность к работе
+  local   run_auto : BOOL  // Запуск в автоматическом режиме
+  local   TON_Start_Auto : TON
+  local   TON_Stop_Auto : TON
+  local   temp : BOOL
+  local   offState : WORD := 0
+  local   runState : WORD := 1
+  local   alarmState : WORD := 2
+  local   MHCalc_1 : MHCalc
+  inOut   MH : DWORD
+  inOut   aMH : DWORD
+END_VAR
+
+(* LD *)
+
+// ---
+IF true AND AZ THEN ErrAz := TRUE; END_IF
+IF true AND OpenDoor AND NOT OffOpenDor THEN ErrOpenDoor := TRUE; END_IF
+IF true AND ResetErrors THEN ErrAz := FALSE; END_IF
+IF true AND ResetErrors THEN ErrOpenDoor := FALSE; END_IF
+
+// --- Готовность к работе
+rr := NOT ErrAZ AND NOT ErrOpenDoor AND NOT GEmer;
+da := NOT (NOT ErrAZ AND NOT ErrOpenDoor);
+
+// --- Запуск автоматического режима
+TON_Start_Auto(IN:=MAuto AND rr AND canRunAuto AND next, PT:=timeBeforeStart);
+IF TON_Start_Auto.Q THEN run_auto := TRUE; END_IF
+
+// ---
+TON_Stop_Auto(IN:=NOT canRunAuto AND NOT prev, PT:=timeToStop);
+
+// --- Сброс автоматического режима
+IF (NOT MAuto OR NOT rr OR NOT next OR TON_Stop_Auto.Q) THEN run_auto := FALSE; END_IF
+
+// ---
+IF R_TRIG(HandMode) AND SlowHand AND canRunAuto THEN yHand := Run; END_IF
+
+// --- Включение пускателя
+Run := ((NOT HandMode AND run_auto) OR yHand) AND rr;
+
+// ---
+IF (NOT rr OR NOT HandMode) THEN yHand := FALSE; END_IF
+
+// ---
+MHCalc_1(Run:=Run, MH:=MH, aMH:=aMH);
+
+// ---
+yHandOut := yHand;
+
+// --- Статус дробилки(0-выключен без аварии, 1-работает, 2-авария)
+IF NOT da AND NOT run THEN state := offState; END_IF
+temp := offState /*EN=NOT da AND NOT run*/;
+IF NOT da AND run THEN state := runState; END_IF
+temp := runState /*EN=NOT da AND run*/;
+IF da THEN state := alarmState; END_IF
+temp := alarmState /*EN=da*/;

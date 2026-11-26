@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Комбикормовый завод «Бугры» — эмулятор пульта и ПЛК</title>
+<link href="assets/logo-contur.webp" rel="icon"/>
+<link href="css/style.css" rel="stylesheet"/>
+<link href="css/bugry.css" rel="stylesheet"/>
+</head>
+<body>
+<div class="app">
+
+  <div class="topbar">
+    <img class="brand" alt="SysAT" src="assets/logo.webp"/>
+    <div class="page-title">
+      <h1>Симулятор КЗ «Бугры»</h1>
+      <div class="page-sub">Комбикормовый завод · логика ПЛК Machine Expert «Bugry» · ЕФБШ-578.01</div>
+    </div>
+    <nav class="tabs" aria-label="Разделы">
+      <button class="tab active" data-tab="mimic" type="button">Мнемосхема</button>
+      <button class="tab" data-tab="prod" type="button">Производство</button>
+      <button class="tab" data-tab="equip" type="button">Оборудование</button>
+      <button class="tab" data-tab="alarms" type="button">Аварии <span class="tab-badge" id="tab-alarm-count"></span></button>
+      <button class="tab" data-tab="signals" type="button">Сигналы ПЛК</button>
+      <button class="tab" data-tab="settings" type="button">Настройки</button>
+    </nav>
+    <div class="top-right">
+      <div class="lamps">
+        <span class="lamp" id="lamp-prod" title="Regim2.10 — RunDosing, производство"><i></i>Производство</span>
+        <span class="lamp" id="lamp-hand" title="Regim0 — ручное управление (MHand)"><i></i>Ручное</span>
+        <span class="lamp" id="lamp-gemer" title="GEmer — общая авария"><i></i>Авария</span>
+        <span class="lamp" id="lamp-siren" title="RunSirena — выход сирены"><i></i>Сирена</span>
+      </div>
+      <div class="clock-block"><div id="clock">00:00:00</div><div id="date"></div></div>
+      <button class="estop" id="btn-estop" type="button">Аварийный стоп</button>
+    </div>
+  </div>
+
+  <div class="workspace">
+    <main class="stage-wrap">
+      <section class="view active" id="view-mimic">
+        <div class="gemer-bar" id="gemer-bar" role="alert" hidden></div>
+        <div class="stage" id="stage">
+          <canvas id="plant-canvas" aria-label="Мнемосхема завода"></canvas>
+          <div class="zoom">
+            <button class="btn zbtn" id="zoom-in" type="button" title="Приблизить">+</button>
+            <button class="btn zbtn" id="zoom-out" type="button" title="Отдалить">−</button>
+            <button class="btn zbtn" id="zoom-fit" type="button" title="Вся схема">⤢</button>
+            <button class="btn zbtn" id="legend-btn" type="button" title="Обозначения" aria-expanded="false">?</button>
+          </div>
+          <div class="legend" id="legend" hidden>
+            <h4>Обозначения</h4>
+            <div class="lg-grid">
+              <span><i class="led run"></i>Механизм работает</span>
+              <span><i class="led"></i>Механизм остановлен</span>
+              <span><i class="led fault"></i>Авария (мигает, красная рамка)</span>
+              <span><i class="lg-r">Р</i>Ручной режим механизма</span>
+              <span><i class="lg-lamp" style="background:#ff5a3c"></i>ДВУ — верхний уровень</span>
+              <span><i class="lg-lamp" style="background:#47e07a"></i>ДНУ — нижний уровень</span>
+              <span><i class="lg-pipe"></i>Самотёчная труба</span>
+              <span><i class="lg-duct"></i>Аспирация (воздуховод)</span>
+              <span><i class="lg-sw" style="background:#d49a2a"></i>Зерно, компоненты</span>
+              <span><i class="lg-sw" style="background:#d2b46a"></i>Дерть</span>
+              <span><i class="lg-sw" style="background:#d8d3c6"></i>Добавки</span>
+              <span><i class="lg-sw" style="background:#b58d4c"></i>Комбикорм россыпью</span>
+              <span><i class="lg-sw" style="background:#86562a"></i>Гранулы</span>
+              <span><i class="lg-sw" style="background:#d8a316"></i>Масло</span>
+            </div>
+            <p>Шибер: зелёный — открыт, серый — закрыт, жёлтый — движется. Цифры на весах — показания тензодатчиков, бейджи «А» — ток двигателя.</p>
+          </div>
+          <div class="stage-hint">Щелчок по механизму или бункеру — окно управления · колесо мыши — масштаб · перетаскивание — сдвиг</div>
+          <div class="prod-card" id="prod-card"></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-prod">
+        <div class="view-head">
+          <h2>Производство</h2>
+          <div class="view-tools">
+            <button class="btn btn-go" id="pr-start" type="button">▶ Пуск производства</button>
+            <button class="btn" id="pr-stop2" type="button">Стоп после порции</button>
+            <button class="btn btn-stop" id="pr-stop3" type="button">■ Полный стоп</button>
+          </div>
+        </div>
+        <div class="view-body" id="prod-body"></div>
+      </section>
+
+      <section class="view" id="view-equip">
+        <div class="view-head">
+          <h2>Оборудование</h2>
+          <div class="view-tools">
+            <input aria-label="Поиск оборудования" id="eq-search" placeholder="Поиск по названию или позиции…" type="search"/>
+            <select aria-label="Фильтр" id="eq-filter">
+              <option value="all">Все механизмы</option>
+              <option value="run">В работе</option>
+              <option value="stop">Остановленные</option>
+              <option value="fault">С аварией</option>
+              <option value="hand">Ручной режим</option>
+              <option value="to">Требуют ТО</option>
+            </select>
+          </div>
+        </div>
+        <div class="view-body">
+          <div class="table-wrap">
+            <table class="grid-table">
+              <thead><tr><th>Поз.</th><th>Наименование</th><th>Участок</th><th>Состояние</th><th>Режим</th><th>Ток / частота</th><th>Наработка, ч</th><th></th></tr></thead>
+              <tbody id="eq-rows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-alarms">
+        <div class="view-head">
+          <h2>Аварии и сообщения</h2>
+          <div class="view-tools">
+            <select aria-label="Журнал" id="al-scope">
+              <option value="active">Активные аварии</option>
+              <option value="archive">Архив аварий</option>
+              <option value="log">Журнал событий</option>
+            </select>
+            <button class="btn" id="al-reset" type="button">↺ Сброс аварий</button>
+          </div>
+        </div>
+        <div class="view-body">
+          <div class="causes" id="al-causes"></div>
+          <div class="table-wrap">
+            <table class="grid-table">
+              <thead><tr><th>Время</th><th>Тип</th><th>Сообщение</th><th>Состояние</th></tr></thead>
+              <tbody id="al-rows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-signals">
+        <div class="view-head">
+          <h2>Сигналы ПЛК</h2>
+          <span class="muted">Переменные эмулируемой программы в реальном времени. Имена — как в проекте Machine Expert «Bugry».</span>
+        </div>
+        <div class="view-body" id="signals-body"></div>
+      </section>
+
+      <section class="view" id="view-settings">
+        <div class="view-head">
+          <h2>Настройки</h2>
+          <div class="view-tools">
+            <button class="btn" id="set-reset-db" type="button">Сбросить базу рецептов</button>
+            <button class="btn" id="set-reset-all" type="button">Начать смену заново</button>
+          </div>
+        </div>
+        <div class="view-body">
+          <div class="set-grid" id="settings-body"></div>
+        </div>
+      </section>
+    </main>
+
+    <aside aria-label="Панель оператора" class="rail">
+      <div class="rail-caption">ПАНЕЛЬ ОПЕРАТОРА</div>
+      <button class="rail-button" id="btn-menu" type="button">☰ Меню управления</button>
+      <button class="rail-button" id="rail-load" type="button">Загрузка БВ <span>›</span></button>
+      <button class="rail-button" id="rail-prod" type="button">Производство <span>›</span></button>
+      <button class="rail-button" id="rail-gran" type="button">Гранулирование <span>›</span></button>
+      <button class="rail-button" id="rail-cars" type="button">Отгрузка ГП <span>›</span></button>
+      <button class="rail-button" id="rail-cabinet" type="button">Шкаф управления <span>›</span></button>
+      <div class="rail-caption">МЕХАНИЗМЫ</div>
+      <input aria-label="Найти механизм" id="rail-search" placeholder="Найти механизм…" type="search"/>
+      <div class="rail-machines" id="rail-machines"></div>
+    </aside>
+  </div>
+
+  <footer class="statusbar">
+    <div class="sb-group">
+      <button class="btn btn-go" id="btn-start" type="button">▶ Пуск производства</button>
+      <button class="btn btn-stop" id="btn-stop" type="button">■ Стоп</button>
+      <button class="btn" id="btn-ack" type="button" title="Regim2.14 — сброс аварий">↺ Сброс аварий</button>
+      <button class="btn" id="btn-mute" type="button" title="Regim2.2 — отключение сирены">Сирена вкл.</button>
+    </div>
+    <span class="alarm-line" id="alarm-line">—</span>
+    <div class="sb-group sb-right">
+      <span class="route-line" id="route-line">—</span>
+      <label class="speed" title="Ускорение модели вместе с таймерами ПЛК">Скорость
+        <select id="speed"><option value="1">×1</option><option value="2">×2</option><option value="5">×5</option><option value="10">×10</option><option value="20">×20</option></select>
+      </label>
+    </div>
+  </footer>
+</div>
+<div class="modal-root" id="modal-root"></div>
+<div class="tooltip" id="tooltip"></div>
+<div class="toast" id="toast" role="status"></div>
+<script src="js/plc-lib.js"></script>
+<script src="js/plc-prod.js"></script>
+<script src="js/plc.js"></script>
+<script src="js/plant.js"></script>
+<script src="js/plant-flow.js"></script>
+<script src="js/db.js"></script>
+<script src="js/render.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>

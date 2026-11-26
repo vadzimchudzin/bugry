@@ -1,0 +1,126 @@
+functionBlock ReverseTransporter
+VAR
+  input   localManual : BOOL  // кнопка на конвейере "Ручн"
+  input   localAuto : BOOL  // кнопка на конвейере "Автомат"
+  input   next_left : BOOL  // Следующий механизм для работы влево
+  input   next_right : BOOL  // Следующий механизм для работы вправо
+  input   prev : BOOL  // Предыдущий механизм
+  input   errAZ : BOOL := FALSE  // Авария от автомата защиты
+  input   dks : BOOL  // Датчик контроля скорости
+  input   dksMustBlink : BOOL  // 1-ДКС в норм.ситуации должен моргать, 0- dks=1-Ok, dks=0-Error
+  input   DKS_off : BOOL  // Не использовать ДКС
+  input   DP1 : BOOL := FALSE  // Датчик подпора 1
+  input   DP1_off : BOOL  // Не учитывать ДП 1
+  input   DP2 : BOOL := FALSE  // Датчик подпора 2
+  input   DP2_off : BOOL  // Не учитывать ДП 2
+  input   HandMode : BOOL  // ручноЙ режим
+  input   SlowHand : BOOL := FALSE  // можно плавно переходить из автоматического в ручной
+  input   canRunAutoLeft : BOOL  // Условие для необходимости работы влево в автоматическом режиме
+  input   canRunAutoRight : BOOL  // Условие для необходимости работы вправо в автоматическом режиме
+  input   timeBeforeStart : TIME := TIME#5s0ms  // Пауза перед запуском в автоматическом режиме
+  input   timeToStop : TIME := TIME#20s0ms  // Время на выгрузку из нории при остановке автоматического режима
+  input   yRunLeft : BOOL
+  input   yRunRight : BOOL
+  output  run_left : BOOL := FALSE  // Включение транспотера влево
+  output  run_right : BOOL := FALSE  // Включение транспотера вправо
+  output  da : BOOL := FALSE  // Авария механизма
+  output  err_AZ : BOOL := FALSE  // Авария от автомата защиты
+  output  err_DKS : BOOL := FALSE  // Авария от ДКС
+  output  err_DP : BOOL := FALSE  // Авария ДП
+  output  state : WORD := 0  // Состояние транспортера (0 выкл.без аварии, 1-включен влево, 2-включен вправо, 3-авария)
+  output  yRunLeftOut : BOOL
+  output  yRunRightOut : BOOL
+  local   rr : BOOL  // Готовность к работе
+  local   t_dks_on : TON
+  local   t_dks_off : TON
+  local   run_auto : BOOL
+  local   TON_START_LEFT : TON
+  local   TON_START_RIGHT : TON
+  local   TON_STOP : TON
+  local   run_left_auto : BOOL
+  local   run_right_auto : BOOL
+  local   offState : WORD := 0
+  local   runLeftState : WORD := 1
+  local   runRightState : WORD := 2
+  local   alarmState : WORD := 3
+  local   temp : BOOL
+  local   MHCalc_0 : MHCalc
+  inOut   MH : DWORD
+  inOut   aMH : DWORD
+END_VAR
+
+(* LD *)
+
+// --- Таймера на аварию ДКС
+t_dks_on(IN:=((run_left OR run_right) AND NOT DKS_off) AND dks, PT:=T#4s);
+t_dks_off(IN:=((run_left OR run_right) AND NOT DKS_off) AND NOT dks, PT:=t#4s);
+
+// --- Авария от автомата защиты
+IF errAZ THEN err_AZ := TRUE; END_IF
+
+// --- Авария ДКС
+IF (((((t_dks_on.Q OR t_dks_off.Q) AND dksMustBlink) OR (t_dks_off.Q AND NOT dksMustBlink)) AND run_left) OR ((((t_dks_on.Q OR t_dks_off.Q) AND dksMustBlink) OR (t_dks_off.Q AND NOT dksMustBlink)) AND run_right)) AND NOT DKS_off THEN err_DKS := TRUE; END_IF
+
+// --- Авария датчика подпора
+IF ((DP1 AND NOT DP1_off) OR (DP2 AND NOT DP2_off)) THEN err_DP := TRUE; END_IF
+
+// --- Сброс аварий
+IF (ResetErrors OR MEmul) THEN err_AZ := FALSE; END_IF
+IF (ResetErrors OR MEmul) THEN err_DP := FALSE; END_IF
+IF (ResetErrors OR MEmul) THEN err_DKS := FALSE; END_IF
+
+// --- Готовность к работе
+rr := NOT err_DKS AND NOT err_DP AND NOT errAZ AND NOT GEmer;
+da := NOT (NOT err_DKS AND NOT err_DP AND NOT errAZ);
+
+// ---
+IF ((SlowHand AND canRunAutoLeft) OR (SlowHand AND canRunAutoRight)) AND (R_TRIG(HandMode)) THEN yRunLeft := run_left; END_IF
+IF run_left /*EN=((SlowHand AND canRunAutoLeft) OR (SlowHand AND canRunAutoRight)) AND (R_TRIG(HandMode))*/ THEN yRunRight := run_right; END_IF
+IF ((SlowHand AND canRunAutoLeft) OR (SlowHand AND canRunAutoRight)) AND (F_TRIG(HandMode)) THEN run_left_auto := yRunLeft; END_IF
+IF yRunLeft /*EN=((SlowHand AND canRunAutoLeft) OR (SlowHand AND canRunAutoRight)) AND (F_TRIG(HandMode))*/ THEN run_right_auto := yRunRight; END_IF
+
+// --- Запуск автоматического режима влево
+TON_START_LEFT(IN:=canRunAutoLeft AND rr AND next_left, PT:=timeBeforeStart);
+IF TON_START_LEFT.Q THEN run_left_auto := TRUE; END_IF
+
+// --- Запуск автоматического режима вправо
+TON_START_RIGHT(IN:=canRunAutoRight AND rr AND next_right, PT:=timeBeforeStart);
+IF TON_START_RIGHT.Q THEN run_right_auto := TRUE; END_IF
+
+// --- Остановка в автоматическом режиме
+TON_STOP(IN:=((true AND NOT canRunAutoRight AND run_right_auto) OR (true AND NOT canRunAutoLeft AND run_left_auto)) AND NOT prev, PT:=timeToStop);
+
+// --- Сброс автоматического режима влево
+IF (TON_STOP.Q OR NOT rr OR NOT next_left) THEN run_left_auto := FALSE; END_IF
+
+// --- Сброс автоматического режима вправо
+IF (TON_STOP.Q OR NOT rr OR NOT next_right) THEN run_right_auto := FALSE; END_IF
+
+// --- Включение транспортера влево
+run_left := ((NOT HandMode AND run_left_auto) OR yRunLeft) AND localAuto;
+
+// --- Включение транспортера вправо
+run_right := ((NOT HandMode AND run_right_auto) OR yRunRight) AND localAuto;
+
+// --- Сброс yRun - ручного запуска из Скады
+IF ((true AND NOT rr) OR (true AND localManual) OR (true AND NOT HandMode) OR (true AND yRunRight AND yRunLeft)) THEN yRunRight := FALSE; END_IF
+IF ((true AND NOT rr) OR (true AND localManual) OR (true AND NOT HandMode) OR (true AND yRunRight AND yRunLeft)) THEN yRunLeft := FALSE; END_IF
+IF true AND NOT MGod AND NOT next_left THEN yRunLeft := FALSE; END_IF
+IF true AND NOT MGod AND NOT next_right THEN yRunRight := FALSE; END_IF
+
+// ---
+MHCalc_0(Run:=(run_left OR run_right), MH:=MH, aMH:=aMH);
+
+// ---
+yRunLeftOut := yRunLeft;
+yRunRightOut := yRunRight;
+
+// --- Статус реверсивного транспортера(0-выключен без аварии, 1-работает влево, 2-работает вправо, 3-авария)
+IF NOT da AND NOT run_left AND NOT run_right THEN state := offState; END_IF
+temp := offState /*EN=NOT da AND NOT run_left AND NOT run_right*/;
+IF NOT da AND run_left THEN state := runLeftState; END_IF
+temp := runLeftState /*EN=NOT da AND run_left*/;
+IF NOT da AND run_right THEN state := runRightState; END_IF
+temp := runRightState /*EN=NOT da AND run_right*/;
+IF da THEN state := alarmState; END_IF
+temp := alarmState /*EN=da*/;

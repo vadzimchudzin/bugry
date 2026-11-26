@@ -1,0 +1,234 @@
+program PrgSmesitel
+VAR
+  local   rr : BOOL
+  local   TON_DksOn : TON
+  local   TON_DksOff : TON
+  local   ErrDks_Sms : BOOL
+  local   dks : BOOL
+  local   TON_LockOn1 : TON
+  local   TON_LockOff1 : TON
+  local   TON_LockOn2 : TON
+  local   TON_LockOff2 : TON
+  local   TON_ShLOn1 : TON
+  local   TON_ShLOn2 : TON
+  local   TON_ShLOff1 : TON
+  local   TON_ShLOff2 : TON
+  local   TON_ShROn1 : TON
+  local   TON_ShROn2 : TON
+  local   TON_ShROff1 : TON
+  local   TON_ShROff2 : TON
+  local   TON_Vigr23 : TON
+  local   TON_Delay3S : TON
+  local   TON_DelayDNU : TON
+  local   Timer_Mok : MyTimer
+  local   Timer_Suh : MyTimer
+  local   Sms2_Opened : BOOL
+  local   Sms2_Closed : BOOL
+  local   TON_ShLOff1_1 : TON
+  local   tof_unlock : TOF
+  local   TON_KlapOpened : TON
+  local   tof_ShR : TON
+  local   ton_Go_ShL : TON
+  local   R_TRIG_0 : R_TRIG
+  local   ton_Reset_ShL : TON
+  local   ton_Reset_yClose_ShL : TON
+  local   TON_Reset_yClose_ShR : TON
+  local   TON_ShRNotClosed : TON
+  local   DualShiber_SMS : DualShiber
+  local   ErrLowPress : BOOL
+  local   tmp : INT
+  local   ShIsOpen : BOOL
+  local   MustWorkSms : BOOL
+  local   TOF_MustWorkSms : TOF
+  local   TON_PM2 : TON
+  local   TOF_PM2 : TOF
+  local   tmpMustShOpen : BOOL
+  local   RVvod : PC_One
+  local   TON_AddRVvod : TON
+  local   TON_AddRVvodToSms : TON
+  local   RVvodVibr : PC_One
+  local   tttt : BOOL
+  local   AllSaveToScada : BOOL
+  local   MustRunMokr : BOOL
+  local   ShiberDownSms : PC_One
+  local   TON_startDKS : TON
+  local   PathReady : BOOL
+  local   KlapSMS : PC_One
+  local   TON_Vigr12 : TON
+  local   TON_DNUUpBunkErr : TON
+END_VAR
+
+(* LD *)
+
+// ---
+IF Go_Sms AND SmsUpState.10 AND (idS1>0) AND (idS2=0) AND NOT BlockSms2 THEN MustKlapOpen := TRUE; END_IF
+
+// ---
+TON_Vigr12(IN:=MustKlapOpen AND KlapOpened AND NOT SmsMainState.10 AND NOT DNU_UpBunk, PT:=t#1s*tcSms1);
+IF TON_Vigr12.Q THEN isVigr12 := TRUE; END_IF
+TON_DNUUpBunkErr(IN:=MustKlapOpen AND KlapOpened AND NOT SmsMainState.10 AND DNU_UpBunk, PT:=t#1s*(tcSms1+60));
+IF TON_DNUUpBunkErr.Q THEN isVigr12 := TRUE; END_IF
+IF TON_DNUUpBunkErr.Q THEN Err29.7 := TRUE; END_IF
+
+// ---
+KlapSMS(opened:=KlapOpened, closed:=KlapClosed, toOpen:=MustKlapOpen AND ZaslDownClosed, noOpen:=(ErrDoor_Sms OR BlockSMS), maxTTO:=t#10s, HandMode:=(MHand OR NOT RunDosing OR fHand2.7), yOpen:=yKlapOpen_Sms);
+Err20.2 := KlapSMS.errLTOpen;
+Err20.3 := KlapSMS.errLTClose;
+KlapOpened := KlapSMS.openedOut;
+KlapClosed := KlapSMS.closedOut;
+yKlapOpen_Sms := KlapSMS.yOpenOut;
+Go_Klap := KlapSMS.runToOpen;
+
+// ---
+IF (CurPortSms1 > 0) /*EN=(CurPortSms2 = 0) /*EN=Go_Klap AND NOT KlapClosed*/*/ THEN CurPortSms2 := CurPortSms1; END_IF
+
+// ---
+TON_startDKS(IN:=Go_Sms AND NOT MEmul, PT:=t#5s);
+TON_DksOn(IN:=TON_startDKS.Q AND DKS_Sms, PT:=T#3s);
+TON_DksOff(IN:=TON_startDKS.Q AND NOT DKS_Sms, PT:=T#3s);
+
+// ---
+IF (TON_DksOn.Q OR TON_DksOff.Q) AND NOT OffDKSSms THEN ErrDks_Sms := TRUE; END_IF
+IF (TON_DksOn.Q OR TON_DksOff.Q) AND NOT OffDKSSms THEN Err20.0 := TRUE; END_IF
+
+// ---
+IF true AND Az_Sms THEN ErrAz_Sms := TRUE; END_IF
+IF true AND DoorSmsOpened AND NOT OffDoorSms THEN ErrDoor_Sms := TRUE; END_IF
+IF true AND DoorDownOpened AND NOT OffDoorDown THEN ErrDoorDownBunk_Sms := TRUE; END_IF
+IF true AND LowPress THEN ErrLowPress := TRUE; END_IF
+
+// ---
+IF ResetErrors THEN Err20 := 0; END_IF
+IF 0 /*EN=ResetErrors*/ THEN ErrDks_Sms := FALSE; END_IF
+IF 0 /*EN=ResetErrors*/ THEN ErrAz_Sms := FALSE; END_IF
+IF 0 /*EN=ResetErrors*/ THEN ErrDoorDownBunk_Sms := FALSE; END_IF
+IF 0 /*EN=ResetErrors*/ THEN ErrLowPress := FALSE; END_IF
+IF 0 /*EN=ResetErrors*/ THEN ErrDoor_Sms := FALSE; END_IF
+
+// ---
+Err20.1 := true AND ErrAz_Sms;
+Err1.10 := true AND ErrDoor_Sms;
+Err1.11 := true AND ErrDoorDownBunk_Sms;
+Err29.8 := true AND ErrLowPress;
+
+// ---
+rr := NOT ErrDks_Sms AND NOT ErrAz_Sms AND NOT ErrDoor_Sms AND NOT ErrLowPress AND NOT GEmer;
+DA_Sms := NOT (NOT ErrDks_Sms AND NOT ErrAz_Sms AND NOT ErrDoor_Sms AND NOT ErrLowPress);
+
+// ---
+IF ((RunDosing AND NOT fHand2.7) OR GEmer OR NOT rr) THEN yRun_Sms := FALSE; END_IF
+
+// --- Таймер сухого смешивания
+Timer_Suh(run:=SmsMainState.0 AND NOT SmsMainState.1 AND Go_Sms, pause:=NOT Go_Sms, reset:=ResetSms);
+
+// --- может идти мокрое смешивание
+MustRunMokr := SmsMainState.0 AND SmsMainState.1 AND SmsMainState.2 AND SmsMainState.13;
+
+// --- Таймер мокрого смешивания
+Timer_Mok(run:=MustRunMokr AND NOT SmsMainState.3 AND Go_Sms, pause:=NOT Go_Sms, reset:=ResetSms2);
+
+// --- Сухое смешивание
+IF SmsMainState.0 THEN TimeZames1 := Timer_Suh.seconds; END_IF
+IF (TimeZames1 >= TimeZames01) /*EN=Timer_Suh.seconds /*EN=SmsMainState.0*/*/ AND NOT SmsMainState.1 THEN msgFromScadaSms2 := 0; END_IF
+IF 0 /*EN=(TimeZames1 >= TimeZames01) /*EN=Timer_Suh.seconds /*EN=SmsMainState.0*/*/ AND NOT SmsMainState.1*/ THEN msgToScadaSms2 := 1; END_IF
+IF 1 /*EN=0 /*EN=(TimeZames1 >= TimeZames01) /*EN=Timer_Suh.seconds /*EN=SmsMainState.0*/*/ AND NOT SmsMainState.1*/*/ THEN SmsMainState.1 := TRUE; END_IF
+IF (TimeZames1 >= TimeZames01) /*EN=Timer_Suh.seconds /*EN=SmsMainState.0*/*/ AND NOT SmsMainState.1 AND PPprmPP[CurTaskSms2].3 THEN gPortJ1 := (gPortJ1+1); END_IF
+IF (TimeZames1 >= TimeZames01) /*EN=Timer_Suh.seconds /*EN=SmsMainState.0*/*/ AND NOT SmsMainState.1 AND PPprmPP[CurTaskSms2].4 THEN gPortJ2 := (gPortJ2+1); END_IF
+IF (TimeZames1 >= TimeZames01) /*EN=Timer_Suh.seconds /*EN=SmsMainState.0*/*/ AND NOT SmsMainState.1 AND NOT PPprmPP[CurTaskSms2].3 THEN SmsMainState.2 := TRUE; END_IF
+IF (TimeZames1 >= TimeZames01) /*EN=Timer_Suh.seconds /*EN=SmsMainState.0*/*/ AND NOT SmsMainState.1 AND NOT PPprmPP[CurTaskSms2].4 THEN SmsMainState.13 := TRUE; END_IF
+
+// --- Записали ручной ввод
+IF (msgToScadaSms2=1) AND (msgFromScadaSms2>0) THEN msgToScadaSms2 := 0; END_IF
+IF 0 /*EN=(msgToScadaSms2=1) AND (msgFromScadaSms2>0)*/ THEN msgFromScadaSms2 := 0; END_IF
+
+// --- Мокрое смешивание
+IF SmsMainState.0 THEN TimeZames2 := Timer_Mok.seconds; END_IF
+IF (TimeZames2 >= TimeZames02) /*EN=Timer_Mok.seconds /*EN=SmsMainState.0*/*/ AND MustRunMokr AND NOT SmsMainState.3 THEN SmsMainState.3 := TRUE; END_IF
+
+// --- Скаде - записать выполнение порции
+IF (msgToScadaSms2 = 0) /*EN=SmsMainState.3 AND NOT SmsMainState.14*/ THEN Port_Done := CurPortSms2; END_IF
+IF CurPortSms2 /*EN=(msgToScadaSms2 = 0) /*EN=SmsMainState.3 AND NOT SmsMainState.14*/*/ THEN msgFromScadaSms2 := 0; END_IF
+IF 0 /*EN=CurPortSms2 /*EN=(msgToScadaSms2 = 0) /*EN=SmsMainState.3 AND NOT SmsMainState.14*/*/*/ THEN msgToScadaSms2 := (2000+CurPortSms2); END_IF
+
+// --- Скада записала выполнение порции
+IF (msgFromScadaSms2 > 0) /*EN=(msgToScadaSms2 > 2000) /*EN=NOT SmsMainState.14*/*/ THEN msgToScadaSms2 := 0; END_IF
+IF 0 /*EN=(msgFromScadaSms2 > 0) /*EN=(msgToScadaSms2 > 2000) /*EN=NOT SmsMainState.14*/*/*/ THEN msgFromScadaSms2 := 0; END_IF
+IF 0 /*EN=0 /*EN=(msgFromScadaSms2 > 0) /*EN=(msgToScadaSms2 > 2000) /*EN=NOT SmsMainState.14*/*/*/*/ THEN SmsMainState.14 := TRUE; END_IF
+
+// ---
+BlockSMS := ((Block.6 AND NOT MustKlapOpen AND (idS2=0)) OR (Block.6 AND NOT MustKlapOpen AND SmsMainState.0 AND SmsMainState.2 AND SmsMainState.13));
+
+// --- Ручной ввод помещен в шлюз
+TON_AddRVvod(IN:=(CurTaskSms2>0) AND PPprmPP[CurTaskSms2].5 AND NOT Regim2.15 AND DoorRVOpened, PT:=t#2s);
+IF TON_AddRVvod.Q THEN flBHDoorOpened := TRUE; END_IF
+IF (CurTaskSms2>0) AND PPprmPP[CurTaskSms2].5 AND flBHDoorOpened AND NOT DoorRVOpened THEN flBHDoorOpened := FALSE; END_IF
+IF (CurTaskSms2>0) AND PPprmPP[CurTaskSms2].5 AND flBHDoorOpened AND NOT DoorRVOpened THEN Regim2.15 := TRUE; END_IF
+TON_AddRVvodToSms(IN:=(CurTaskSms2>0) AND PPprmPP[CurTaskSms2].5 AND Regim2.15 AND SmsMainState.10 AND DoorRVOpened, PT:=t#10s);
+IF TON_AddRVvodToSms.Q THEN Regim2.15 := FALSE; END_IF
+IF TON_AddRVvodToSms.Q THEN SmsMainState.4 := TRUE; END_IF
+
+// --- здесь можно вносить изменения, если в смс надо добавлять не только ручные добавки
+IF SmsMainState.4 THEN SmsMainState.0 := TRUE; END_IF
+
+// ---
+TOF_MustWorkSms(IN:=((idK+idPBD+idD+idM+idS1+idS2>0) > 0) /*EN=NOT BlockSMS*/, PT:=t#5s);
+MustWorkSms := TOF_MustWorkSms.Q;
+
+// ---
+Go_Sms := ((RunDosing AND NOT StopDosing) OR (RunDosing AND MustWorkSms) OR yRun_Sms) AND rr;
+
+// --- Дальше - сброс из СМС в бункер для выгрузки в силос
+
+// --- (качество Ок и выгрузка не в бункера с кач.продукцией) или (брак и выгрузка не в брак)
+IF (idS2>0) AND (CurTaskSms2=CurTaskSms3) AND NOT DNU_DownBunk AND NOT SmsMainState.15 AND NOT SmsMainState.9 AND NOT UnloadSt.6 AND NOT UnloadSt.3 AND NOT UnloadSt.4 THEN UnloadSt := (1+2+8); END_IF
+IF (BunkForDefect > 0) /*EN=(idS2>0) AND (CurTaskSms2=CurTaskSms3) AND NOT DNU_DownBunk AND SmsMainState.9 AND UnloadSt.5 AND NOT UnloadSt.7*/ THEN UnloadSt := (1+2+32); END_IF
+
+// --- качество Ок и выгрузка в БГП или брак и выгрузка в брак
+PathReady := (((((idS3 = 0) /*EN=(CurTaskSms2 = CurTaskSms3) /*EN=SmsMainState.14*/*/ AND NOT DNU_DownBunk AND NOT Answ.0 AND Go_TrSms AND Opened_ShTrSms AND PPprmPP[CurTaskSms3].8) OR ((idS3 = 0) /*EN=(CurTaskSms2 = CurTaskSms3) /*EN=SmsMainState.14*/*/ AND NOT DNU_DownBunk AND NOT Answ.0 AND Go_TrSms AND Closed_ShTrSms)) AND NOT DoorDownOpened) OR ((((idS3 = 0) /*EN=(CurTaskSms2 = CurTaskSms3) /*EN=SmsMainState.14*/*/ AND NOT DNU_DownBunk AND NOT Answ.0 AND Go_TrSms AND Opened_ShTrSms AND PPprmPP[CurTaskSms3].8) OR ((idS3 = 0) /*EN=(CurTaskSms2 = CurTaskSms3) /*EN=SmsMainState.14*/*/ AND NOT DNU_DownBunk AND NOT Answ.0 AND Go_TrSms AND Closed_ShTrSms)) AND OffDoorDown));
+
+// --- качество Ок и выгрузка в БГП или брак и выгрузка в брак
+MustVigr23 := ((PathReady AND NOT SmsMainState.15 AND NOT SmsMainState.9 AND UnloadSt.6) OR (PathReady AND SmsMainState.9 AND UnloadSt.7));
+
+// --- Скаде - записать вес в силос
+IF R_TRIG(MustVigr23) THEN msgFromScadaUnl := 0; END_IF
+IF 0 /*EN=R_TRIG(MustVigr23)*/ THEN msgToScadaUnl := 2; END_IF
+
+// --- можно выгружать, скада - записала
+IF MustVigr23 AND NOT BlockSms3 AND (msgToScadaUnl=2) AND (msgFromScadaUnl>0) AND NOT MustShOpen THEN CurPortSms3 := CurPortSms2; END_IF
+IF MustVigr23 AND NOT BlockSms3 AND (msgToScadaUnl=2) AND (msgFromScadaUnl>0) AND NOT MustShOpen THEN idS3 := idS2; END_IF
+IF MustVigr23 AND NOT BlockSms3 AND (msgToScadaUnl=2) AND (msgFromScadaUnl>0) AND NOT MustShOpen THEN msgToScadaUnl := 0; END_IF
+IF 0 /*EN=MustVigr23 AND NOT BlockSms3 AND (msgToScadaUnl=2) AND (msgFromScadaUnl>0) AND NOT MustShOpen*/ THEN msgFromScadaUnl := 0; END_IF
+IF MustVigr23 AND NOT BlockSms3 AND (msgToScadaUnl=2) AND (msgFromScadaUnl>0) AND NOT MustShOpen THEN MustShOpen := TRUE; END_IF
+
+// ---
+ShiberDownSms(opened:=ZaslDownOpened, closed:=ZaslDownClosed, toOpen:=MustShOpen, noOpen:=false, maxTTO:=t#10s, HandMode:=(BlockSMS OR NOT RunDosing OR fHand2.7), yOpen:=yOpenSms);
+Err20.8 := ShiberDownSms.errLTOpen;
+Err20.9 := ShiberDownSms.errLTClose;
+Err20.10 := ShiberDownSms.errKonc;
+ZaslDownOpened := ShiberDownSms.openedOut;
+ZaslDownClosed := ShiberDownSms.closedOut;
+yOpenSms := ShiberDownSms.yOpenOut;
+Go_ZaslDown := ShiberDownSms.runToOpen;
+
+// --- Результаты дозировки масла и жира записаны скадой. Здесь добавлять проверку на запись в скаду всего, что добавляется в смеситель
+AllSaveToScada := SaveToScadaJ1 AND (SaveToScadaJ2 or true);
+
+// --- выгрузка из смесителя на шнек идет
+ShIsOpen := RunDosing AND MustShOpen AND ZaslDownOpened AND AllSaveToScada;
+
+// --- выгрузка из смесителя на шнек только началась
+IF R_TRIG(ShIsOpen) THEN VesSmsR[3] := VesSmsR[2]; END_IF
+IF VesSmsR[2] /*EN=R_TRIG(ShIsOpen)*/ THEN VesSmsR[2] := 0; END_IF
+IF 0 /*EN=VesSmsR[2] /*EN=R_TRIG(ShIsOpen)*/*/ THEN ResetSms2 := TRUE; END_IF
+IF 0 /*EN=VesSmsR[2] /*EN=R_TRIG(ShIsOpen)*/*/ THEN ResetSms := TRUE; END_IF
+
+// --- выгрузка из смесителя на шнек
+TON_Vigr23(IN:=ShIsOpen, PT:=t#1s*tcSms2);
+IF TON_Vigr23.Q THEN IsVigr23 := TRUE; END_IF
+
+// --- Выгрузка из смс в БГП завершена Первый таймер - на заполнение выше ДНУ, второй - на очищение
+TON_Delay3S(IN:=(idS3 <> idS2) /*EN=(idS3 > 0) /*EN=Go_TrSms*/*/, PT:=t#10s);
+TON_DelayDNU(IN:=TON_Delay3S.Q AND NOT DNU_DownBunk, PT:=t#20s);
+IF TON_DelayDNU.Q THEN isVigr3S := TRUE; END_IF
+
+// ---

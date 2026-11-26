@@ -1,0 +1,199 @@
+program PrgEventsJ1
+VAR
+  local   ii : WORD
+  local   One_Perc : REAL
+  local   CalcLen : BOOL
+  local   iiii : BOOL
+  local   mustFS : WORD
+  local   VesLastPort : WORD
+  local   VesLastPort2 : WORD
+  local   RecalcDose : BOOL
+  local   i2 : WORD
+  local   i3 : WORD
+  local   FoundForDelete : BOOL
+  local   FoundTask : WORD
+  local   WantDoliv : REAL
+  local   qqqq : BOOL
+  local   a1 : WORD := 0
+  local   a2 : WORD := 0
+  local   a3 : WORD := 0
+  local   a4 : WORD := 0
+  local   a5 : WORD := 0
+  local   dddd : BOOL
+  local   cdm : WORD
+  local   cd : WORD
+END_VAR
+
+(* ST *)
+IF msgToScadaJ1=0 AND CurTaskJ1=0 THEN
+	//поиск актуальной задачи
+	FoundTask:=0;
+	IF (CurTaskSms2>0) AND ((CurPortSms2>0) AND (NOT SmsMainState.2)) THEN 
+		IF PPprmPP[CurTaskSms2].3 THEN 
+			FoundTask:=CurTaskSms2;
+			CurPortJ1:=CurPortSms2;
+		END_IF 
+	END_IF
+	IF (FoundTask=0) AND (CurTaskSms1>0) AND (CurPortSms1>0) THEN 
+		IF PPprmPP[CurTaskSms1].3 THEN 
+			FoundTask:=CurTaskSms1;
+			CurPortJ1:=CurPortSms1;
+		END_IF 
+	END_IF
+	IF (FoundTask=0) AND (CurTaskPBD>0) AND (CurPortPBD>0) THEN 
+		IF PPprmPP[CurTaskPBD].3 THEN 
+			FoundTask:=CurTaskPBD;
+			CurPortJ1:=CurPortPBD;
+		END_IF 
+	END_IF
+	IF (FoundTask=0) AND (CurTaskK>0) AND (CurPortK>0) THEN 
+		IF PPprmPP[CurTaskK].3 THEN 
+			FoundTask:=CurTaskK;
+			CurPortJ1:=CurPortK;
+		END_IF 
+	END_IF
+	//пока не ищем альтернативу в добавках и микродобавках
+	IF FoundTask>0 THEN
+		IF (PPPrcJ1[FoundTask]>0) THEN
+			// если в задаче есть масло и установлен процент ввода
+			msgToScadaJ1:=1;
+			CurTaskJ1:=FoundTask;
+			VesPJ[1]:=WORD_TO_REAL(PPPrcJ1[FoundTask])/1000;
+		END_IF
+	ELSE
+		CurTaskJ1:=0;
+		CurPortJ1:=0;
+	END_IF
+END_IF   
+
+IF (msgToScadaJ1=1) AND (CurTaskJ1>0) THEN   
+	//рассчитываем вес текущей порции
+	//дальше расчет первой или 2х последних порций, если партия делится на порции с остатком
+	CurVesPortJ1:=PPVesPort[CurTaskJ1];
+	VesLastPort :=PPVesPort[CurTaskJ1];
+	VesLastPort2:=PPVesPort[CurTaskJ1];
+	WantDoliv:=0;
+	IF PPCouPort[CurTaskJ1]=1 THEN
+		VesLastPort2:=0;
+		IF CouDolivM>0 THEN
+			WantDoliv:=CurVesPortJ1;
+		END_IF
+	ELSE
+		IF PPVesPort[CurTaskJ1]*PPCouPort[CurTaskJ1]<>PPVesPart[CurTaskJ1] THEN
+			VesLastPort:=PPVesPart[CurTaskJ1]-PPVesPort[CurTaskJ1]*(PPCouPort[CurTaskJ1]-1);
+			IF VesLastPort<(PPVesPort[CurTaskJ1]/2) THEN
+				VesLastPort2:=PPVesPort[CurTaskJ1]+VesLastPort;
+				VesLastPort:=REAL_TO_WORD(VesLastPort2/ 2);
+				VesLastPort2:=VesLastPort2-VesLastPort;
+			END_IF
+			IF PPCouPort[CurTaskJ1]=CurPortJ1 THEN	//последняя
+				CurVesPortJ1:=VesLastPort;
+			ELSE 
+				IF PPCouPort[CurTaskJ1]=CurPortJ1+1 THEN	//предпоследняя
+					CurVesPortJ1:=VesLastPort2;
+				END_IF
+			END_IF
+		END_IF
+		IF CouDolivM>0 THEN
+			cdm:=(PPCouPort[CurTaskJ1]-CurPortJ1+1);	//осталось сдозировать порций
+			
+			IF cdm=1 THEN
+				WantDoliv:=VesLastPort;
+			ELSIF cdm=2 THEN
+				WantDoliv:=VesLastPort+VesLastPort2;
+			ELSE
+				WantDoliv:=VesLastPort+VesLastPort2+((cdm-2)*PPVesPort[CurTaskJ1]);
+			END_IF
+			IF CouDolivM*PPVesPort[CurTaskJ1]<WantDoliv THEN
+				WantDoliv:=CouDolivM*PPVesPort[CurTaskJ1];
+			END_IF
+		END_IF
+	END_IF
+	IF WantDoliv>0 THEN
+		WantDoliv:=WantDoliv+CurVesPortJ1*0.1;
+	END_IF
+	
+	WantDolivJ1:=WantDoliv/100*VesPJ[1];
+	One_Perc := CurVesPortJ1/100.0; //количество кг на 1% веса порции		
+	VesZJ[1]:=One_Perc*VesPJ[1];  //вес комп. на порцию в кг. (Real)
+	VesDJ[1]:=0;
+	VesCJ[1]:=0;
+	DeleteFromRecipeJ[1]:=FALSE;
+	//готова к доливу	
+	DolivJ1_Done:=0;
+	IgnoreDolivJ1:=0;
+	msgToScadaJ1:=2;	
+END_IF
+
+IF (msgToScadaJ1=2) AND (DolivJ1_Done OR (CouDolivM=0) OR (noWeight1.15 AND IgnoreDolivJ1) OR (SmsMainState.1 AND ((Ves4.RealValue)>VesZJ[1]))) THEN 
+	//долив завершен 
+	msgToScadaJ1:=4;
+	IgnoreDolivJ1:=0;
+	//можно дозировать 
+END_IF
+
+IF msgToScadaJ1=4 AND SmsMainState.2 THEN
+
+	// дозировка завершена. 
+	// переходим к ожиданию сообщения от скады, что результаты записаны 
+	VesSmsR[2]:=VesSmsR[2]+VesDJ[1];
+	msgFromScadaJ1:=0;
+	msgToScadaJ1:=8;	// записать результаты дозирования
+	SmsMainState.13:=1;
+END_IF
+
+IF msgToScadaJ1=8 AND msgFromScadaJ1>0  THEN
+	//результаты записаны
+	SmsMainState.2:=1;
+	msgFromScadaJ1:=0;
+	MsgToScadaJ1:=16;	//результаты записаны. В isVigr23 изменить на 32
+END_IF
+
+IF (SmsMainState=0) OR (CurTaskSms2=0) THEN 
+	SaveToScadaJ1:=0;	//это сдублировать в isVigr23 на всякий случай
+ELSE
+	IF CurTaskSms2>0 THEN
+		IF (NOT PPprmPP[CurTaskSms2].3) OR (MsgToScadaJ1=16) THEN
+			SaveToScadaJ1:=1;
+		END_IF
+	END_IF
+END_IF
+
+IF msgToScadaJ1=32 THEN
+	VesDJ[1]:=0;
+	VesCJ[1]:=0;
+	IF DeleteFromRecipeJ[1] THEN
+		DeleteFromRecipeJ[1]:=FALSE;
+		VesPJ[1]:=0;
+		VesZJ[1]:=0;
+		VesZJ[1]:=0;
+		HaveJ1:=0;
+	END_IF		
+	DolivJ1_Done:=0;
+	DosingJ1_Done:=0;
+	msgFromScadaJ1:=0;
+	IF CurPortJ1<PPCouPort[CurTaskJ1] THEN
+		CurPortJ1:=CurPortJ1+1;
+		msgToScadaJ1:=1;
+	ELSE
+		CurPortJ1:=0;
+		msgToScadaJ1:=0;
+		CurTaskJ1:=0;
+	END_IF
+END_IF
+
+IF msgToScadaJ2=64 THEN
+	//заглушка - ничего не делаем 
+END_IF
+
+IF Regim.6 AND (CurTaskSms2>0) THEN
+	//жир удаляется из рецепта
+	IF SmsMainState>0 THEN SmsMainState.2:=1; END_IF
+	PPprmPP[CurTaskSms2].3:=0;
+	PPPrcJ1[CurTaskSms2]:=0;
+	VesZJ[1]:=0;
+	VesPJ[1]:=0;
+	msgToScadaJ1:=0;
+	HaveJ1:=0;
+	Regim.6:=0;
+END_IF

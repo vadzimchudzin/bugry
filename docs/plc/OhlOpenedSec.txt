@@ -1,0 +1,12 @@
+function OhlOpenedSec
+VAR
+  local   ii : WORD
+END_VAR
+
+(* ST *)
+OhlOpenedSec:=0;
+FOR ii:=0 TO 59 DO
+	IF OhlOpenedBySec[ii] THEN
+		OhlOpenedSec:=OhlOpenedSec+1;
+	END_IF
+END_FOR

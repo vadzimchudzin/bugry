@@ -1,0 +1,59 @@
+functionBlock CheckSpeedAndWeight
+VAR
+  local   wTmp : WORD
+  local   tSp : ARRAY[1..4] OF WORD
+  local   i : INT
+  local   j : INT
+  inOut   Check : BOOL
+  inOut   VesTo1 : WORD
+  inOut   VesTo2 : WORD
+  inOut   VesTo3 : WORD
+  inOut   SPEED_1 : WORD
+  inOut   SPEED_2 : WORD
+  inOut   SPEED_3 : WORD
+  inOut   SPEED_4 : WORD
+  inOut   Linear2to1 : BOOL  // плавное снижение скорости с 2 на 1
+END_VAR
+
+(* ST *)
+IF Check THEN
+	IF (MAX(VesTo3,VesTo2)<>VesTo3) THEN
+		wTmp := VesTo3; VesTo3:=VesTo2;VesTo2:=wTmp;	
+	END_IF
+	IF (MAX(VesTo3,VesTo1)<>VesTo3) THEN
+		wTmp := VesTo3; VesTo3:=VesTo1;VesTo1:=wTmp;	
+	END_IF
+	IF (MAX(VesTo2,VesTo1)<>VesTo2) THEN
+		wTmp := VesTo2; VesTo2:=VesTo1;VesTo1:=wTmp;	
+	END_IF
+	IF (VesTo2=VesTo1) THEN
+		Linear2to1:=FALSE;	
+	END_IF
+	//скорости в процентах
+	
+	IF SPEED_1>100 THEN SPEED_1:=100; END_IF
+	IF SPEED_2>100 THEN SPEED_2:=100; END_IF
+	IF SPEED_3>100 THEN SPEED_3:=100; END_IF
+	IF SPEED_4>100 THEN SPEED_4:=100; END_IF
+	
+	IF SPEED_1=0 THEN SPEED_1:=6; END_IF
+	IF SPEED_2=0 THEN SPEED_2:=6; END_IF
+	IF SPEED_3=0 THEN SPEED_3:=6; END_IF
+	IF SPEED_4=0 THEN SPEED_4:=6; END_IF
+	tSp[1]:=SPEED_1;	
+	tSp[2]:=SPEED_2;	
+	tSp[3]:=SPEED_3;	
+	tSp[4]:=SPEED_4;
+	FOR i:=1 TO 3 DO
+	  FOR j:=i+1 TO 4 DO
+		  IF tSp[i]>tSp[j] THEN
+			wTmp:=tSp[i]; tSp[i]:=tSp[j]; tSp[j]:=wTmp;
+		  END_IF	
+	  END_FOR
+	END_FOR
+	SPEED_1:=tSp[1];	
+	SPEED_2:=tSp[2];	
+	SPEED_3:=tSp[3];	
+	SPEED_4:=tSp[4];	
+  Check:=FALSE;
+END_IF

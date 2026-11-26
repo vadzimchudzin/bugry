@@ -1,0 +1,65 @@
+/* Дополнения к оформлению Родины для КЗ «Бугры»: карточка производства на
+   мнемосхеме, вкладка «Производство», таблицы порций и формы программ. */
+
+.prod-card { position: absolute; left: 14px; bottom: 52px; width: min(380px, calc(100% - 28px)); background: rgba(255,255,255,.95); border: 1px solid var(--line); border-left: 3px solid var(--navy); box-shadow: 0 4px 16px rgba(0,0,0,.08); padding: 10px 14px; font-size: 12px; font-weight: 600; pointer-events: auto; }
+.prod-card:empty { display: none; }
+.prod-card h4 { margin: 0 0 6px; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: var(--navy); display: flex; justify-content: space-between; gap: 8px; }
+.prod-card .pc-row { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
+.prod-card .pc-row span:last-child { font-variant-numeric: tabular-nums; text-align: right; }
+.prod-card .pc-bar { height: 5px; background: #e3e7ec; margin: 6px 0 2px; overflow: hidden; }
+.prod-card .pc-bar i { display: block; height: 100%; background: var(--go); }
+.prod-card.collapsed .pc-body { display: none; }
+.prod-card .pc-toggle { background: none; border: 0; padding: 0; color: var(--muted); font-weight: 800; }
+
+.pr-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 16px; }
+.pr-grid .panel { min-width: 0; }
+.pr-grid .panel.wide { grid-column: 1 / -1; }
+.form-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end; margin: 8px 0 12px; }
+.form-row label { display: flex; flex-direction: column; gap: 4px; font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+.form-row input, .form-row select { min-width: 120px; }
+.silo-pick { display: flex; flex-wrap: wrap; gap: 4px; }
+.silo-pick button { min-width: 44px; padding: 5px 6px; border: 1px solid var(--line-2); background: var(--panel); font-size: 12px; font-weight: 800; }
+.silo-pick button.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+.grid-table.compact td, .grid-table.compact th { padding: 6px 9px; }
+.grid-table td.c-num, .grid-table th.c-num { text-align: right; }
+.comp-done { color: #13793f; font-weight: 800; }
+.comp-now { color: #0a4c9a; font-weight: 800; }
+.mini-bar { display: inline-block; width: 70px; height: 6px; background: #e3e7ec; vertical-align: middle; margin-right: 6px; }
+.mini-bar i { display: block; height: 100%; background: linear-gradient(90deg, #b88a24, #f0c24e); }
+.stages { display: flex; gap: 4px; flex-wrap: wrap; }
+.stage-chip { font-size: 10px; font-weight: 800; letter-spacing: .6px; padding: 3px 7px; background: #e6eaef; color: #7b8794; text-transform: uppercase; }
+.stage-chip.on { background: var(--navy); color: #fff; }
+.stage-chip.done { background: rgba(31,163,92,.16); color: #13793f; }
+.empty-note { color: var(--muted); font-size: 12px; font-weight: 600; padding: 10px 0; }
+
+/* окна HMI: таблица компонентов и селектор бункеров */
+.dlg table.hmi-table { width: 100%; border-collapse: collapse; font-size: 15px; background: #fff; color: #000; }
+.dlg .hmi-table th { background: var(--hmi-row); color: #fff; padding: 4px 6px; text-align: left; font-weight: 400; border: 1px solid #fff; }
+.dlg .hmi-table td { padding: 3px 6px; border: 1px solid #9cb7c9; }
+.dlg .hmi-table tr.cur td { background: #fff3c2; }
+.dlg .hmi-table tr.done td { background: #dff5e4; }
+.dlg select { height: 24px; font-family: inherit; font-size: 15px; background: #fffff0; color: #000; border: 0; }
+.dlg .chk-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.dlg .chk-row .btn-sw { min-width: 52px; }
+.dlg .big-go.sm, .dlg .big-stop.sm { width: auto; min-width: 110px; padding: 0 12px; font-size: 22px; height: 36px; }
+.dlg .big-blue { width: auto; min-width: 110px; padding: 0 12px; height: 36px; background: #ffd21a; color: #222; border: 1px solid rgba(0,0,0,.35); font-family: "Arial Narrow", "Roboto Condensed", Arial, sans-serif; font-size: 20px; text-transform: uppercase; }
+.dlg .big-blue:disabled { opacity: .6; cursor: not-allowed; }
+
+@media (max-width: 700px) {
+  .pr-grid { grid-template-columns: 1fr; }
+  .prod-card { display: none; }
+}
+
+/* обозначения мнемосхемы */
+.legend { position: absolute; right: 14px; bottom: 60px; width: min(470px, calc(100% - 28px)); background: rgba(255,255,255,.97); border: 1px solid var(--line-2); border-left: 3px solid var(--red); box-shadow: 0 6px 20px rgba(0,0,0,.14); padding: 12px 16px; font-size: 12px; font-weight: 600; z-index: 5; }
+.legend[hidden] { display: none; }
+.legend h4 { margin: 0 0 8px; font-size: 11px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; }
+.legend p { margin: 8px 0 0; color: var(--muted); font-weight: 500; line-height: 1.45; }
+.lg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
+.lg-grid span { display: flex; align-items: center; gap: 8px; }
+.lg-grid i { flex-shrink: 0; }
+.lg-r { display: inline-grid; place-items: center; width: 16px; height: 16px; background: #1f63c6; color: #fff; font-style: normal; font-size: 10px; font-weight: 800; }
+.lg-lamp { width: 10px; height: 10px; border-radius: 50%; border: 1px solid #1b252c; }
+.lg-pipe { width: 26px; height: 8px; background: #8a97a6; border: 2px solid #5c6977; border-radius: 4px; }
+.lg-duct { width: 26px; height: 0; border-top: 3px dashed rgba(132,58,160,.85); }
+.lg-sw { width: 20px; height: 12px; border: 1px solid rgba(0,0,0,.25); }

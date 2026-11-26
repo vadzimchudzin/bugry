@@ -1,0 +1,186 @@
+functionBlock DrobilkaMolotkovaja
+VAR
+  input   next : BOOL  // Следующий механизм. После его запуска будет запущен механизм в автоматическом режиме через время timeBeforeStart
+  input   prev : BOOL  // Предыдущий механизм. После его остановки будет остановлен механизм в автоматическом режиме через время timeToStop
+  input   pause : BOOL  // Приостановить работу в автоматическом режиме (режим не сбрасывается)
+  input   ErrUPP : BOOL  // Защита двигателя
+  input   EnginRun : BOOL
+  input   EnginRunR : BOOL
+  input   EnginRunL : BOOL
+  input   OpenDoor1 : BOOL  // Концевой выключатель безопасности
+  input   OffOpenDoor1 : BOOL  // не учитывать Концевой выключатель безопасности
+  input   OpenDoor2 : BOOL  // Концевой выключатель безопасности
+  input   OffOpenDoor2 : BOOL  // не учитывать Концевой выключатель безопасности
+  input   canRunAuto : BOOL  // Условие для запуска в автоматическом режиме
+  input   HandMode : BOOL  // работа в ручном режиме, даже если идет процесс
+  input   AutoRight : BOOL  // Вправо в авто режиме.
+  input   AutoLeft : BOOL  // Влево в авто режиме.
+  input   timeBeforeStart : TIME := TIME#5s0ms  // Пауза перед запуском в автоматическом режиме
+  input   timeToStop : TIME := TIME#20s0ms  // Время на выгрузку из нории при остановке автоматического режима
+  input   yHandLeft : BOOL
+  input   yHandRight : BOOL
+  output  Run : BOOL  // Включение
+  output  RunLeft : BOOL  // включение пускателя влево !!!до Run
+  output  RunRight : BOOL  // включение пускателя вправо !!!до Run
+  output  DA : BOOL  // Авария
+  output  err_Eng : BOOL
+  output  err_EngR : BOOL
+  output  err_EngL : BOOL
+  output  err_UPP : BOOL
+  output  err_Door1 : BOOL
+  output  err_Door2 : BOOL
+  output  state : WORD
+  output  TimeOutL : WORD
+  output  TimeOutR : WORD
+  output  HandLeftSet : BOOL
+  output  HandLeftReset : BOOL
+  output  HandRightSet : BOOL
+  output  HandRightReset : BOOL
+  local   rr : BOOL  // Готовность к работе
+  local   run_auto : BOOL  // Запуск в автоматическом режиме
+  local   TON_Start_Auto : TON
+  local   TON_Stop_Auto : TON
+  local   temp : BOOL
+  local   offState : WORD := 0
+  local   runState : WORD := 1
+  local   alarmState : WORD := 2
+  local   DirectOnRun : BOOL
+  local   runPusk : BOOL
+  local   TON_Pusk : TON
+  local   flRunLeft : BOOL
+  local   flRunRight : BOOL
+  local   TOF_0ffRight : TOF
+  local   TOF_0ffLeft : TOF
+  local   TON_LTLeft : TON
+  local   TON_LTRun : TON
+  local   TON_LTRight : TON
+  local   isHandMode : BOOL
+  local   NotRunLeft : BOOL
+  local   NotRunRight : BOOL
+  local   TOF_RunLeft : TOF
+  local   TOF_RunRight : TOF
+  local   NotRun : BOOL
+  local   F_TRIG_Run : F_TRIG
+  local   TP_Run : TP
+  local   HandLeftOnBegin : BOOL
+  local   HandRightOnBegin : BOOL
+  local   MHCalc_L : MHCalc
+  local   MHCalc_R : MHCalc
+  local   MHCalc_run : MHCalc
+  inOut   MH : DWORD
+  inOut   aMH : DWORD
+  inOut   MHL : DWORD
+  inOut   aMHL : DWORD
+  inOut   MHR : DWORD
+  inOut   aMHR : DWORD
+END_VAR
+
+(* LD *)
+
+// ---
+HandLeftOnBegin := yHandLeft;
+HandRightOnBegin := yHandRight;
+
+// --- Долго не включается двигатель
+TON_LTRun(IN:=Run AND NOT EnginRun, PT:=T#4s);
+IF TON_LTRun.Q THEN err_Eng := TRUE; END_IF
+
+// --- Долго не включается вращение вправо
+TON_LTRight(IN:=RunRight AND Run AND NOT EnginRunR, PT:=T#4s);
+IF TON_LTRight.Q THEN err_EngR := TRUE; END_IF
+
+// --- Долго не включается вращение влево
+TON_LTLeft(IN:=RunLeft AND Run AND NOT EnginRunL, PT:=T#4s);
+IF TON_LTLeft.Q THEN err_EngL := TRUE; END_IF
+
+// ---
+IF ResetErrors THEN err_UPP := FALSE; END_IF
+IF ResetErrors THEN err_Eng := FALSE; END_IF
+IF ResetErrors THEN err_EngR := FALSE; END_IF
+IF ResetErrors THEN err_EngL := FALSE; END_IF
+IF ResetErrors THEN err_Door2 := FALSE; END_IF
+IF ResetErrors THEN err_Door1 := FALSE; END_IF
+
+// ---
+IF true AND ErrUPP THEN err_UPP := TRUE; END_IF
+IF true AND OpenDoor1 AND NOT OffOpenDoor1 THEN err_Door1 := TRUE; END_IF
+IF true AND OpenDoor2 AND NOT OffOpenDoor2 THEN err_Door2 := TRUE; END_IF
+
+// --- Готовность к работе
+rr := NOT err_UPP AND NOT err_Eng AND NOT err_EngR AND NOT err_EngL AND NOT err_Door1 AND NOT err_Door2 AND NOT GEmer;
+da := NOT (NOT err_UPP AND NOT err_Eng AND NOT err_EngR AND NOT err_EngL AND NOT err_Door1 AND NOT err_Door2);
+
+// ---
+IF R_TRIG(HandMode) AND canRunAuto AND run_auto AND flRunLeft THEN yHandLeft := TRUE; END_IF
+IF R_TRIG(HandMode) AND canRunAuto AND run_auto AND flRunRight THEN yHandRight := TRUE; END_IF
+
+// --- Запуск автоматического режима
+TON_Start_Auto(IN:=MAuto AND rr AND canRunAuto AND NOT HandMode AND next, PT:=timeBeforeStart);
+IF TON_Start_Auto.Q THEN run_auto := TRUE; END_IF
+
+// ---
+TON_Stop_Auto(IN:=NOT canRunAuto AND NOT prev, PT:=timeToStop);
+
+// ---
+
+// --- Сброс автоматического режима
+IF (NOT MAuto OR NOT rr OR NOT next OR TON_Stop_Auto.Q OR (F_TRIG(AutoRight)) OR (F_TRIG(AutoLeft)) OR HandMode) THEN run_auto := FALSE; END_IF
+
+// ---
+IF (NOT rr OR (RunDosing AND NOT HandMode) OR (yHandRight AND yHandLeft)) THEN yHandLeft := FALSE; END_IF
+IF (NOT rr OR (RunDosing AND NOT HandMode) OR (yHandRight AND yHandLeft)) THEN yHandRight := FALSE; END_IF
+
+// --- флаг на Включение пускателя вправо
+flRunRight := ((((MAuto AND run_auto AND NOT pause AND AutoRight AND NOT AutoLeft) OR yHandRight) AND rr) AND NOT NotRunRight) AND NOT NotRun;
+
+// --- флаг на Включение пускателя влево
+flRunLeft := ((((MAuto AND run_auto AND NOT pause AND AutoLeft AND NOT AutoRight) OR yHandLeft) AND rr) AND NOT NotRunLeft) AND NOT NotRun;
+
+// --- Включение УПП
+TON_Pusk(IN:=(flRunRight OR flRunLeft), PT:=t#500ms);
+Run := TON_Pusk.Q;
+
+// --- Работа пускателя вправо. 5сек задержки на выключение - потому, что УПП долго выключается
+TOF_0ffRight(IN:=flRunRight, PT:=t#5s);
+RunRight := TOF_0ffRight.Q;
+
+// --- Работа пускателя влево
+TOF_0ffLeft(IN:=flRunLeft, PT:=t#5s);
+RunLeft := TOF_0ffLeft.Q;
+
+// ---
+TOF_RunLeft(IN:=EnginRun AND EnginRunR, PT:=t#300s);
+NotRunLeft := TOF_RunLeft.Q;
+TOF_RunRight(IN:=EnginRun AND EnginRunL, PT:=t#300s);
+NotRunRight := TOF_RunRight.Q;
+
+// ---
+IF (TOF_RunLeft.ET>(T#0s)) THEN TimeOutL := (300-int_to_word(real_to_int(time_to_real(TOF_RunLeft.ET)/1000))); END_IF
+IF (TOF_RunLeft.ET>(T#0s)) THEN TimeOutL := 0; END_IF
+IF (TOF_RunRight.ET>(T#0s)) THEN TimeOutR := (300-int_to_word(real_to_int(time_to_real(TOF_RunRight.ET)/1000))); END_IF
+IF (TOF_RunRight.ET>(T#0s)) THEN TimeOutR := 0; END_IF
+
+// ---
+F_TRIG_Run(CLK:=((EnginRun AND EnginRunR) OR (EnginRun AND EnginRunL)));
+TP_Run(IN:=F_TRIG_Run.Q, PT:=t#5s);
+NotRun := TP_Run.Q;
+
+// ---
+MHCalc_L(Run:=EnginRun AND EnginRunL, MH:=MHL, aMH:=aMHL);
+MHCalc_R(Run:=EnginRun AND EnginRunR, MH:=MHR, aMH:=aMHR);
+MH := (MHL+MHR);
+IF (MHL+MHR) THEN aMH := (aMHL+aMHR); END_IF
+
+// ---
+HandLeftSet := yHandLeft AND NOT HandLeftOnBegin;
+HandLeftReset := NOT yHandLeft AND HandLeftOnBegin;
+HandRightSet := yHandRight AND NOT HandRightOnBegin;
+HandRightReset := NOT yHandRight AND HandRightOnBegin;
+
+// --- Статус дробилки(0-выключен без аварии, 1-работает, 2-авария)
+IF NOT da AND NOT run THEN state := offState; END_IF
+temp := offState /*EN=NOT da AND NOT run*/;
+IF NOT da AND run THEN state := runState; END_IF
+temp := runState /*EN=NOT da AND run*/;
+IF da THEN state := alarmState; END_IF
+temp := alarmState /*EN=da*/;

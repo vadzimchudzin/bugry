@@ -1,0 +1,696 @@
+program MainCycle1
+VAR
+  local   ii : WORD
+  local   jj : WORD
+  local   couStep : WORD
+  local   tmp : WORD
+  local   RTrigRegim9 : Standard.R_TRIG
+  local   Daley : BOOL
+  local   tmpVes : REAL
+  local   SUBNum : WORD
+  local   NeedRecalc : BOOL
+  local   NewPorc : REAL
+  local   Delta : REAL
+  local   PredLim : REAL
+  local   fl : BOOL
+  local   RecalcJDos : BOOL
+  local   FTrigAutoPause : Standard.F_TRIG
+  local   RTrigStopDosing : Standard.R_TRIG
+  local   RTRIGUnloadSt : R_TRIG
+  local   flsds : INT
+  local   NewErr0 : WORD
+  local   rrr : LREAL
+  local   rr1 : LREAL
+  local   rr2 : LREAL
+  local   AllInit : BOOL
+  local   arr : ARRAY[1..10] OF DWORD
+  local   minIdNum : WORD
+  local   minId : DWORD
+  local   CheckCUL : WORD
+  local   DelayUnlList : TON
+  local   ttttt : BOOL
+  local   vvv : ARRAY[1..5] OF REAL
+  local   tmpStopWork : WORD
+  local   tttt : BOOL
+  local   TON_Zachistka : Ton
+  local   aaa : INT
+  local   CanStartUnload : BOOL
+END_VAR
+
+(* ST *)
+IF Every1Sec THEN
+	IF FirstCycle=0 THEN 
+		// Это, чтобы при включении шкафа не сетились ошибки по аварийным стопам, если они не нажаты
+		ttt:=ttt+1;
+		IF ttt>1 THEN 
+			FirstCycle:=1;
+		END_IF
+	END_IF
+	IF Sec10=10 THEN
+		Sec10:=1;
+	ELSE
+		Sec10:=Sec10+1;
+	END_IF
+END_IF
+
+PrgCheckVar();	// проверка допустимости значений переменных
+
+IF Regim2.0 THEN
+	Regim2.0:=0;
+	PBDState:=0;
+	SmsUpState:=0;
+	SmsMainState:=0;
+	Regim2.9:=0;
+	Regim2.10:=0;
+	UnloadSt:=0;
+END_IF
+
+tmpStopWork := StopWork;
+IF (tmpStopWork<>StopWorkPred) THEN
+	IF tmpStopWork=1 THEN
+		//после выполнения ПП
+		Regim2.9:=0;
+	ELSIF tmpStopWork=2 THEN
+		//после выполнения порции
+		StopDosingID:=0;
+		IF msgToScadaK>2 AND msgToScadaK<32 THEN
+			StopDosingID:=idK;
+		END_IF 
+		IF msgToScadaD>2 AND msgToScadaD<32 AND ((idD>idK) OR (StopDosingID=0)) THEN
+			StopDosingID:=idD;
+		END_IF 
+		IF msgToScadaM>2 AND msgToScadaM<32 AND (idM>idK AND idM>idD OR (StopDosingID=0)) THEN
+			StopDosingID:=idM;
+		END_IF
+		Regim2.9:=0;
+	ELSIF tmpStopWork=3 THEN
+		//полный стоп
+		tmpStopWork:=0;
+		PBDState:=0;
+		SmsUpState:=0;
+		SmsMainState:=0;
+		Regim2.9:=0;
+		Regim2.10:=0;
+		UnloadSt:=0;
+	END_IF
+	StopWorkPred:=tmpStopWork;
+END_IF
+StopWork:=0;
+
+RTrigRegim9(CLK:=Regim2.9);
+IF RTrigRegim9.Q THEN
+	IF Regim2.10 THEN
+		//возобновление производства
+		msgFromScadaK:=0;
+		msgFromScadaD:=0;
+		msgFromScadaM:=0;
+		IF (msgToScadaK=0) OR (msgToScadaK=64) THEN
+			IF CurPortK>1 THEN
+				msgToScadaK:=2;
+			ELSE
+				msgToScadaK:=1;
+			END_IF
+		END_IF
+		IF (msgToScadaD=0) OR (msgToScadaD=64) THEN
+			IF CurPortD>1 THEN
+				msgToScadaD:=2;
+			ELSE
+				msgToScadaD:=1;
+			END_IF
+		END_IF
+		(*IF (msgToScadaM=0) OR (msgToScadaM=64) THEN
+			IF CurPortM>1 THEN
+				msgToScadaM:=2;
+			ELSE
+				msgToScadaM:=1;
+			END_IF
+		END_IF*)
+	END_IF 
+	StopWork:=0;
+	StopDosingID:=0;	
+END_IF
+
+
+IF Regim2.9 THEN
+	StopWork:=0;
+	StopDosingID:=0;	
+	IF (NOT Regim2.10) AND flStartDosing THEN
+		//производство только запущено со скады
+		StartDosing();
+	END_IF 
+END_IF
+
+IF NOT (Regim2.9 OR Regim2.10) THEN
+	StopWork:=0;
+	StopDosingID:=0;
+END_IF
+
+RunDosing := Regim2.10;	//производство работает. Надо везде использовать RunDosing
+//производство останавливается. Regim2.9 снят
+StopDosing := Regim2.10 AND NOT Regim2.9;
+EmerStopScada:=Regim2.13;
+ResetErrors:=Regim2.14;
+
+GEmer:=(EmerPuskBtn OR EmerStopShkaf OR EmerStopScalp OR EmerStopBunkZ OR EmerStopBunkD OR EmerStopBunkV OR EmerStopExit OR EmerStopUdjk OR EmerStopScada);
+
+  IF ResetErrors THEN
+	EmerPuskBtn:=0;
+	EmerStopShkaf:=0;
+	EmerStopScalp:=0;
+	EmerStopBunkZ:=0;
+	EmerStopBunkD:=0; 
+	EmerStopBunkV:=0; 
+	EmerStopExit:=0;
+	EmerStopUdjk:=0;
+	EmerStopScada:=0;
+	Regim2.13:=0;
+	ErrRKF:=0;	
+	RunLamp:=0;
+	ErrUnloadK:=FALSE;
+	ErrUnloadD:=FALSE;
+	ErrUnloadM:=FALSE;
+	
+	Err29:=0;
+	
+	//RstErrPCH_TrSms := 1;
+	//RstErrPCH_TrHole := 1;
+  END_IF
+    
+  RunSirena:=(flRunSirenaEm OR flRunSirena) AND (NOT Regim.2) OR Regim2.4;
+  
+  RunPCH_Scalp:=NOT(GEmer);
+  RunPCH_TrDob:=NOT(GEmer);
+  RunPCH_Pit1:=NOT(GEmer);
+  RunPCH_Pit2:=NOT(GEmer);
+  RunPCH_TrSms:=NOT(GEmer);
+
+  MHand:=Regim.0;
+  MAuto:=NOT MHand;
+  MGod:=Regim.1;
+  //MGod:= 1; 
+  MAutoPause:=Regim.7;
+  
+  IF NOT MAuto THEN MAutoPause:=FALSE; END_IF
+  FTrigAutoPause(clk:=MAutoPause);
+  IF FTrigAutoPause.Q THEN
+	  PauseDosingK:=FALSE;
+	  PauseDosingD:=FALSE;
+	  PauseDosingM:=FALSE;
+	  PauseDosingJ1:=TRUE;
+	  PauseDosingJ2:=TRUE;
+  END_IF
+  
+
+  NewErr0 :=0;
+  NewErr0.0:=EmerPuskBtn; 	//Не нажат ПУСК на шкафу 
+  NewErr0.1:=EmerStopShkaf;//аварийный стоп на шкафу
+  NewErr0.2:=EmerStopScalp;//аварийный стоп на зав. яме
+  NewErr0.3:=EmerStopBunkZ;	//аварийный стоп на дробилке
+  NewErr0.4:=EmerStopBunkD;	//аварийный стоп на бункерах
+  NewErr0.5:=EmerStopBunkV;	//EmerStopScalp;	//аварийный стоп на скальператоре
+  NewErr0.6:=EmerStopExit;	//аварийный стоп возле лестницы
+  NewErr0.10:=EmerStopUdjk;
+  NewErr0.11:=EmerStopFire;
+  NewErr0.12:=mErrRKF;
+  IF NewErr0>0 THEN
+	  EmerStopScada:=0;
+  END_IF
+  Err0:=NewErr0;
+  Err0.9:=EmerStopScada;  
+  RunLamp:=(NewErr0>0) OR ErrAz_TrHole OR ErrAz_NorHole OR ErrAz_DVPT OR ErrAz_Nor1 OR ErrAz_Tr1 OR ErrAz_Tr1L OR 
+  	ErrAz_ShR1 OR ErrAz_ShR2 OR ErrAz_Tr1R OR ErrAz_ShL1 OR ErrAz_ShL2 OR ErrAz_TrKomp OR 
+	ErrAz_Nor2 OR ErrAz_Nor3 OR ErrAz_TrDrob OR ErrPCH_TrSms OR errAz_Nor4;
+
+  ErrRes:=(SaveErr0<Err0) OR (SaveErr1<Err1) OR (SaveErr2<Err2) OR (SaveErr3<Err3) OR (SaveErr4<Err4) OR (SaveErr5<Err5) OR
+		  (SaveErr6<Err6) OR (SaveErr7<Err7) OR (SaveErr8<Err8) OR (SaveErr9<Err9) OR (SaveErr10<Err10) OR
+		  (SaveErr11<Err11) OR (SaveErr12<Err12) OR (SaveErr13<Err13) OR (SaveErr14<Err14) OR 
+		  (SaveErr16<Err16) OR (SaveErr17<Err17) OR (SaveErr18<Err18) OR (SaveErr20<Err20) OR (SaveErr22<Err22);
+  
+		  
+SaveErr0:=Err0;
+SaveErr1:=Err1;
+SaveErr2:=Err2;
+SaveErr3:=Err3;
+SaveErr4:=Err4;
+SaveErr5:=Err5;
+SaveErr6:=Err6;
+SaveErr7:=Err7;
+SaveErr8:=Err8;
+SaveErr9:=Err9;
+SaveErr10:=Err10;
+SaveErr11:=Err11;
+SaveErr12:=Err12;
+SaveErr13:=Err13;
+SaveErr14:=Err14;
+SaveErr15:=Err15;  
+SaveErr16:=Err16;
+SaveErr17:=Err17;
+SaveErr18:=Err18;
+SaveErr20:=Err20;
+SaveErr22:=Err22;  
+SaveErr23:=Err23;  
+SaveErr24:=Err24;  
+SaveErr25:=Err25;  
+SaveErr26:=Err26;  
+SaveErr27:=Err27;  
+SaveErr28:=Err28;  
+SaveErr29:=Err29;  
+  
+IF Ves01a=0 THEN Ves01a:=1; END_IF	  
+IF Ves02a=0 THEN Ves02a:=1; END_IF	  
+IF Ves03a=0 THEN Ves03a:=1; END_IF	  
+IF Ves04a=0 THEN Ves04a:=1; END_IF	  
+IF Ves05a=0 THEN Ves05a:=1; END_IF	  
+  			
+IF NOT (RunDosing OR StopDosing) THEN
+	InitAllVar();
+END_IF
+  
+MainCycleLoad();
+//MainCycleLoadD(); 
+MainCycleUnload();
+  
+IF RunDosing THEN	//Regim2.10
+	PrgEventsBV();	// события от больших весов
+	IF idS1=idPBD AND idS1>0 AND (NOT (SmsUpState.0 OR SmsUpState.8)) AND HaveKomp THEN
+		SmsUpState.0:=1;
+		IF DefectPBD THEN
+			SmsUpState.15:=TRUE;
+			DefectPBD:=0;
+		END_IF		
+		//поехали выгружать в предбункер смесителя
+		VesSmsR[1]:=VesSmsR[1]+VesPBD;
+		VesPBD:=0;
+	END_IF
+	PrgEventsSV();	// события от средних весов
+	//PrgEventsMV();	// события от малых весов
+	PrgEventsJ1();
+	//PrgEventsJ2();
+		
+	//предбункер смесителя пуст, не заблокирован, клапан закрыт
+	IF (SmsUpState=0) AND (idS1=0) AND (KlapClosed) AND (NOT BlockSms1) THEN  
+		//выбираем Id порции, которую будем выгружать в смеситель
+		//находим наименьший, больший нуля id
+		//старт выгрузки в смеситель
+		//CurTaskSms1:=0;
+		CurPortSms1:=0;
+		VesSmsR[1]:=0;
+
+		FOR ii:=1 TO 4 DO arr[ii]:=0; END_FOR
+		arr[1]:=idK;	arr[2]:=idPBD;	arr[3]:=idD;	arr[4]:=idM;	
+		minIdNum:=0;
+		minId:=0;
+		
+		
+		FOR ii:=1 TO 4 DO
+			IF arr[ii]>0 AND (minId=0 OR arr[ii]<minId) THEN
+				minId:=arr[ii];
+				minIdNum:=ii;
+			END_IF
+		END_FOR
+		IF minId>0 THEN	//нашли id
+			idS1:=minId;
+			IF minIdNum=1 THEN
+				CurTaskSms1:=CurTaskK;
+			ELSIF minIdNum=2 THEN
+				CurTaskSms1:=CurTaskPBD;
+			ELSIF minIdNum=3 THEN
+				CurTaskSms1:=CurTaskD;
+			//ELSIF minIdNum=4 THEN
+			//	CurTaskSms1:=CurTaskM;
+			END_IF
+		END_IF
+	ELSE	//(SmsUpState>0)
+		IF CurPortSms1=0 THEN
+			IF (CurPortPBD>0) AND (SmsUpState.0) AND (idS1=idPBD) THEN
+				CurPortSms1:=CurPortPBD;
+			END_IF
+			IF (CurPortD>0) AND SmsUpState.1 AND (idS1=idD) THEN
+				CurPortSms1:=CurPortD;
+			END_IF
+			//IF (CurPortM>0) AND SmsUpState.9 AND (idS1=idD) THEN
+			//	CurPortSms1:=CurPortD;
+			//END_IF
+			IF CurPortSms1>0 THEN
+				IF NOT PPprmPP[CurTaskSms1].0 THEN
+					SmsUpState.5:=1;
+					SmsUpState.6:=1;
+					SmsUpState.7:=1;
+					SmsUpState.8:=1;
+				END_IF
+				IF NOT PPprmPP[CurTaskSms1].1 THEN
+					SmsUpState.2:=1;
+					SmsUpState.3:=1;
+					SmsUpState.4:=1;
+				END_IF
+				IF NOT PPprmPP[CurTaskSms1].2 THEN
+					SmsUpState.11:=1;
+					SmsUpState.12:=1;
+					SmsUpState.13:=1;
+				END_IF	
+			END_IF
+		END_IF
+	END_IF
+	
+	IF (SmsUpState>0) AND (idS1>0) AND (LastIdGPortSms1<>idS1) THEN
+		//увеличение счетчика порций за смену
+		LastIdGPortSms1:=idS1;
+		gPortSms1:=gPortSms1+1;
+	END_IF
+	
+	IF CurTaskSms1>0 AND CurTaskSms2=0 THEN
+		CurTaskSms2:=CurTaskSms1;
+		CurPortSms2:=0;
+		TimeZames01:=PPtime_suh[CurTaskSms2];
+		TimeZames02:=PPtime_mokr[CurTaskSms2];
+	END_IF
+
+	IF (CurTaskSms3=0) AND (CurTaskSms2>0) THEN
+		IF UnloadSt<2 AND (AllUnloadGPStop) THEN
+			//пака что так	
+			CurTaskSms3:=CurTaskSms2;
+			FOR ii:=1 TO CBGP DO
+			  UnloadBunk[ii]:=FALSE;
+			  unloadList[ii]:=0;
+			END_FOR
+			UnloadPath:=255;	//со скады должен установиться 0..8
+			UnloadStop:=0;			
+			msgFromScadaUnl:=0; 	
+			msgToScadaUnl:=1;
+			MustStartUnload:=FALSE;
+		END_IF
+	END_IF
+	DelayUnlList(IN:=(msgToScadaUnl=1 AND msgFromScadaUnl>0), PT:=T#1S);
+	IF DelayUnlList.Q AND (UnloadPath<=255) THEN
+		//пришел ответ от скады, что очередь на выгрузку заполнена
+		UseGran:=UnloadPath.0;
+		//UseIzm :=UnloadPath.1;
+		//UseJir :=UnloadPath.2;
+		//UseMel :=UnloadPath.3;
+		//CloseShDop:=1;
+		//MelasState:=0;
+		CheckCUL:=0;
+		FOR ii:=1 TO msgFromScadaUnl DO
+			IF unloadList[ii]>0 THEN CheckCUL:=CheckCUL+1; ELSE EXIT; END_IF					
+		END_FOR
+		IF CheckCUL=msgFromScadaUnl THEN
+			MustStartUnload:=TRUE;
+			msgFromScadaUnl:=0;
+			msgToScadaUnl:=0; 
+		END_IF 
+	END_IF	  
+
+	IF MustStartUnload THEN
+		CanStartUnload:=FALSE;
+		IF UseGran THEN
+			//нужен гранулятор
+			//IF GranIsEmpty THEN
+				NewGranIdPP:=PPidPP[CurTaskSms3];
+				//NewGranUnl309:=UnloadPath.4;
+				//NewGranUnl310:=UnloadPath.5;
+				//NewGranUnlZ310:=UnloadPath.6;
+				//NewGranUnl8:=NOT (UnloadPath.4 OR UnloadPath.5 OR UnloadPath.6);
+				NewGranUnlRun:=1;
+				CanStartUnload := TRUE;				
+			//END_IF
+		ELSE
+			//не нужен гранулятор
+			CanStartUnload := TRUE;				
+		END_IF
+		IF CanStartUnload THEN
+			MustStartUnload := FALSE;
+			IF SmsMainState.15 THEN 
+				UnloadSt:=1+2+32;
+			ELSE 
+				UnloadSt:=1+2+8; 
+			END_IF 		
+		END_IF 		
+	END_IF
+
+	IF (CurTaskSms3=0) AND (CurTaskSms2>0) AND (UnloadSt>1) THEN
+		//на случай, если для бункера 3 задача не определена, но выгрузка работает по какому-то заданию
+		UnloadSt.0:=0;
+	END_IF
+	
+	IF isVigr12  THEN
+		isVigr12:=0;	
+		MustKlapOpen:=0;
+		CurPortSms2:=CurPortSms1;
+		gPortSms2:=gPortSms1;
+		gPortSms1:=0;
+		idS2:=idS1;
+		IF CurPortSms1>=PPCouPort[CurTaskSms1] THEN 
+			CurTaskSms1:=0;
+		END_IF
+		CurPortSms1:=0;
+		idS1:=0;
+		IF NOT PPprmPP[CurTaskSms2].5 THEN
+			SmsMainState.4:=1;	//нет ручного ввода, считаем, что добавлен
+			SmsMainState.0:=1;	//в этой версии - значит в смесителе всё есть
+		END_IF
+		SmsMainState.8:=1;	//можно сыпать ручной ввод
+		SmsMainState.10:=1;
+		SmsMainState.15:=SmsUpState.15;
+		SmsUpState:=0;
+		VesSmsR[2]:=VesSmsR[1];
+		VesSmsR[1]:=0;
+	END_IF	
+		
+	IF IsVigr23 THEN
+		IsVigr23:=0;
+		SaveToScadaJ1:=0;
+		SaveToScadaJ2:=0;
+		gPortSms3:=gPortSms2;
+		gPortSms2:=0;
+		IF idS2>0 THEN
+			idS3:=idS2;
+		END_IF
+		SmsMainState:=0;
+		MustShOpen:=0;
+		IF VesSmsR[2]>0 THEN
+			VesSmsR[3]:=VesSmsR[2];
+		END_IF
+		IF CurPortSms2>=PPCouPort[CurTaskSms2] THEN 
+			CurTaskSms2:=0;
+			msgToScadaJ1:=0;
+			msgToScadaJ2:=0;
+			CurTaskJ1:=0;
+			CurTaskJ2:=0;
+			Port_Need:=0;
+			Port_Done:=0;
+			VesDJ[1]:=0;	VesCJ[1]:=0;	VesPJ[1]:=0;	VesZJ[1]:=0;
+			VesDJ[2]:=0;	VesCJ[2]:=0;	VesPJ[2]:=0;	VesZJ[2]:=0;
+		ELSE
+			msgToScadaJ1:=32;
+			msgToScadaJ2:=32;
+		END_IF
+		idS2:=0;
+		CurPortSms2:=0;
+		msgToScadaSms2:=0;
+		msgFromScadaSms2:=0;		
+	END_IF
+	
+	IF ((isVigr3Wait>0) AND NOT (UseGran))THEN
+		isVigr3Wait:=2;
+	END_IF
+	
+	TON_Zachistka(IN:=isVigr3Wait=1,PT:=T#60S);
+	IF TON_Zachistka.Q THEN 
+		isVigr3Wait:=2; 
+		UnloadSt.0:=0;	//останавливаем выгрузку
+	END_IF
+	
+	IF isVigr3S AND (isVigr3Wait<>1) THEN
+		IF ((CurPortSms3>=PPCouPort[CurTaskSms3]) OR (StopDosingID>0 AND idS3>=StopDosingID)) THEN
+			IF (isVigr3Wait=0) THEN
+				isVigr3Wait:=1;	//переходим в режим ожидания
+			ELSE
+				IF msgToScadaClearTask=0 THEN
+					msgFromScadaClearTask:=0;		
+					IF CurPortSms3>=PPCouPort[CurTaskSms3] THEN
+						msgToScadaClearTask:=100+CurTaskSms3;	//для скады, что надо ПП с id=PPidPP[CurTaskSms3] установить state=4 (выполнена) и убрать из списка активных ПП 
+					ELSE
+						msgToScadaClearTask:=200+CurTaskSms3;	//для скады, что надо ПП с id=PPidPP[CurTaskSms3] установить state=0 (не активна) и убрать из списка активных ПП
+					END_IF
+					UnloadSt.0:=0;
+					CurTaskSms3:=0;
+					CurPortSms3:=0;
+				ELSIF msgFromScadaClearTask>0 THEN
+					isVigr3Save:=1;
+					msgFromScadaClearTask:=0;		
+					msgToScadaClearTask:=0;
+				END_IF			
+			END_IF
+		ELSE
+			isVigr3Save:=1;
+		END_IF
+		
+		IF isVigr3Save THEN
+			CurPortSms3:=0;
+			idS3:=0;
+			VesSmsR[3]:=0;
+			isVigr3S:=0;
+			isVigr3Save:=0;
+		END_IF
+	END_IF		
+	
+	IF (msgToScadaClearTask>100) AND (msgFromScadaClearTask=2) THEN
+		msgFromScadaClearTask:=0;		
+		msgToScadaClearTask:=0;
+	END_IF
+	
+	IF (CurTaskSms2>0) AND (PPidPP[CurTaskSms2]=0) THEN CurTaskSms2:=0;	END_IF
+	IF (CurTaskSms3>0) AND (PPidPP[CurTaskSms3]=0) THEN CurTaskSms3:=0;	END_IF
+
+	IF StopDosing THEN
+		//
+	END_IF	
+
+	PrgCheckQuality();	// проверка качества порций	
+    
+	IF ((CurTaskSms2>0)) THEN 
+		IF Port_Need=0 THEN 
+			TaskPort_Need:=CurTaskSms2;
+			Port_Need:=PPCouPort[CurTaskSms2];
+		END_IF
+	ELSE
+		IF ((CurTaskK=0) OR (CurTaskK<>TaskPort_Need)) AND ((CurTaskD=0) OR (CurTaskD<>TaskPort_Need)) AND 
+			((CurTaskPBD=0) OR (CurTaskPBD<>TaskPort_Need)) THEN
+			
+			Port_Need:=0;
+			Port_Done:=0;	
+		END_IF
+	END_IF
+	
+	
+	
+ELSE	// RunDosing
+	
+	CurTaskSms1:=0;
+	CurTaskSms2:=0;
+	CurTaskSms3:=0;
+	msgToScadaUnl:=0;
+	msgFromScadaUnl:=0;
+		
+	msgFromScadaK:=0;		msgToScadaK:=0; 	CurVesPortK:=0;		CurPortK:=0;	CurTaskK:=0;		
+	msgFromScadaD:=0;		msgToScadaD:=0; 	CurVesPortD:=0;		CurPortD:=0;	CurTaskD:=0;		
+	msgFromScadaM:=0;		msgToScadaM:=0; 	CurVesPortM:=0;		CurPortM:=0;	CurTaskM:=0;		
+	msgFromScadaJ1:=0;		msgToScadaJ1:=0;	CurVesPortJ1:=0;	 				
+	msgFromScadaJ2:=0;		msgToScadaJ2:=0;	CurVesPortJ2:=0;	 				
+
+	CanRunAutoD:=FALSE;
+	CanRunAutoK:=FALSE;
+	CanRunAutoDrob:=FALSE;
+	Port_Need:=0;
+	Port_Done:=0;
+	idK:=0; idPBD:=0; idD:=0; idM:=0; idS1:=0; idS2:=0; idS3:=0; 
+	SmsUpState:=0; SmsMainState:=0;
+	CurPortDr:=0;
+	CurPortPBD:=0;
+	CurPortSms1:=0;	
+	CurPortSms2:=0;	
+	CurPortSms3:=0;	
+	CurTaskPBD:=0;
+	MustShOpen:=0;	
+	
+END_IF
+
+  
+  
+IF IsFirstMastCycle() THEN
+	IF TokNom1<1 THEN
+		TokIdl1:=100; //83.0 A
+		TokNom1:=320;
+		TokMax1:=350;
+	END_IF
+	IF TokNom2<1 THEN
+		TokIdl2:=100; //83.0 A
+		TokNom2:=320;
+		TokMax2:=350;
+	END_IF
+	IF TimeZames01=0 THEN
+		TimeZames01:=30;
+	END_IF
+	IF TimeZames02=0 THEN
+		TimeZames02:=150;
+	END_IF
+	ResetErrors:=1;
+	Regim.0:=0;
+	GranIsEmpty:=1;
+	OhlIsEmpty:=1;
+END_IF
+	
+IF fHand7.15 THEN
+	fHand1 := 0;
+	fHand2 := 0;
+	fHand3 := 0;
+	fHand4 := 0;
+	fHand5 := 0;
+	fHand6 := 0;
+	fHand7 := 0;
+	fHand8 := 0;
+	fHand9 := 0;
+	fHand10:= 0;
+	fHand11:= 0;
+	fHand12:= 0;
+	fHand13:= 0;
+	fHand14:= 0;
+	fHand15:= 0;	
+END_IF
+
+IF Regim2.5 THEN
+	gPortBV 	:=0;
+	gPortSV 	:=0;
+	gPortMV 	:=0;
+	gPortJ1 	:=0;
+	gPortJ2 	:=0;
+	gPortSms1 	:=0;
+	gPortSms2 	:=0;
+	gPortGran 	:=0;
+	gPortNJ 	:=0;
+	gPortMel 	:=0;
+    Regim2.5:=0;	
+END_IF
+	
+
+//Гранулятор
+//===========================================================================================
+IF GranIdPP=0 AND NewGranIdPP>0 THEN
+	//путь от гранулятора свободен а над гранулятором что-то есть
+	GranIdPP:=NewGranIdPP;
+	GranPath:=NewGranPath;
+	NewGranIdPP:=0;
+	NewGranPath:=0;
+END_IF
+
+IF DNU_PBGran AND (isVigr3Wait=0) THEN 
+	UnloadStop:=0;
+END_IF
+IF OhlIsEmpty THEN
+	GranUnlRun := 0;
+	IF GranIsEmpty THEN
+		GrStart := 0;
+	END_IF	
+END_IF
+
+IF UseGran AND (UnloadStop>0) AND (UnloadSt=0) THEN
+	GranIdPP:=0;
+	UnloadStop:=0;
+	UseGran:=0;
+	GranPath:=0;
+END_IF
+
+
+IF GrStart AND (GranIdPP>0) AND Go_Tr40800 THEN
+	AutoUnlOhl:=TRUE;
+END_IF;
+IF ((NOT GrStart) AND (OhlIsEmpty)) OR (NOT Go_Tr40800) THEN
+	AutoUnlOhl:=FALSE;
+END_IF;
+
+
+// смазка
+    IF TimeWorkOil < 20 THEN timeWorkOil:= 20; END_IF;
+    IF TimeWorkOil > 100 THEN timeWorkOil:= 100; END_IF;
+    if TimePauseOil < 0 then TimePauseOil:= 0; end_if;
+    if TimePauseOil > 300 then TimePauseOil:= 300; end_if;

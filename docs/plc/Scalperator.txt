@@ -1,0 +1,87 @@
+functionBlock Scalperator
+VAR
+  input   ErrPCH : BOOL  // Авария от частотника
+  input   canAutoRun : BOOL  // Условие для необходимости работы в автоматическом режиме
+  input   next : BOOL  // Следующий механизм (после запуска этого механизма будет запущен скальператор через время time2Start)
+  input   prev : BOOL  // Предыдущий механиз (после его остановки через время time2Stop будет остановлен скальператор)
+  input   HandMode : BOOL
+  input   SlowHand : BOOL := FALSE  // можно плавно переходить из автоматического в ручной
+  input   time2Start : TIME  // Время перед запуском в автоматическом режиме после запуска механизма next
+  input   time2Stop : TIME  // Время остановки послеостановки механизма prev
+  input   yRun : BOOL
+  output  run : BOOL  // Запуск скальператора
+  output  run_pch : BOOL
+  output  ResetPCH : BOOL  // Сброс ошибок ПЧ
+  output  da : BOOL  // Авария
+  output  sErrPCH : BOOL
+  output  yRunOut : BOOL
+  output  state : WORD  // Статут скальператора (0-выключен без аварии, 1-работает, 2-авария)
+  local   rr : BOOL  // Готовность к работе
+  local   run_auto : BOOL
+  local   TON_START_AUTO : TON
+  local   TON_STOP_AUTO : TON
+  local   offState : WORD := 0
+  local   runState : WORD := 1
+  local   alarmState : WORD := 2
+  local   temp : BOOL
+  local   TON_pch_scalp : TON
+  local   TP_ResetError : TP
+  local   TON_SetErr : TON
+  local   MHCalc_0 : MHCalc
+  inOut   MH : DWORD
+  inOut   aMH : DWORD
+END_VAR
+
+(* LD *)
+
+// ---
+run_pch := NOT GEmer;
+
+// ---
+TON_SetErr(IN:=ErrPCH AND run_pch, PT:=t#1s);
+IF TON_SetErr.Q THEN sErrPCH := TRUE; END_IF
+
+// ---
+IF (ResetErrors OR MEmul) THEN sErrPCH := FALSE; END_IF
+
+// ---
+TP_ResetError(IN:=ResetErrors AND sErrPCH, PT:=t#2s);
+ResetPCH := TP_ResetError.Q;
+
+// --- Готовность к работе
+rr := NOT sErrPCH AND NOT GEmer;
+da := NOT NOT sErrPCH;
+
+// ---
+IF SlowHand AND canAutoRun AND R_TRIG(HandMode) THEN yRun := run; END_IF
+IF SlowHand AND canAutoRun AND F_TRIG(HandMode) THEN run_auto := yRun; END_IF
+
+// --- Запуск автоматического режима
+TON_START_AUTO(IN:=canAutoRun AND rr AND next, PT:=time2Start);
+IF TON_START_AUTO.Q THEN run_auto := TRUE; END_IF
+
+// --- Таймер на остановку автоматического режима
+TON_STOP_AUTO(IN:=NOT canAutoRun AND NOT prev, PT:=time2Stop);
+
+// --- Остановка автоматического режима
+IF (TON_STOP_AUTO.Q OR NOT rr OR NOT next) THEN run_auto := FALSE; END_IF
+
+// ---
+IF ((NOT next AND NOT MGod) OR NOT rr OR NOT HandMode) THEN yRun := FALSE; END_IF
+
+// --- Запуск
+run := ((NOT HandMode AND run_auto) OR yRun);
+
+// ---
+MHCalc_0(Run:=run, MH:=MH, aMH:=aMH);
+
+// ---
+yRunOut := yRun;
+
+// --- Статус скальператора (0-выключен без аварии, 1-работает, 2-авария)
+IF NOT da AND NOT run THEN state := offState; END_IF
+temp := offState /*EN=NOT da AND NOT run*/;
+IF NOT da AND run THEN state := runState; END_IF
+temp := runState /*EN=NOT da AND run*/;
+IF da THEN state := alarmState; END_IF
+temp := alarmState /*EN=da*/;

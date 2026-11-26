@@ -1,0 +1,105 @@
+program MainCycle1_POU
+VAR
+  local   condTR : WORD := 1
+  local   OPEN : BOOL := FALSE
+  local   temp1 : BOOL
+  local   temp2 : BOOL
+  local   temp3 : BOOL
+  local   temp4 : BOOL
+  local   temp5 : BOOL
+  local   temp6 : BOOL
+  local   temp7 : BOOL
+  local   temp8 : BOOL
+  local   temp9 : BOOL
+  local   temp10 : BOOL
+  local   temp11 : BOOL
+  local   temp12 : BOOL
+  local   temp13 : BOOL
+  local   temp14 : BOOL
+  local   temp15 : BOOL
+  local   temp16 : BOOL
+  local   temp17 : BOOL
+  local   TON_ResetError : TON
+  local   TON_Change_sh1 : TON
+  local   TON_Change_sh2 : TON
+  local   TON_StartDosing : TON
+  local   TP_RunSirOnEvent : TP
+  local   TP_RunSirOnLoad : TP
+  local   TP_Siren : TP
+  local   Err_13 : WORD
+  local   Err_12 : WORD
+  local   TON_TimeOutScada1 : TON
+  local   TON_RunDosing : TON
+  local   TON_DopFlagToScada1 : TON
+  local   TON_DopFlagToScada6 : TON
+  local   TP_PushPuskBtn : TP
+  local   TON_msgToScadaK : TON
+  local   TON_msgToScadaD : TON
+  local   TON_msgToScadaM : TON
+  local   TON_Reset_Regim9 : TON
+  local   TON_TempPodsh : TON
+  local   tmpint : INT
+  local   TON_StartLoad1 : TON
+  local   TON_StartLoad2 : TON
+END_VAR
+
+(* LD *)
+
+// ---
+Every1Sec := R_TRIG(plc_r.i_x1sClk);
+Every100ms := R_TRIG(PLC_R.i_x100msClk);
+
+// ---
+TP_PushPuskBtn(IN:=F_TRIG(EmerPuskBtn), PT:=t#2s);
+IF TP_PushPuskBtn.Q THEN ResetErrors := TRUE; END_IF
+
+// ---
+TON_ResetError(IN:=ResetErrors, PT:=t#2s);
+IF TON_ResetError.Q THEN Regim2.14 := FALSE; END_IF
+
+// ---
+TP_RunSirOnLoad(IN:=(Load1St.0 OR Load2St.0 OR Regim2.9 OR UnloadSt.0), PT:=t#5s);
+flRunSirena := TP_RunSirOnLoad.Q;
+
+// --- Сирена по каждой фигне
+TP_Siren(IN:=((true AND ErrRes) OR (true AND (Err0>0)) OR (true AND PolnSiloCur) OR (true AND PolnBunkCur)), PT:=t#2s);
+flRunSirenaEm := TP_Siren.Q;
+
+// ---
+TON_StartLoad1(IN:=Load1St.0 AND Go_Asp1, PT:=t#20s);
+flStartLoad1 := TON_StartLoad1.Q;
+
+// ---
+TON_StartLoad2(IN:=Load2St.0, PT:=t#20s);
+flStartLoad2 := TON_StartLoad2.Q;
+
+// ---
+TON_RunDosing(IN:=Regim2.9, PT:=t#20s);
+flStartDosing := TON_RunDosing.Q;
+
+// ---
+TON_Reset_Regim9(IN:=((((Regim2.10 AND (msgToScadaK=1)) OR (Regim2.10 AND (msgToScadaK=0)) OR (Regim2.10 AND (msgToScadaK=64))) AND (msgToScadaD=1) OR ((Regim2.10 AND (msgToScadaK=1)) OR (Regim2.10 AND (msgToScadaK=0)) OR (Regim2.10 AND (msgToScadaK=64))) AND (msgToScadaD=0) OR ((Regim2.10 AND (msgToScadaK=1)) OR (Regim2.10 AND (msgToScadaK=0)) OR (Regim2.10 AND (msgToScadaK=64))) AND (msgToScadaD=64)) AND (msgToScadaM=1) OR (((Regim2.10 AND (msgToScadaK=1)) OR (Regim2.10 AND (msgToScadaK=0)) OR (Regim2.10 AND (msgToScadaK=64))) AND (msgToScadaD=1) OR ((Regim2.10 AND (msgToScadaK=1)) OR (Regim2.10 AND (msgToScadaK=0)) OR (Regim2.10 AND (msgToScadaK=64))) AND (msgToScadaD=0) OR ((Regim2.10 AND (msgToScadaK=1)) OR (Regim2.10 AND (msgToScadaK=0)) OR (Regim2.10 AND (msgToScadaK=64))) AND (msgToScadaD=64)) AND (msgToScadaM=0) OR (((Regim2.10 AND (msgToScadaK=1)) OR (Regim2.10 AND (msgToScadaK=0)) OR (Regim2.10 AND (msgToScadaK=64))) AND (msgToScadaD=1) OR ((Regim2.10 AND (msgToScadaK=1)) OR (Regim2.10 AND (msgToScadaK=0)) OR (Regim2.10 AND (msgToScadaK=64))) AND (msgToScadaD=0) OR ((Regim2.10 AND (msgToScadaK=1)) OR (Regim2.10 AND (msgToScadaK=0)) OR (Regim2.10 AND (msgToScadaK=64))) AND (msgToScadaD=64)) AND (msgToScadaM=64)), PT:=t#10s);
+IF ((idK+idD+idM+idPBD+idS1+idS2+idS3) = 0) /*EN=TON_Reset_Regim9.Q AND NOT RunDob AND NOT RunDrob AND NOT RunKomp*/ THEN Regim2.9 := FALSE; END_IF
+IF ((idK+idD+idM+idPBD+idS1+idS2+idS3) = 0) /*EN=TON_Reset_Regim9.Q AND NOT RunDob AND NOT RunDrob AND NOT RunKomp*/ THEN Regim2.10 := FALSE; END_IF
+
+// ---
+IF (msgToScadaK <> msgToScadaKGo) /*EN=true*/ THEN msgToScadaKGo := 0; END_IF
+IF 0 /*EN=(msgToScadaK <> msgToScadaKGo) /*EN=true*/*/ THEN msgFromScadaK := 0; END_IF
+IF (msgToScadaD <> msgToScadaDGo) /*EN=true*/ THEN msgToScadaDGo := 0; END_IF
+IF 0 /*EN=(msgToScadaD <> msgToScadaDGo) /*EN=true*/*/ THEN msgFromScadaD := 0; END_IF
+IF (msgToScadaM <> msgToScadaMGo) /*EN=true*/ THEN msgToScadaMGo := 0; END_IF
+IF 0 /*EN=(msgToScadaM <> msgToScadaMGo) /*EN=true*/*/ THEN msgFromScadaM := 0; END_IF
+
+// ---
+TON_msgToScadaK(IN:=(msgToScadaK <> msgToScadaKGo) /*EN=true*/, PT:=t#1s);
+IF (msgFromScadaK = 0) /*EN=TON_msgToScadaK.Q*/ THEN msgToScadaKGo := msgToScadaK; END_IF
+
+// ---
+TON_msgToScadaD(IN:=(msgToScadaD <> msgToScadaDGo) /*EN=true*/, PT:=t#1s);
+IF (msgFromScadaD = 0) /*EN=TON_msgToScadaD.Q*/ THEN msgToScadaDGo := msgToScadaD; END_IF
+
+// ---
+TON_msgToScadaM(IN:=(msgToScadaM <> msgToScadaMGo) /*EN=true*/, PT:=t#1s);
+IF (msgFromScadaM = 0) /*EN=TON_msgToScadaM.Q*/ THEN msgToScadaMGo := msgToScadaM; END_IF
+
+// ---

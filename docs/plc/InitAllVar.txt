@@ -1,0 +1,42 @@
+program InitAllVar
+VAR
+  local   i : WORD
+END_VAR
+
+(* ST *)
+FOR i:=1 TO 5 DO
+	PPidPP[i]:=0;
+	PPCompleted[i]:=0; 
+	PPtime_suh 	[i]:=0; 
+	PPtime_mokr	[i]:=0; 
+	PPspeedmel 	[i]:=0; 
+	PPVesPart 	[i]:=0; 
+	PPVesPort 	[i]:=0; 
+	PPCouPort 	[i]:=0; 
+	//PPLastSavePort[i]:=0;
+	//PPidStart 	[i]:=0; 
+	PPprmPP 	[i]:=0;	
+	PPnpp 		[i]:=0; 	
+END_FOR
+FOR i:=1 TO CBK DO
+	VesZ[i]:=0;
+	VesP[i]:=0;
+    VesD[i]:=0;
+END_FOR 
+FOR i:=1 TO CBD DO
+	VesZD[i]:=0;
+	VesPD[i]:=0;
+    VesDD[i]:=0;
+END_FOR 
+FOR i:=1 TO CBM DO
+	VesZM[i]:=0;
+	VesPM[i]:=0;
+    VesDM[i]:=0;
+END_FOR 
+FOR i:=1 TO CBJ DO
+	VesZJ[i]:=0;
+	VesPJ[i]:=0;
+    VesDJ[i]:=0;
+END_FOR 
+	flBHDoorOpened:=0;
+	Regim2.15:=0;

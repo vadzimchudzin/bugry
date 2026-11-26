@@ -1,0 +1,222 @@
+functionBlock TDozatorJir
+VAR
+  input   lPuskDos : BOOL  // Местное управление насосом дозировки - пуск
+  input   lStopDos : BOOL  // Местное управление насосом дозировки - стоп
+  input   lPuskVigr : BOOL  // Местное управление насосом доп емкости - пуск
+  input   lStopVigr : BOOL  // Местное управление насосом доп емкости - стоп
+  input   ClapOpened : BOOL  // клапан над весами открыт
+  input   ClapClosed : BOOL  // клапан над весами закрыт
+  input   AzDos : BOOL  // Аз двигателя дозирования
+  input   AzVigr : BOOL  // Аз доп емкости
+  input   BlockLDos : BOOL  // блокировать клавиши местного управления дозировкой
+  input   canDos : BOOL := FALSE  // Условие для включения дозировки
+  input   canVigr : BOOL  // условие для выгрузки сдозированной порции в смеситель
+  input   HandMode : BOOL  // работать с ручным управлением
+  input   Ves : REAL := 0  // Текущий вес с весов
+  input   VesRequire : REAL  // Требуемый вес дозы
+  input   yVes : REAL  // требуемый вес в ручном режиме
+  input   DONE_Reset : BOOL  // сброс флага выполненного дозирования
+  input   AutoStolb : BOOL
+  output  Done : BOOL := FALSE  // дозирование закончено, выгрузка произведена
+  output  DoneDos : BOOL := FALSE  // дозирование закончено
+  output  Go_Dos : BOOL
+  output  Go_Vigr : BOOL  // Включить насос выгрузки
+  output  Go_Produv : BOOL
+  output  ClapMustOpen : BOOL  // клапан над весами должен быть открыт
+  output  ErrAzDos : BOOL  // Аз двигателя дозировки
+  output  ErrAzVigr : BOOL  // Аз двигателя выгрузки
+  output  da : BOOL := FALSE  // Авария
+  output  VesDone : REAL := 0  // сдозированный вес в граммах
+  output  state : WORD  // Статус дозатора (0-выключен без аварии, 1-работает, 2-авария, 3-пауза)
+  output  noWeight : BOOL  // Ошибка - не хватает материала.
+  local   lPuskVigrMain : BOOL
+  local   offState : WORD := 0  // Статус "Выключен"
+  local   runState : WORD := 1  // Статус "Включен"
+  local   alarmState : WORD := 2  // Статус "Авария"
+  local   pauseState : WORD := 3  // Статус "Пауза"
+  local   VesStop : REAL
+  local   VesStartDone : REAL := 0  // Сдозированный вес на старте очередного этапа дозирования
+  local   VesLocalDone : REAL := 0  // Сдозированный вес в текущем этапе
+  local   VesStart : REAL  // вес в начале дозирования
+  local   rr : BOOL := TRUE  // Готовность к работе
+  local   StopRun : BOOL := FALSE
+  local   TON_wakeUp : TON
+  local   TOF_off_pusk : TP  // Таймер на выключение пускателя
+  local   TON_DoneDos : TON
+  local   TmpSH : WORD
+  local   flWakeUp : BOOL
+  local   flRun : BOOL
+  local   flCalcSpeed : BOOL
+  local   WeightControl_K : WeightControl
+  local   noWeightFlag : BOOL
+  local   tOff : TOF
+  local   runDoliv : BOOL
+  local   WeightControlVigr : WeightControl
+  local   noWeightVigrFlag : BOOL
+  local   Port_Ost : WORD
+  local   tmp : BOOL
+  local   TON_StopProduv : TON
+  local   timeProduv : TIME := TIME#2s0ms
+  local   ProduvS1 : BOOL
+  local   ProduvS2 : BOOL
+  local   ProduvS3 : BOOL
+  local   ProduvStart : BOOL
+  local   TON_StopProduv2 : TON
+  local   TON_StopProduv3 : TON
+  local   yVesStart : REAL
+  local   TP_ProduvStart : TP
+  local   lPuskDosMain : BOOL
+  local   OrderPS : ARRAY[1..5] OF REAL  // последние 5 весов ПС
+  local   Count_OrderPS : WORD := 0
+  local   PDos : BOOL
+  local   PVigr : BOOL
+  inOut   Pause : BOOL
+  inOut   yDos : BOOL
+  inOut   yVigr : BOOL  // Включить насос выгрузки
+  inOut   yProduv : BOOL
+  inOut   VesStolba : REAL  // Вес падающего стола
+END_VAR
+
+(* LD *)
+
+// ---
+IF true AND AzVigr THEN ErrAzVigr := TRUE; END_IF
+IF true AND AzDos THEN ErrAzDos := TRUE; END_IF
+
+// ---
+IF R_TRIG(HandMode) THEN yDos := Go_Dos; END_IF
+IF Go_Dos /*EN=R_TRIG(HandMode)*/ THEN yVigr := Go_Vigr; END_IF
+IF (GEmer OR lStopDos OR NOT HandMode OR BlockLDos OR ErrAzDos OR (HandMode AND NOT BlockLDos AND RunDosing AND NOT canDos)) THEN yDos := FALSE; END_IF
+IF (GEmer OR lStopVigr OR NOT HandMode OR BlockSMS OR ErrAzVigr OR (HandMode AND NOT BlockSMS AND RunDosing AND NOT canVigr)) THEN yVigr := FALSE; END_IF
+
+// --- Локарьный ПУСК/СТОП дозирования ПУСК: Вкл/Выкл. СТОП: Выкл. не зависимо, какой локальный ПУСК
+IF R_TRIG(lPuskDos) THEN lPuskDosMain := (NOT(lPuskDosMain)); END_IF
+IF (lStopDos OR (RunDosing AND NOT Pause) OR BlockLDos) THEN lPuskDosMain := FALSE; END_IF
+
+// --- Локарьный ПУСК/СТОП выгрузки из весов в смеситель ПУСК: Вкл/Выкл. СТОП: Выкл. не зависимо, какой локальный ПУСК
+IF R_TRIG(lPuskVigr) THEN lPuskVigrMain := (NOT(lPuskVigrMain)); END_IF
+IF (lStopVigr OR (RunDosing AND NOT Pause)) THEN lPuskVigrMain := FALSE; END_IF
+
+// ---
+IF ResetErrors THEN ErrAzVigr := FALSE; END_IF
+IF ResetErrors THEN ErrAzDos := FALSE; END_IF
+IF ResetErrors THEN noWeight := FALSE; END_IF
+
+// --- сброс флага PRun и NRun
+IF true THEN PDos := FALSE; END_IF
+IF true THEN PVigr := FALSE; END_IF
+
+// --- установка флага PRun и NRun
+IF true AND R_TRIG(canDos) THEN noWeight := FALSE; END_IF
+IF true AND R_TRIG(canDos) THEN PDos := TRUE; END_IF
+IF true AND R_TRIG(canVigr) THEN PVigr := TRUE; END_IF
+
+// --- Дозировка -----------------------------
+
+// --- Вес падающего столба очень маленьктй или очень большой
+IF (VesStolba <= 0.05) /*EN=PDos*/ THEN VesStolba := 0.2; END_IF
+IF (VesRequire <= VesStolba) /*EN=PDos*/ THEN VesStolba := (VesRequire/2); END_IF
+
+// ---
+IF NOT canDos THEN noWeight := FALSE; END_IF
+IF NOT canDos THEN flRun := FALSE; END_IF
+
+// ---
+IF (DONE_Reset OR PDos) THEN VesDone := 0; END_IF
+IF 0 /*EN=(DONE_Reset OR PDos)*/ THEN VesLocalDone := 0; END_IF
+IF 0 /*EN=0 /*EN=(DONE_Reset OR PDos)*/*/ THEN Done := FALSE; END_IF
+IF 0 /*EN=0 /*EN=(DONE_Reset OR PDos)*/*/ THEN DoneDos := FALSE; END_IF
+IF 0 /*EN=0 /*EN=(DONE_Reset OR PDos)*/*/ THEN StopRun := FALSE; END_IF
+IF 0 /*EN=0 /*EN=(DONE_Reset OR PDos)*/*/ THEN noWeight := FALSE; END_IF
+
+// ---
+IF (VesDone < VesRequire) /*EN=(VesRequire > 0) /*EN=(PDos OR (canDos AND F_TRIG(Pause)))*/*/ THEN Done := FALSE; END_IF
+IF (VesDone < VesRequire) /*EN=(VesRequire > 0) /*EN=(PDos OR (canDos AND F_TRIG(Pause)))*/*/ THEN DoneDos := FALSE; END_IF
+IF (VesDone < VesRequire) /*EN=(VesRequire > 0) /*EN=(PDos OR (canDos AND F_TRIG(Pause)))*/*/ THEN StopRun := FALSE; END_IF
+IF (VesDone < VesRequire) /*EN=(VesRequire > 0) /*EN=(PDos OR (canDos AND F_TRIG(Pause)))*/*/ THEN noWeight := FALSE; END_IF
+IF (VesDone < VesRequire) /*EN=(VesRequire > 0) /*EN=(PDos OR (canDos AND F_TRIG(Pause)))*/*/ THEN flWakeUp := TRUE; END_IF
+IF (((VesRequire < 0.01) /*EN=(PDos OR (canDos AND F_TRIG(Pause)))*/) OR ((VesDone >= VesRequire) /*EN=(PDos OR (canDos AND F_TRIG(Pause)))*/)) THEN DoneDos := TRUE; END_IF
+IF (((VesRequire < 0.01) /*EN=(PDos OR (canDos AND F_TRIG(Pause)))*/) OR ((VesDone >= VesRequire) /*EN=(PDos OR (canDos AND F_TRIG(Pause)))*/)) THEN flWakeUp := FALSE; END_IF
+
+// ---
+TON_wakeUp(IN:=flWakeUp, PT:=t#2s);
+IF TON_wakeUp.Q THEN VesStart := Ves; END_IF
+IF Ves /*EN=TON_wakeUp.Q*/ THEN VesStartDone := VesDone; END_IF
+IF VesDone /*EN=Ves /*EN=TON_wakeUp.Q*/*/ THEN VesLocalDone := 0; END_IF
+IF TON_wakeUp.Q THEN VesStop := (VesStart+VesRequire-VesStartDone-VesStolba); END_IF
+IF TON_wakeUp.flWakeUp THEN flWakeUp := FALSE; END_IF
+IF TON_wakeUp.ClapMustOpen THEN ClapMustOpen := TRUE; END_IF
+IF TON_wakeUp.flRun THEN flRun := TRUE; END_IF
+
+// --- Включение дозирования
+Go_Dos := (((((RunDosing AND canDos AND flRun AND NOT Pause AND NOT StopRun AND NOT DoneDos) OR yDos OR lPuskDosMain) AND NOT lStopDos) AND NOT ErrAzDos) AND NOT GEmer) AND ClapOpened;
+
+// --- это для определения момента, когда надо остановиться
+IF canDos AND Go_Dos AND NOT yDos AND (Ves>=VesStop) THEN flRun := FALSE; END_IF
+IF canDos AND Go_Dos AND NOT yDos AND (Ves>=VesStop) THEN ClapMustOpen := FALSE; END_IF
+IF canDos AND Go_Dos AND NOT yDos AND (Ves>=VesStop) THEN StopRun := TRUE; END_IF
+
+// --- а это, чтобы во время дозировки на скаде вес менялся
+IF canDos AND Go_Dos THEN VesLocalDone := (VesStart-Ves); END_IF
+IF (VesStart-Ves) /*EN=canDos AND Go_Dos*/ THEN VesDone := (VesStartDone+VesLocalDone); END_IF
+
+// --- Ждем устаканивания веса, снимаем точный сдозированный вес и устанавливаем Done
+TON_DoneDos(IN:=canDos AND NOT DoneDos AND StopRun AND NOT Go_Dos AND ClapClosed, PT:=t#4s);
+IF TON_DoneDos.Q THEN VesDone := (Ves-VesStart+VesStartDone); END_IF
+IF (Ves-VesStart+VesStartDone) /*EN=TON_DoneDos.Q*/ THEN DoneDos := TRUE; END_IF
+IF (Ves-VesStart+VesStartDone) /*EN=TON_DoneDos.Q*/ THEN StopRun := FALSE; END_IF
+
+// ---
+IF R_TRIG(DoneDos) AND AutoStolb THEN VesStolba := (VesStolba-(VesDone-VesRequire)*0.6); END_IF
+
+// ---
+WeightControl_K(RunWatch:=canDos AND Go_Dos, Ves:=Ves, ToInc:=true, timeDedLine:=t#10s, range:=0.01, timeOutWatch:=t#2s);
+noWeightFlag := WeightControl_K.notChange;
+
+// --- при нехватке, становимся на паузу, даем сообщение
+IF R_TRIG(noWeightFlag) THEN noWeight := TRUE; END_IF
+IF R_TRIG(noWeightFlag) THEN Pause := TRUE; END_IF
+
+// ---
+IF NOT RunDosing AND R_TRIG(yDos) THEN yVesStart := Ves; END_IF
+IF NOT RunDosing AND yDos THEN VesDone := (yVesStart-Ves); END_IF
+IF (VesDone >= yVes) /*EN=(yVes > 0) /*EN=(yVesStart-Ves) /*EN=NOT RunDosing AND yDos*/*/*/ THEN yDos := FALSE; END_IF
+
+// --- Выгрузка ---------------------------------------------
+
+// --- Включение дозирования
+Go_Vigr := ((((RunDosing AND canVigr AND NOT Pause AND NOT Done) OR yVigr OR lPuskVigrMain) AND NOT lStopVigr) AND NOT ErrAzVigr) AND NOT GEmer;
+
+// ---
+WeightControlVigr(RunWatch:=MAuto AND Go_Vigr, Ves:=Ves, ToInc:=false, timeDedLine:=t#5s, range:=0.1, timeOutWatch:=t#2s);
+noWeightVigrFlag := WeightControlVigr.notChange;
+
+// ---
+IF R_TRIG(noWeightVigrFlag) THEN Done := TRUE; END_IF
+
+// ---
+
+// --- Продувка --------------------------
+
+// ---
+TP_ProduvStart(IN:=canVigr AND R_TRIG(Go_Vigr), PT:=t#4s);
+ProduvS1 := TP_ProduvStart.Q;
+
+// --- Если идет дозировка - никакой продувки
+IF Go_Dos THEN yProduv := FALSE; END_IF
+IF Go_Dos THEN ProduvS1 := FALSE; END_IF
+
+// ---
+Go_Produv := (ProduvS1 OR yProduv);
+
+// --- --------------------------
+
+// --- Статус дозатора (0-выключен без аварии, 1-работает, 2-авария)
+IF NOT da AND Go_Dos THEN state := runState; END_IF
+tmp := runState /*EN=NOT da AND Go_Dos*/;
+IF NOT da AND NOT Go_Dos THEN state := offState; END_IF
+tmp := offState /*EN=NOT da AND NOT Go_Dos*/;
+IF da THEN state := alarmState; END_IF
+tmp := alarmState /*EN=da*/;
+IF Pause THEN state := pauseState; END_IF
+tmp := pauseState /*EN=Pause*/;

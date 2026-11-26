@@ -1,0 +1,6 @@
+program CheckParamDosing
+VAR
+END_VAR
+
+(* ST *)
+//проверка скоростей и переходов

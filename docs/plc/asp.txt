@@ -1,0 +1,134 @@
+functionBlock asp
+VAR
+  input   Az : BOOL
+  input   AzGway : BOOL
+  input   dks : BOOL
+  input   offDks : BOOL
+  input   prev : BOOL
+  input   HandMode : BOOL
+  input   conditionToWork : BOOL
+  input   TTS : TIME  // время остановки после снятия conditionToWork и prev
+  input   yRun : BOOL
+  input   yRunGw : BOOL
+  output  runAsp : BOOL
+  output  runGway : BOOL
+  output  rr : BOOL
+  output  DA : BOOL
+  output  DAGway : BOOL
+  output  errAz : BOOL
+  output  errdks : BOOL
+  output  errAzGway : BOOL
+  output  State : WORD
+  output  yRunOut : BOOL
+  output  yRunGwOut : BOOL
+  local   on : TON
+  local   off : TON
+  local   startt : TON
+  local   stop : TON
+  local   on11 : TON
+  local   off11 : TON
+  local   tonAsp : TON
+  local   temp : BOOL
+  local   MHCalc_asp : MHCalc
+  local   MHCalc_GW : MHCalc
+  local   TOF_GWay : TOF
+  local   AutoAsp : BOOL
+  local   AutoGW : BOOL
+  local   TON_StopGW : TON
+  local   rrGw : BOOL
+  local   TON_stopAsp : TON
+  inOut   MHAsp : DWORD
+  inOut   aMHAsp : DWORD
+  inOut   MHGw : DWORD
+  inOut   aMHGw : DWORD
+END_VAR
+
+(* LD *)
+
+// ---
+on11(IN:=runGway AND dks, PT:=T#4s);
+off11(IN:=runGway AND NOT dks, PT:=T#4s);
+
+// ---
+IF (on11.Q OR off11.Q) AND NOT offdks THEN errdks := TRUE; END_IF
+
+// ---
+IF true AND Az THEN ErrAz := TRUE; END_IF
+IF true AND AzGway THEN errAzGway := TRUE; END_IF
+
+// ---
+IF (ResetErrors OR MEmul) THEN ErrAz := FALSE; END_IF
+IF (ResetErrors OR MEmul) THEN errAzGway := FALSE; END_IF
+IF (ResetErrors OR MEmul) THEN errdks := FALSE; END_IF
+
+// ---
+rrGw := NOT errAzGway AND NOT errdks AND NOT GEmer;
+DAGway := NOT (NOT errAzGway AND NOT errdks);
+
+// ---
+rr := NOT errAz AND NOT GEmer;
+DA := NOT NOT errAz;
+
+// ---
+IF conditionToWork AND R_TRIG(HandMode) THEN yRun := runAsp; END_IF
+IF runAsp /*EN=conditionToWork AND R_TRIG(HandMode)*/ THEN yRunGw := runGway; END_IF
+IF conditionToWork AND F_TRIG(HandMode) THEN AutoAsp := runAsp; END_IF
+IF conditionToWork AND F_TRIG(HandMode) THEN AutoGW := runGway; END_IF
+
+// --- если аспирация уже была включена
+IF R_TRIG(conditionToWork) AND runAsp THEN AutoAsp := TRUE; END_IF
+IF R_TRIG(conditionToWork) AND runGway THEN AutoGW := TRUE; END_IF
+
+// ---
+startt(IN:=rrGw AND conditionToWork, PT:=T#4s);
+IF startt.Q THEN AutoGW := TRUE; END_IF
+
+// ---
+TON_StopGW(IN:=autoGW AND NOT conditionToWork AND NOT runAsp, PT:=t#3s);
+
+// ---
+IF (NOT rrGw OR TON_StopGW.Q) THEN AutoGW := FALSE; END_IF
+
+// ---
+IF (NOT rrGw OR NOT HandMode) THEN yRunGW := FALSE; END_IF
+
+// ---
+runGway := ((rrGw AND AutoGW) OR (rrGw AND yRunGW));
+
+// --- Вентилятор
+
+// ---
+tonAsp(IN:=rr AND conditionToWork AND runGway, PT:=t#3s);
+IF tonAsp.Q THEN autoAsp := TRUE; END_IF
+
+// ---
+TON_stopAsp(IN:=NOT prev AND NOT conditionToWork, PT:=TTS);
+
+// ---
+IF (TON_stopAsp.Q OR NOT rr OR HandMode) THEN autoAsp := FALSE; END_IF
+
+// ---
+IF (NOT rr OR (NOT runGway AND NOT MGod) OR NOT HandMode) THEN yRun := FALSE; END_IF
+
+// ---
+RunAsp := (autoAsp OR yRun) AND rr;
+
+// ---
+MHCalc_asp(Run:=runAsp, MH:=MHAsp, aMH:=aMHAsp);
+
+// ---
+MHCalc_GW(Run:=runGway, MH:=MHGw, aMH:=aMHGw);
+
+// ---
+yRunOut := yRun;
+yRunGwOut := yRunGw;
+
+// --- Статус (0-выключен без аварии, 1-работает, 2-авария)
+IF NOT da AND NOT runAsp THEN state := 0; END_IF
+temp := 0 /*EN=NOT da AND NOT runAsp*/;
+IF NOT da AND runAsp THEN state := 1; END_IF
+temp := 1 /*EN=NOT da AND runAsp*/;
+IF da THEN state := 2; END_IF
+temp := 2 /*EN=da*/;
+
+// ---

@@ -1,0 +1,27 @@
+functionBlock FILTER_analog_signal
+VAR
+  input   START : BOOL
+  input   VALUE : INT
+  input   LEN : TIME
+  output  F_VALUE : INT
+  local   VALUES : ARRAY[1..100] OF INT
+  local   TON_0 : TON
+  local   CTU_0 : CTU
+  local   ORD_NUM : WORD := 0
+END_VAR
+
+(* LD *)
+
+// ---
+TON_0(IN:=START AND NOT TON_0.Q, PT:=LEN);
+
+// ---
+CTU_0(CU:=R_TRIG(TON_0.Q), RESET:=CTU_0.Q, PV:=10);
+ORD_NUM := CTU_0.CV;
+
+// ---
+IF (Value >= 0) /*EN=R_TRIG(TON_0.Q)*/ THEN VALUES[ORD_NUM] := Value; END_IF
+IF (Value < 0) /*EN=R_TRIG(TON_0.Q)*/ THEN VALUES[ORD_NUM] := 0; END_IF
+
+// ---
+IF true THEN F_VALUE := ((VALUES[1]+VALUES[2]+VALUES[3]+VALUES[4]+VALUES[5]+VALUES[6]+VALUES[7]+VALUES[8]+VALUES[9]+VALUES[10])/10); END_IF

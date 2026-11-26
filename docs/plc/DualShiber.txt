@@ -1,0 +1,319 @@
+functionBlock DualShiber
+VAR
+  input   openedLS1 : BOOL  // Открыта левая створка датчик 1
+  input   closedLS1 : BOOL  // Закрыта левая створка датчик 1
+  input   openedLS2 : BOOL  // Открыта левая створка датчик 2
+  input   closedLS2 : BOOL  // Закрыта левая створка датчик 2
+  input   openedRS1 : BOOL  // Открыта правая створка датчик 1
+  input   closedRS1 : BOOL  // Закрыта правая створка датчик 1
+  input   openedRS2 : BOOL  // Открыта правая створка датчик 1
+  input   closedRS2 : BOOL  // Закрыта правая створка датчик 1
+  input   openedL1 : BOOL  // Открыт замок 1
+  input   closedL1 : BOOL  // Закрыт замок 1
+  input   openedL2 : BOOL  // Открыт замок 2
+  input   closedL2 : BOOL  // Закрыт замок 2
+  input   NoUseLock : BOOL := TRUE  // не использовать замок
+  input   toOpen : BOOL  // Открыть в авто режиме
+  input   toClose : BOOL  // Закрыть в авто режиме
+  input   maxTSS : TIME := TIME#20s0ms  // максимальное время на переключение створки
+  input   maxTSL : TIME := TIME#10s0ms  // максимальное время на переключение замка
+  input   AutoMode : BOOL  // Работает в автоматическом режиме, если не установлен HandMode
+  input   HandMode : BOOL  // Работает в ручном режиме, имеет приоритет перед AutoMode
+  input   LP : BOOL  // низкое давление в системе
+  input   notOpen : BOOL  // нельзя открывать
+  input   notClose : BOOL  // нельзя закрывать
+  input   yOpenLS : BOOL  // Открыть левую створку
+  input   yCloseLS : BOOL  // Закрыть левую створку
+  input   yOpenRS : BOOL  // Открыть правую створку
+  input   yCloseRS : BOOL  // Закрыть правую створку
+  input   yOpenL : BOOL  // Открыть замок
+  input   yCloseL : BOOL  // Закрыть замок
+  input   yOpen : BOOL  // Открыть шибер в автомате
+  input   yClose : BOOL  // Закрыть шибер в автомате
+  output  runToOpenLS : BOOL  // Открыть левую створку
+  output  runToCloseLS : BOOL  // Закрыть левую створку
+  output  runToOpenRS : BOOL  // Открыть правую створку
+  output  runToCloseRS : BOOL  // Закрыть правую створку
+  output  runToOpenL : BOOL  // Открыть замок
+  output  runToCloseL : BOOL  // Закрыть замок
+  output  errLTO_LS1 : BOOL  // Авария "Долгое открытие левой створки" датчик 1
+  output  errLTC_LS1 : BOOL  // Авария "Долгое закрытие левой створки" датчик 1
+  output  errLTO_LS2 : BOOL  // Авария "Долгое открытие левой створки" датчик 2
+  output  errLTC_LS2 : BOOL  // Авария "Долгое закрытие левой створки" датчик 2
+  output  errLTO_RS1 : BOOL  // Авария "Долгое открытие правой створки" датчик 1
+  output  errLTC_RS1 : BOOL  // Авария "Долгое закрытие правой створки" датчик 1
+  output  errLTO_RS2 : BOOL  // Авария "Долгое открытие правой створки" датчик 2
+  output  errLTC_RS2 : BOOL  // Авария "Долгое закрытие правой створки" датчик 2
+  output  errLTO_L1 : BOOL  // Авария "Долгое открытие замка"
+  output  errLTC_L1 : BOOL  // Авария "Долгое закрытие замка"
+  output  errLTO_L2 : BOOL  // Авария "Долгое открытие замка"
+  output  errLTC_L2 : BOOL  // Авария "Долгое закрытие замка"
+  output  da : BOOL  // Сигнализация об аварии
+  output  yOpenLSOut : BOOL  // Открыть левую створку
+  output  yCloseLSOut : BOOL  // Закрыть левую створку
+  output  yOpenRSOut : BOOL  // Открыть правую створку
+  output  yCloseRSOut : BOOL  // Закрыть правую створку
+  output  yOpenLOut : BOOL  // Открыть замок
+  output  yCloseLOut : BOOL  // Закрыть замок
+  output  yOpenOut : BOOL  // Открыть шибер в автомате
+  output  yCloseOut : BOOL  // Закрыть шибер в автомате
+  output  state : WORD  // Состояние: 0-Закрыт, 1-Открыт, 2-Переключение, 3-Авария, 4-Промежуточное положение
+  local   TON_LT_LSO : TON
+  local   TON_LT_LSC : TON
+  local   TON_LT_RSO : TON
+  local   TON_LT_RSC : TON
+  local   TON_LT_LO1 : TON
+  local   TON_LT_LC1 : TON
+  local   TON_LT_LO2 : TON
+  local   TON_LT_LC2 : TON
+  local   TON_START : TON
+  local   rr : BOOL  // Готовность к работе
+  local   TON_STOP : TON
+  local   temp : BOOL
+  local   lAutoMode : BOOL
+  local   lUnlock : BOOL
+  local   lLock : BOOL
+  local   RR_Fall : BOOL  // rr - только что упал
+  local   isOpened : BOOL
+  local   isClosed : BOOL
+  local   lOpenLS : BOOL
+  local   lOpenRS : BOOL
+  local   lCloseRS : BOOL
+  local   lCloseLS : BOOL
+  local   TON_CloseRS : TON
+  local   TON_OpenLS : TON
+  local   TON_Lock : TON
+  local   TON_OpenRS : TON
+  local   ClosedBeforeLP : BOOL  // перед падением давления был нормально закрыт
+  local   RestoreAfterLP : BOOL  // попытаться восстановить закрытое состояние
+  local   AutoOpen : BOOL := FALSE  // режим автоматического открытия
+  local   AutoClose : BOOL := FALSE  // режим автоматического закрытия
+  local   TON_LT_LSO2 : TON
+  local   TON_LT_LSC2 : TON
+  local   TON_LT_RS2 : TON
+  local   TON_LT_RSC2 : TON
+END_VAR
+
+(* LD *)
+
+// ---
+TON_LT_LSO(IN:=runToOpenLS AND NOT openedLS1, PT:=maxTSS);
+IF TON_LT_LSO.Q THEN errLTO_LS1 := TRUE; END_IF
+
+// ---
+TON_LT_LSC(IN:=runToCloseLS AND NOT closedLS1, PT:=maxTSS);
+IF TON_LT_LSC.Q THEN errLTC_LS1 := TRUE; END_IF
+
+// ---
+TON_LT_LSO2(IN:=runToOpenLS AND NOT openedLS2, PT:=maxTSS);
+IF TON_LT_LSO2.Q THEN errLTO_LS2 := TRUE; END_IF
+
+// ---
+TON_LT_LSC2(IN:=runToCloseLS AND NOT closedLS2, PT:=maxTSS);
+IF TON_LT_LSC2.Q THEN errLTC_LS2 := TRUE; END_IF
+
+// ---
+TON_LT_RSO(IN:=runToOpenRS AND NOT openedRS1, PT:=maxTSS);
+IF TON_LT_RSO.Q THEN errLTO_RS1 := TRUE; END_IF
+
+// ---
+TON_LT_RSC(IN:=runToCloseRS AND NOT closedRS1, PT:=maxTSS);
+IF TON_LT_RSC.Q THEN errLTC_RS1 := TRUE; END_IF
+
+// ---
+TON_LT_RS2(IN:=runToOpenRS AND NOT openedRS2, PT:=maxTSS);
+IF TON_LT_RS2.Q THEN errLTO_RS2 := TRUE; END_IF
+
+// ---
+TON_LT_RSC2(IN:=runToCloseRS AND NOT closedRS2, PT:=maxTSS);
+IF TON_LT_RSC2.Q THEN errLTC_RS2 := TRUE; END_IF
+
+// ---
+TON_LT_LO1(IN:=runToOpenL AND NOT openedL1, PT:=maxTSL);
+IF TON_LT_LO1.Q THEN errLTO_L1 := TRUE; END_IF
+
+// ---
+TON_LT_LC1(IN:=runToCloseL AND NOT closedL1, PT:=maxTSL);
+IF TON_LT_LC1.Q THEN errLTC_L1 := TRUE; END_IF
+
+// ---
+TON_LT_LO2(IN:=runToOpenL AND NOT openedL2, PT:=maxTSL);
+IF TON_LT_LO2.Q THEN errLTO_L2 := TRUE; END_IF
+
+// ---
+TON_LT_LC2(IN:=runToCloseL AND NOT closedL2, PT:=maxTSL);
+IF TON_LT_LC2.Q THEN errLTC_L2 := TRUE; END_IF
+
+// ---
+IF true AND R_TRIG(yOpenLS) THEN errLTO_LS1 := FALSE; END_IF
+IF true AND R_TRIG(yOpenLS) THEN errLTO_LS2 := FALSE; END_IF
+IF true AND R_TRIG(yCloseLS) THEN errLTC_LS1 := FALSE; END_IF
+IF true AND R_TRIG(yCloseLS) THEN errLTC_LS2 := FALSE; END_IF
+IF true AND R_TRIG(yOpenRS) THEN errLTO_RS1 := FALSE; END_IF
+IF true AND R_TRIG(yOpenRS) THEN errLTO_RS2 := FALSE; END_IF
+IF true AND R_TRIG(yCloseRS) THEN errLTC_RS1 := FALSE; END_IF
+IF true AND R_TRIG(yCloseRS) THEN errLTC_RS2 := FALSE; END_IF
+IF true AND R_TRIG(yOpenL) THEN errLTO_L1 := FALSE; END_IF
+IF true AND R_TRIG(yOpenL) THEN errLTO_L2 := FALSE; END_IF
+IF true AND R_TRIG(yCloseL) THEN errLTC_L1 := FALSE; END_IF
+IF true AND R_TRIG(yCloseL) THEN errLTC_L2 := FALSE; END_IF
+
+// ---
+IF ((true AND errLTO_LS1) OR (true AND errLTO_LS2)) THEN yOpenLS := FALSE; END_IF
+IF ((true AND errLTC_LS1) OR (true AND errLTC_LS2)) THEN yCloseLS := FALSE; END_IF
+IF ((true AND errLTO_RS1) OR (true AND errLTO_RS2)) THEN yOpenRS := FALSE; END_IF
+IF ((true AND errLTC_RS1) OR (true AND errLTC_RS2)) THEN yCloseRS := FALSE; END_IF
+IF ((true AND errLTO_L1) OR (true AND errLTO_L2)) THEN yOpenL := FALSE; END_IF
+IF ((true AND errLTC_L1) OR (true AND errLTC_L2)) THEN yCloseL := FALSE; END_IF
+
+// --- Сброс ручного управления
+IF (NOT HandMode OR NOT openedL1 OR NOT openedL2 OR NOT MGod) THEN yOpenLS := FALSE; END_IF
+IF (NOT HandMode OR NOT openedL1 OR NOT openedL2 OR NOT MGod) THEN yCloseLS := FALSE; END_IF
+IF (NOT HandMode OR NOT openedL1 OR NOT openedL2 OR NOT MGod) THEN yOpenRS := FALSE; END_IF
+IF (NOT HandMode OR NOT openedL1 OR NOT openedL2 OR NOT MGod) THEN yCloseRS := FALSE; END_IF
+IF (NOT HandMode OR NOT MGod) THEN yOpenL := FALSE; END_IF
+IF (NOT HandMode OR NOT MGod) THEN yCloseL := FALSE; END_IF
+IF (NOT HandMode OR NOT rr) THEN yClose := FALSE; END_IF
+IF (NOT HandMode OR NOT rr) THEN yOpen := FALSE; END_IF
+
+// --- Сброс Аварий
+IF ResetErrors THEN errLTO_LS1 := FALSE; END_IF
+IF ResetErrors THEN errLTO_LS2 := FALSE; END_IF
+IF ResetErrors THEN errLTC_LS1 := FALSE; END_IF
+IF ResetErrors THEN errLTC_LS2 := FALSE; END_IF
+IF ResetErrors THEN errLTO_RS1 := FALSE; END_IF
+IF ResetErrors THEN errLTO_RS2 := FALSE; END_IF
+IF ResetErrors THEN errLTC_RS1 := FALSE; END_IF
+IF ResetErrors THEN errLTC_RS2 := FALSE; END_IF
+IF ResetErrors THEN errLTO_L1 := FALSE; END_IF
+IF ResetErrors THEN errLTC_L1 := FALSE; END_IF
+IF ResetErrors THEN errLTO_L2 := FALSE; END_IF
+IF ResetErrors THEN errLTC_L2 := FALSE; END_IF
+
+// --- Готовность к работе
+rr := NOT errLTO_LS1 AND NOT errLTO_LS2 AND NOT errLTC_LS1 AND NOT errLTC_LS2 AND NOT errLTO_RS1 AND NOT errLTO_RS2 AND NOT errLTC_RS1 AND NOT errLTC_RS2 AND NOT errLTO_L1 AND NOT errLTC_L1 AND NOT errLTO_L2 AND NOT errLTC_L2 AND NOT GEmer;
+da := NOT (NOT errLTO_LS1 AND NOT errLTO_LS2 AND NOT errLTC_LS1 AND NOT errLTC_LS2 AND NOT errLTO_RS1 AND NOT errLTO_RS2 AND NOT errLTC_RS1 AND NOT errLTC_RS2 AND NOT errLTO_L1 AND NOT errLTC_L1 AND NOT errLTO_L2 AND NOT errLTC_L2);
+
+// --- Если одна из створок всётаки открылась - сбросить флаг восстановления закрытия
+IF ((openedLS1 AND openedLS2) OR (openedRS1 AND openedRS2)) AND ClosedBeforeLP THEN ClosedBeforeLP := FALSE; END_IF
+
+// ---
+IF R_TRIG(LP) AND isClosed THEN ClosedBeforeLP := TRUE; END_IF
+IF NOT LP AND rr AND ClosedBeforeLP THEN RestoreAfterLP := TRUE; END_IF
+IF NOT LP AND rr AND ClosedBeforeLP THEN ClosedBeforeLP := FALSE; END_IF
+
+// ---
+IF ((RestoreAfterLP AND closedLS1 AND closedLS2 AND closedRS1 AND closedRS2) OR (RestoreAfterLP AND NOT rr)) THEN RestoreAfterLP := FALSE; END_IF
+
+// ---
+lAutoMode := AutoMode AND NOT HandMode;
+
+// --- установить режим автозакрытия
+IF ((true AND lAutoMode AND toClose) OR (true AND HandMode AND yClose)) THEN AutoClose := TRUE; END_IF
+IF ((true AND lAutoMode AND toClose) OR (true AND HandMode AND yClose)) THEN AutoOpen := FALSE; END_IF
+
+// --- установить режим автооткрытия
+IF ((true AND lAutoMode AND toOpen) OR (true AND HandMode AND yOpen)) THEN AutoOpen := TRUE; END_IF
+IF ((true AND lAutoMode AND toOpen) OR (true AND HandMode AND yOpen)) THEN AutoClose := FALSE; END_IF
+
+// --- сброс авторежимов
+IF ((true AND lAutoMode AND toOpen AND toClose) OR (true AND HandMode AND yOpen AND yClose) OR (true AND HandMode AND yOpenLS) OR (true AND HandMode AND yCloseLS) OR (true AND HandMode AND yOpenRS) OR (true AND HandMode AND yCloseRS) OR (true AND HandMode AND yCloseL) OR (true AND HandMode AND yOpenL)) THEN AutoOpen := FALSE; END_IF
+IF ((true AND lAutoMode AND toOpen AND toClose) OR (true AND HandMode AND yOpen AND yClose) OR (true AND HandMode AND yOpenLS) OR (true AND HandMode AND yCloseLS) OR (true AND HandMode AND yOpenRS) OR (true AND HandMode AND yCloseRS) OR (true AND HandMode AND yCloseL) OR (true AND HandMode AND yOpenL)) THEN AutoClose := FALSE; END_IF
+
+// ---
+IF true THEN yOpen := FALSE; END_IF
+IF true THEN yClose := FALSE; END_IF
+
+// ---
+isOpened := true AND openedLS1 AND openedLS2 AND openedRS1 AND openedRS2;
+isClosed := ((true AND closedLS1 AND closedLS2 AND closedRS1 AND closedRS2 AND closedL1 AND closedL2) OR (true AND closedLS1 AND closedLS2 AND closedRS1 AND closedRS2 AND NoUseLock));
+
+// --- Сброс ручного автооткрытия / автозакрытия
+IF isOpened THEN AutoOpen := FALSE; END_IF
+IF isClosed THEN AutoClose := FALSE; END_IF
+
+// ---
+IF true THEN lUnlock := FALSE; END_IF
+IF true THEN lLock := FALSE; END_IF
+IF true THEN lOpenLS := FALSE; END_IF
+IF true THEN lCloseLS := FALSE; END_IF
+IF true THEN lOpenRS := FALSE; END_IF
+IF true THEN lCloseRS := FALSE; END_IF
+
+// --- Разблокировать замок
+IF (((true AND AutoOpen AND NOT openedLS1) OR (true AND AutoOpen AND NOT openedLS2) OR (true AND AutoOpen AND NOT openedRS1) OR (true AND AutoOpen AND NOT openedRS2) OR (true AND AutoClose AND NOT closedLS1) OR (true AND AutoClose AND NOT closedLS2) OR (true AND AutoClose AND NOT closedRS1) OR (true AND AutoClose AND NOT closedRS2) OR (true AND yOpenL)) AND NOT errLTO_L1) AND NOT errLTO_L2 THEN lUnlock := TRUE; END_IF
+IF (((true AND AutoOpen AND NOT openedLS1) OR (true AND AutoOpen AND NOT openedLS2) OR (true AND AutoOpen AND NOT openedRS1) OR (true AND AutoOpen AND NOT openedRS2) OR (true AND AutoClose AND NOT closedLS1) OR (true AND AutoClose AND NOT closedLS2) OR (true AND AutoClose AND NOT closedRS1) OR (true AND AutoClose AND NOT closedRS2) OR (true AND yOpenL)) AND NOT errLTO_L1) AND NOT errLTO_L2 THEN yOpenL := FALSE; END_IF
+
+// ---
+TON_Lock(IN:=AutoClose AND closedLS1 AND closedLS2 AND closedRS1 AND closedRS2, PT:=t#3s);
+IF ((TON_Lock.Q OR yCloseL) AND NOT errLTC_L1) AND NOT errLTC_L2 THEN lLock := TRUE; END_IF
+IF ((TON_Lock.Q OR yCloseL) AND NOT errLTC_L1) AND NOT errLTC_L2 THEN yCloseL := FALSE; END_IF
+
+// ---
+IF lUnlock AND NOT lLock THEN runToOpenL := TRUE; END_IF
+IF lUnlock AND NOT lLock THEN runToCloseL := FALSE; END_IF
+IF NOT lUnlock AND lLock THEN runToOpenL := FALSE; END_IF
+IF NOT lUnlock AND lLock THEN runToCloseL := TRUE; END_IF
+IF lUnlock AND lLock THEN runToOpenL := FALSE; END_IF
+IF lUnlock AND lLock THEN runToCloseL := FALSE; END_IF
+IF (errLTC_L1 OR errLTC_L2 OR errLTO_LS1 OR errLTO_LS2 OR errLTC_LS1 OR errLTC_LS2 OR errLTO_RS1 OR errLTO_RS2 OR errLTC_RS1 OR errLTC_RS2 OR (closedL1 AND closedL2)) THEN runToCloseL := FALSE; END_IF
+IF (errLTO_L1 OR errLTO_L2 OR (openedL1 AND openedL2)) THEN runToOpenL := FALSE; END_IF
+
+// ---
+IF NoUseLock AND runToOpenL THEN openedL1 := TRUE; END_IF
+IF NoUseLock AND runToOpenL THEN openedL2 := TRUE; END_IF
+IF NoUseLock AND runToCloseL THEN closedL1 := TRUE; END_IF
+IF NoUseLock AND runToCloseL THEN closedL2 := TRUE; END_IF
+IF NoUseLock THEN runToOpenL := FALSE; END_IF
+IF NoUseLock THEN runToCloseL := FALSE; END_IF
+
+// --- Открыть правый шибер
+TON_OpenRS(IN:=(((true AND AutoOpen AND openedL1 AND openedL2) OR (true AND AutoOpen AND openedRS1 AND openedRS2) OR (true AND yOpenRS)) AND NOT errLTO_RS1) AND NOT errLTO_RS2, PT:=t#2s);
+IF TON_OpenRS.Q THEN lOpenRS := TRUE; END_IF
+IF TON_OpenRS.Q THEN yOpenRS := FALSE; END_IF
+
+// ---
+TON_CloseRS(IN:=AutoClose AND NOT openedLS1 AND NOT openedLS2, PT:=t#5s);
+
+// --- Закрыть правый шибер
+IF ((((((((true AND AutoClose AND openedL1 AND openedL2) OR (true AND AutoClose AND closedRS1 AND closedRS2) OR (true AND AutoClose AND RestoreAfterLP)) AND closedLS1) AND closedLS2) OR (((true AND AutoClose AND openedL1 AND openedL2) OR (true AND AutoClose AND closedRS1 AND closedRS2) OR (true AND AutoClose AND RestoreAfterLP)) AND TON_CloseRS.Q) OR (true AND yCloseRS)) AND NOT errLTC_RS1) AND NOT errLTC_RS2) AND NOT errLTC_LS1) AND NOT errLTC_LS2 THEN lCloseRS := TRUE; END_IF
+IF ((((((((true AND AutoClose AND openedL1 AND openedL2) OR (true AND AutoClose AND closedRS1 AND closedRS2) OR (true AND AutoClose AND RestoreAfterLP)) AND closedLS1) AND closedLS2) OR (((true AND AutoClose AND openedL1 AND openedL2) OR (true AND AutoClose AND closedRS1 AND closedRS2) OR (true AND AutoClose AND RestoreAfterLP)) AND TON_CloseRS.Q) OR (true AND yCloseRS)) AND NOT errLTC_RS1) AND NOT errLTC_RS2) AND NOT errLTC_LS1) AND NOT errLTC_LS2 THEN yCloseRS := FALSE; END_IF
+
+// ---
+IF lOpenRS AND NOT lCloseRS THEN runToOpenRS := TRUE; END_IF
+IF lOpenRS AND NOT lCloseRS THEN runToCloseRS := FALSE; END_IF
+IF NOT lOpenRS AND lCloseRS THEN runToOpenRS := FALSE; END_IF
+IF NOT lOpenRS AND lCloseRS THEN runToCloseRS := TRUE; END_IF
+IF lOpenRS AND lCloseRS THEN runToOpenRS := FALSE; END_IF
+IF lOpenRS AND lCloseRS THEN runToCloseRS := FALSE; END_IF
+IF (errLTO_RS1 OR errLTO_RS2 OR (openedRS1 AND openedRS2)) THEN runToOpenRS := FALSE; END_IF
+IF (errLTC_RS1 OR errLTC_RS2 OR errLTC_LS1 OR errLTC_LS2 OR (closedRS1 AND closedRS2)) THEN runToCloseRS := FALSE; END_IF
+
+// ---
+TON_OpenLS(IN:=AutoOpen AND NOT closedRS1 AND NOT closedRS2, PT:=t#5s);
+
+// --- Открыть левый шибер
+IF ((((((((true AND AutoOpen AND openedL1 AND openedL2) OR (true AND AutoOpen AND openedLS1 AND openedLS2)) AND openedRS1) AND openedRS2) OR (((true AND AutoOpen AND openedL1 AND openedL2) OR (true AND AutoOpen AND openedLS1 AND openedLS2)) AND TON_OpenLS.Q) OR (true AND yOpenLS)) AND NOT errLTO_LS1) AND NOT errLTO_LS2) AND NOT errLTO_RS1) AND NOT errLTO_RS2 THEN lOpenLS := TRUE; END_IF
+IF ((((((((true AND AutoOpen AND openedL1 AND openedL2) OR (true AND AutoOpen AND openedLS1 AND openedLS2)) AND openedRS1) AND openedRS2) OR (((true AND AutoOpen AND openedL1 AND openedL2) OR (true AND AutoOpen AND openedLS1 AND openedLS2)) AND TON_OpenLS.Q) OR (true AND yOpenLS)) AND NOT errLTO_LS1) AND NOT errLTO_LS2) AND NOT errLTO_RS1) AND NOT errLTO_RS2 THEN yOpenLS := FALSE; END_IF
+
+// --- Закрыть левый шибер
+IF (((true AND AutoClose AND openedL1 AND openedL2) OR (true AND AutoClose AND closedLS1 AND closedLS2) OR (true AND AutoClose AND RestoreAfterLP) OR (true AND yCloseLS)) AND NOT errLTC_LS1) AND NOT errLTC_LS2 THEN lCloseLS := TRUE; END_IF
+IF (((true AND AutoClose AND openedL1 AND openedL2) OR (true AND AutoClose AND closedLS1 AND closedLS2) OR (true AND AutoClose AND RestoreAfterLP) OR (true AND yCloseLS)) AND NOT errLTC_LS1) AND NOT errLTC_LS2 THEN yCloseLS := FALSE; END_IF
+
+// ---
+IF lOpenLS AND NOT lCloseLS THEN runToOpenLS := TRUE; END_IF
+IF lOpenLS AND NOT lCloseLS THEN runToCloseLS := FALSE; END_IF
+IF NOT lOpenLS AND lCloseLS THEN runToOpenLS := FALSE; END_IF
+IF NOT lOpenLS AND lCloseLS THEN runToCloseLS := TRUE; END_IF
+IF lOpenLS AND lCloseLS THEN runToOpenLS := FALSE; END_IF
+IF lOpenLS AND lCloseLS THEN runToCloseLS := FALSE; END_IF
+IF (errLTC_LS1 OR errLTC_LS2 OR (ClosedLS1 AND closedLS2)) THEN runToCloseLS := FALSE; END_IF
+IF (errLTO_LS1 OR errLTO_LS2 OR errLTO_RS1 OR errLTO_RS2 OR (openedLS1 AND openedLS2)) THEN runToOpenLS := FALSE; END_IF
+
+// ---
+
+// ---
+
+// ---
+
+// ---

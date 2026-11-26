@@ -1,0 +1,348 @@
+program PrgUnLoadDop
+VAR
+  local   FiltNor6 : Filter
+  local   NotUseUjos : BOOL
+  local   FiltNor7 : Filter
+  local   Nor6 : Noria
+  local   Pros1 : Filter
+  local   Pros2 : Filter
+  local   Nor5 : Noria
+  local   FiltNor5 : Filter
+  local   Tr40100 : Transporter
+  local   Tr40300 : Transporter
+  local   Tr40700 : Transporter
+  local   Tr40800 : Transporter
+  local   Tr51100 : Transporter
+  local   Tr51200 : Transporter
+  local   asp_Gran : asp
+  local   NextFiltNor6 : BOOL
+  local   NextFiltNor5 : BOOL
+  local   ZatvorOhlGr : Zatvor
+  local   PrevTrPVH : BOOL
+  local   BypasIzm : PC_One
+  local   TON_OpenZaslOhl : TON
+  local   TON_CloseZaslOhl : TON
+  local   TON_GranIdl : TON
+  local   Vibrator_PBGran1 : TVibrator
+  local   Vibrator_PBGran2 : TVibrator
+  local   TOF_VibrPBGran : TOF
+  local   DVUOhlGran_emul : BOOL := 0
+  local   DSUOhlGran_emul : BOOL := 0
+  local   DNUOhlGran_emul : BOOL := 0
+  local   TON_StopPVH : TON
+  local   TON_Go_Pit : TON
+  local   TOF_go_pc : TOF
+  local   TON_CloseShDop : TON
+  local   Shiber_40110 : AutoShiber
+  local   ShTrSmsMustOpen : BOOL
+  local   Nor7 : Noria
+  local   PP3 : PP
+  local   PP2 : PP
+  local   AutoPros : BOOL
+  local   PP1 : PP
+  local   NextNor6 : BOOL
+  local   AutoRunGran : BOOL
+  local   GranPathIs0 : BOOL
+  local   Ohladitel1 : Ohladitel
+  local   Shiber_O9 : ManualShiber
+  local   LebUpDown : ManualShiber
+  local   LebLR : ManualShiber
+  local   FILTER_CURR_GRAN : FILTER_analog_signal
+  local   FILTER_CURR_PitGR : FILTER_analog_signal
+  local   FILTER_CURR_Tr40700 : FILTER_analog_signal
+  local   AutoTr51100 : BOOL
+  local   BLINK_DksOhl : BLINK
+  local   AutoNor7 : BOOL
+END_VAR
+
+(* LD *)
+
+// ---
+ShTrSmsMustOpen := (GranIdPP = PPidPP[CurTaskSms3]) /*EN=(CurTaskSms3 > 0) /*EN=UseGran*/*/;
+
+// ---
+Shiber_40110(opened:=Opened_ShTrSms, closed:=Closed_ShTrSms, toOpen:=ShTrSmsMustOpen AND NOT Opened_ShTrSms, toClose:=NOT ShTrSmsMustOpen AND NOT Closed_ShTrSms, maxTTO:=t#15s, errAZ:=ErrAz_ShTrSms, HandMode:=(MHand OR NOT UseGran OR fHand3.10), yOpen:=yOpenShTrSms, yClose:=yCloseShTrSms, MH:=MhShTrSms, aMH:=aMhShTrSms);
+Go_CloseShTrSms := Shiber_40110.runToClose;
+Err32.0 := Shiber_40110.errLT;
+Err32.1 := Shiber_40110.errKonc;
+Err32.2 := Shiber_40110.errAZOut;
+DA_ShTrSms := Shiber_40110.da;
+Opened_ShTrSms := Shiber_40110.openedOut;
+Closed_ShTrSms := Shiber_40110.closedOut;
+yOpenShTrSms := Shiber_40110.yOpenOut;
+yCloseShTrSms := Shiber_40110.yCloseOut;
+StMeh[22] := Shiber_40110.state;
+Go_OpenShTrSms := Shiber_40110.runToOpen;
+
+// ---
+AutoNor7 := GranUnlRun AND GranUnl309;
+
+// ---
+FiltNor7(next:=TRUE, StopOnNoNext:=false, prev:=Go_Nor7, AZ:=ErrAz_FiltNor7, HandMode:=(MHand OR (NOT GranUnl309 AND NOT FiltNor7.run_auto) OR fHand4.6), SlowHand:=(GranUnl309 OR FiltNor7.run_auto), canRunAuto:=AutoNor7, timeBeforeStart:=t#1s, timeToStop:=t#10s, yRun:=yRunFiltNor7, MH:=MhFiltNor7, aMH:=aMhFiltNor7);
+DA_FiltNor7 := FiltNor7.da;
+Err18.9 := FiltNor7.errAZ;
+yRunFiltNor7 := FiltNor7.HandOut;
+Go_FiltNor7 := FiltNor7.run;
+
+// ---
+Nor7 //Nor50100(localPusk:=LPusk_Nor7, localStop:=(LStopD_Nor7 OR LStopU_Nor7), next:=TRUE, prev:=Go_Tr51100 AND PP3_Pos2, dp:=DP_Nor7, off_dp:=OffDP_Nor7, dks:=DKS_Nor7, off_dks:=OffDKS_Nor7, dsl1:=DSL1_Nor7, dsl2:=DSL2_Nor7, off_dsl1:=OffDSL1_Nor7, off_dsl2:=OffDSL2_Nor7, AZ:=ErrAz_Nor7, HandMode:=(MHand OR (NOT GranUnl309 AND NOT Nor7.run_auto) OR fHand4.3), SlowHand:=Nor7.run_auto, canRunAuto:=AutoNor7, timeBeforeStart:=t#5S, timeToStop:=t#1S*tcNor7, yRun:=yRunNor7, MH:=MhNor7, aMH:=aMhNor7);
+DA_Nor7 := Nor7 //Nor50100.da;
+Err26.10 := Nor7 //Nor50100.errAZ;
+Err26.11 := Nor7 //Nor50100.errDKS;
+Err26.12 := Nor7 //Nor50100.errDP;
+Err26.13 := Nor7 //Nor50100.errDSL1;
+Err26.14 := Nor7 //Nor50100.errDSL2;
+yRunNor7 := Nor7 //Nor50100.yRunOut;
+Go_Nor7 := Nor7 //Nor50100.run;
+
+// ---
+GranPathIs0 := (GranPath = 0);
+
+// ---
+PP3(curPos1:=PP3_Pos1, curPos2:=PP3_Pos2, toPos1:=GranUnl8, toPos2:=GranUnl309, maxTTO:=t#15s, errAz:=ErrAz_PP3, HandMode:=(mHand OR (GranPathIs0 AND NOT Tr51100.run_auto) OR fHand5.2), yRun1:=yPP3to1, yRun2:=yPP3to2, MH:=MhPP3, aMH:=aMhPP3);
+PP3_ToPos2 := PP3.runToPos2;
+Err5.6 := PP3.errLT;
+Err5.7 := PP3.errKonc;
+Err5.8 := PP3.errAZOut;
+DA_PP3 := PP3.da;
+PP3_Pos1 := PP3.curPos1out;
+PP3_Pos2 := PP3.curPos2out;
+yPP3to1 := PP3.yRun1Out;
+yPP3to2 := PP3.yRun2Out;
+PP3_ToPos1 := PP3.runToPos1;
+
+// ---
+Tr51200(localStop:=(LStop1_Tr51200 OR LStop2_Tr51200), localPusk:=LPusk_Tr51200 AND Local_Tr51200, next:=Go_Nor4, prev:=Go_Tr51100 AND PP3_Pos1, errAZ:=ErrAz_Tr51200, dks:=DKS_Tr51200, dksMustBlink:=TRUE, DKS_off:=OffDKS_Tr51200, DP:=DP_Tr51200, DP_off:=OffDP_Tr51200, HandMode:=(MHand OR (NOT GranUnl8 AND NOT Tr51200.run_auto) OR fHand4.0), SlowHand:=Tr51200.run_auto, canRunAuto:=GranUnlRun AND GranUnl8, timeBeforeStart:=t#3s, timeToStop:=t#1S*tcTr51200, yHand:=yRunTr51200, MH:=MhTr51200, aMH:=aMhTr51200);
+DA_Tr51200 := Tr51200.da;
+Err8.12 := Tr51200.err_AZ;
+Err8.13 := Tr51200.err_DKS;
+Err8.14 := Tr51200.err_DP;
+yRunTr51200 := Tr51200.HandOut;
+Go_Tr51200 := Tr51200.run;
+
+// ---
+AutoTr51100 := ((UnloadSt.1 AND GranUnl8) OR GranUnl309);
+
+// ---
+Tr51100(localStop:=(LStop1_Tr51100 OR LStop2_Tr51100), localPusk:=LPusk_Tr51100 AND Local_Tr51100, next:=((PP3_Pos1 AND Go_Tr51200) OR (PP3_Pos2 AND Go_Nor7)), prev:=(Go_Pros1 OR Go_Pros2) AND PP2_Pos2, errAZ:=ErrAz_Tr51100, dks:=DKS_Tr51100, dksMustBlink:=TRUE, DKS_off:=OffDKS_Tr51100, DP:=DP_Tr51100, DP_off:=OffDP_Tr51100, HandMode:=(MHand OR (NOT GranUnl8 AND NOT Tr51100.run_auto) OR fHand3.15), SlowHand:=AutoTr51100, canRunAuto:=((GranUnlRun AND GranUnl8) OR (GranUnlRun AND GranUnl309)), timeBeforeStart:=t#3s, timeToStop:=t#1S*tcTr51100, yHand:=yRunTr51100, MH:=MhTr51100, aMH:=aMhTr51100);
+DA_Tr51100 := Tr51100.da;
+Err8.3 := Tr51100.err_AZ;
+Err8.4 := Tr51100.err_DKS;
+Err8.5 := Tr51100.err_DP;
+yRunTr51100 := Tr51100.HandOut;
+Go_Tr51100 := Tr51100.run;
+
+// ---
+PP2(curPos1:=PP2_Pos1, curPos2:=PP2_Pos2, toPos1:=GranUnl310 AND NOT Go_Pros1 AND NOT Go_Pros2, toPos2:=((GranUnl309 OR GranUnl8) AND NOT Go_Pros1) AND NOT Go_Pros2, maxTTO:=t#15s, errAz:=ErrAz_PP2, HandMode:=(mHand OR (GranPathIs0 AND NOT pros1.run_auto AND NOT pros2.run_auto) OR fHand5.1), yRun1:=yPP2to1, yRun2:=yPP2to2, MH:=MhPP2, aMH:=aMhPP2);
+PP2_ToPos2 := PP2.runToPos2;
+Err5.3 := PP2.errLT;
+Err5.4 := PP2.errKonc;
+Err5.5 := PP2.errAZOut;
+DA_PP2 := PP2.da;
+PP2_Pos1 := PP2.curPos1out;
+PP2_Pos2 := PP2.curPos2out;
+yPP2to1 := PP2.yRun1Out;
+yPP2to2 := PP2.yRun2Out;
+PP2_ToPos1 := PP2.runToPos1;
+
+// ---
+AutoPros := ((GranUnl310 AND PP2_Pos1) OR ((GranUnl309 OR GranUnl8) AND PP2_Pos2)) AND GranUnlRun;
+
+// ---
+Pros1(next:=(PP2_Pos1 OR (PP2_Pos2 AND go_Tr51100)) AND Go_Tr40800, StopOnNoNext:=true, prev:=Go_Nor6 AND PP1_Pos1, AZ:=ErrAz_Pros1, HandMode:=(MHand OR (NOT AutoPros AND NOT Nor6.run_auto) OR fHand4.14), SlowHand:=AutoPros, canRunAuto:=AutoPros, timeBeforeStart:=t#5s, timeToStop:=t#10s, yRun:=yRunPros1, MH:=MhPros1, aMH:=aMhPros1);
+Err18.11 := Pros1.errAZ;
+yRunPros1 := Pros1.HandOut;
+Go_Pros1 := Pros1.run;
+
+// ---
+Pros2(next:=(PP2_Pos1 OR (PP2_Pos2 AND go_Tr51100)) AND Go_Tr40800, StopOnNoNext:=true, prev:=Go_Nor6 AND PP1_Pos1, AZ:=ErrAz_Pros2, HandMode:=(MHand OR (NOT AutoPros AND NOT Nor6.run_auto) OR fHand4.14), SlowHand:=AutoPros, canRunAuto:=AutoPros, timeBeforeStart:=t#5s, timeToStop:=t#10s, yRun:=yRunPros2, MH:=MhPros2, aMH:=aMhPros2);
+Err18.12 := Pros2.errAZ;
+yRunPros2 := Pros2.HandOut;
+Go_Pros2 := Pros2.run;
+
+// ---
+PP1(curPos1:=PP1_Pos1, curPos2:=PP1_Pos2, toPos1:=AutoPros AND NOT GrClear AND NOT PP1_Pos1, toPos2:=(GranUnlZ310 OR GrClear) AND NOT PP1_Pos2, maxTTO:=t#15s, errAz:=ErrAz_PP1, HandMode:=(mHand OR (NOT AutoRunGran AND NOT Nor6.run_auto) OR fHand5.0), yRun1:=yPP1to1, yRun2:=yPP1to2, MH:=MhPP1, aMH:=aMhPP1);
+PP1_ToPos2 := PP1.runToPos2;
+Err5.0 := PP1.errLT;
+Err5.1 := PP1.errKonc;
+Err5.2 := PP1.errAZOut;
+DA_PP1 := PP1.da;
+PP1_Pos1 := PP1.curPos1out;
+PP1_Pos2 := PP1.curPos2out;
+yPP1to1 := PP1.yRun1Out;
+yPP1to2 := PP1.yRun2Out;
+PP1_ToPos1 := PP1.runToPos1;
+
+// ---
+AutoRunGran := (GranPath>0);
+
+// ---
+NextNor6 := ((true AND PP1_Pos2) OR (true AND PP1_Pos1 AND Go_Pros1 AND Go_Pros2) OR (true AND NOT PP1_Pos1 AND NOT PP1_Pos2 AND NOT DA_PP1));
+
+// ---
+FiltNor6(next:=(NextNor6 OR Go_Nor6), StopOnNoNext:=false, prev:=Go_Nor6, AZ:=ErrAz_FiltNor6, HandMode:=(MHand OR (NOT AutoRunGran AND NOT FiltNor6.run_auto) OR fHand4.5), SlowHand:=FiltNor6.run_auto, canRunAuto:=GranUnlRun, timeBeforeStart:=t#1s, timeToStop:=t#15s, yRun:=yRunFiltNor6, MH:=MhFiltNor6, aMH:=aMhFiltNor6);
+DA_FiltNor6 := FiltNor6.da;
+Err18.8 := FiltNor6.errAZ;
+yRunFiltNor6 := FiltNor6.HandOut;
+Go_FiltNor6 := FiltNor6.run;
+
+// ---
+Nor6 //40900(localPusk:=LPusk_Nor6 AND Local_Nor6, localStop:=(LStopD_Nor6 OR LStopU_Nor6), next:=NextNor6, prev:=onPchTr40700 AND Go_PchTr40700, dp:=DP_Nor6, off_dp:=OffDP_Nor6, dks:=DKS_Nor6, off_dks:=OffDKS_Nor6, dsl1:=DSL1_Nor6, dsl2:=DSL2_Nor6, off_dsl1:=OffDSL1_Nor6, off_dsl2:=OffDSL2_Nor6, AZ:=ErrAz_Nor6, HandMode:=(MHand OR (NOT AutoRunGran AND NOT Nor6.run_auto) OR fHand4.2), SlowHand:=Nor6.run_auto, canRunAuto:=GranUnlRun, timeBeforeStart:=t#5S, timeToStop:=t#1S*tcNor6, yRun:=yRunNor6, MH:=MhNor6, aMH:=aMhNor6);
+DA_Nor6 := Nor6 //40900.da;
+Err26.5 := Nor6 //40900.errAZ;
+Err26.6 := Nor6 //40900.errDKS;
+Err26.7 := Nor6 //40900.errDP;
+Err26.8 := Nor6 //40900.errDSL1;
+Err26.9 := Nor6 //40900.errDSL2;
+yRunNor6 := Nor6 //40900.yRunOut;
+Go_Nor6 := Nor6 //40900.run;
+
+// ---
+Tr40700(localStop:=(LStop1_Tr40700 OR LStop2_Tr40700), localPusk:=LPusk_Tr40700, next:=Go_Nor6, prev:=(NOT GranIsEmpty OR NOT OhlIsEmpty), errAZ:=ErrPch_Tr40700, dks:=DKS_Tr40700, dksMustBlink:=true, DKS_off:=OffDKS_Tr40700, DP:=DP_Tr40700, DP_off:=OffDP_Tr40700, HandMode:=(MHand OR (NOT GranUnlRun AND NOT Tr40700.run_auto) OR fHand3.13), SlowHand:=Tr40700.run_auto, canRunAuto:=GranUnlRun, timeBeforeStart:=t#3s, timeToStop:=t#1S*tcTr40700, yHand:=yRunTr40700, MH:=MhTr40700, aMH:=aMhTr40700);
+DA_Tr40700 := Tr40700.da;
+Err28.6 := Tr40700.err_AZ;
+Err28.7 := Tr40700.err_DKS;
+Err28.8 := Tr40700.err_DP;
+yRunTr40700 := Tr40700.HandOut;
+Go_PchTr40700 := Tr40700.run;
+
+// ---
+Tr40300(localStop:=(LStop1_Tr40300 OR LStop2_Tr40300), localPusk:=LPusk_Tr40300, next:=TRUE, prev:=Go_Nor5, errAZ:=ErrAz_Tr40300, dks:=DKS_Tr40300, dksMustBlink:=true, DKS_off:=OffDKS_Tr40300, DP:=DP_Tr40300, DP_off:=OffDP_Tr40300, HandMode:=(MHand OR (NOT AutoRunGran AND NOT Tr40300.run_auto) OR fHand3.12), SlowHand:=Tr40300.run_auto, canRunAuto:=GranUnlRun, timeBeforeStart:=t#3s, timeToStop:=t#1S*tcTr40300, yHand:=yRunTr40300, MH:=MhTr40300, aMH:=aMhTr40300);
+DA_Tr40300 := Tr40300.da;
+Err8.6 := Tr40300.err_AZ;
+Err8.7 := Tr40300.err_DKS;
+Err8.8 := Tr40300.err_DP;
+yRunTr40300 := Tr40300.HandOut;
+StMeh[35] := Tr40300.state;
+Go_Tr40300 := Tr40300.run;
+
+// ---
+FiltNor5(next:=Go_Tr40300, StopOnNoNext:=FALSE, prev:=Go_Nor5, AZ:=ErrAz_FiltNor5, HandMode:=(MHand OR (NOT UseGran AND NOT FiltNor5.run_auto) OR fHand4.4), SlowHand:=FiltNor5.run_auto, canRunAuto:=GranUnlRun, timeBeforeStart:=t#5s, timeToStop:=t#10s, yRun:=yRunFiltNor5, MH:=MhFiltNor5, aMH:=aMhFiltNor5);
+DA_FiltNor5 := FiltNor5.da;
+Err18.7 := FiltNor5.errAZ;
+yRunFiltNor5 := FiltNor5.HandOut;
+Go_FiltNor5 := FiltNor5.run;
+
+// ---
+Nor5//40200(localPusk:=LPusk_Nor5 AND Local_Nor5, localStop:=(LStopD_Nor5 OR LStopU_Nor5), next:=Go_Tr40300, prev:=Go_Tr40100, dp:=DP_Nor5, off_dp:=OffDP_Nor5, dks:=DKS_Nor5, off_dks:=OffDKS_Nor5, dsl1:=DSL1_Nor5, dsl2:=DSL2_Nor5, off_dsl1:=OffDSL1_Nor5, off_dsl2:=OffDSL2_Nor5, AZ:=ErrAz_Nor5, HandMode:=(MHand OR (NOT AutoRunGran AND NOT Nor5.run_auto) OR fHand4.1), SlowHand:=Nor5.run_auto, canRunAuto:=GranUnlRun, timeBeforeStart:=t#5S, timeToStop:=t#1S*tcNor5, yRun:=yRunNor5, MH:=MhNor5, aMH:=aMhNor5);
+DA_Nor5 := Nor5//40200.da;
+Err26.0 := Nor5//40200.errAZ;
+Err26.1 := Nor5//40200.errDKS;
+Err26.2 := Nor5//40200.errDP;
+Err26.3 := Nor5//40200.errDSL1;
+Err26.4 := Nor5//40200.errDSL2;
+yRunNor5 := Nor5//40200.yRunOut;
+StMeh[36] := Nor5//40200.state;
+Go_Nor5 := Nor5//40200.run;
+
+// ---
+Tr40100(localStop:=(LStop1_Tr40100 OR LStop2_Tr40100), localPusk:=LPusk_Tr40100, next:=Go_Nor5, prev:=((Go_TrSms AND Opened_ShTrSms) OR Go_Tr40800), errAZ:=ErrAz_Tr40100, dks:=DKS_Tr40100, dksMustBlink:=true, DKS_off:=OffDKS_Tr40100, DP:=DP_Tr40100, DP_off:=OffDP_Tr40100, HandMode:=(MHand OR (NOT AutoRunGran AND NOT Tr40100.run_auto) OR fHand3.11), SlowHand:=Tr40100.run_auto, canRunAuto:=GranUnlRun, timeBeforeStart:=t#3s, timeToStop:=t#1S*tcTr40100, yHand:=yRunTr40100, MH:=MhTr40100, aMH:=aMhTr40100);
+DA_Tr40100 := Tr40100.da;
+Err8.0 := Tr40100.err_AZ;
+Err8.1 := Tr40100.err_DKS;
+Err8.2 := Tr40100.err_DP;
+yRunTr40100 := Tr40100.HandOut;
+StMeh[35] := Tr40100.state;
+Go_Tr40100 := Tr40100.run;
+
+// ---
+Tr40800(localStop:=(LStop1_Tr40800 OR LStop2_Tr40800), localPusk:=LPusk_Tr40800, next:=Go_Tr40100, prev:=(Go_GwAspOhl OR Go_Pros1 OR Go_Pros2), errAZ:=ErrAz_Tr40800, dks:=DKS_Tr40800, dksMustBlink:=true, DKS_off:=OffDKS_Tr40800, DP:=DP_Tr40800, DP_off:=OffDP_Tr40800, HandMode:=(MHand OR (NOT GranUnlRun AND NOT Tr40800.run_auto) OR fHand3.14), SlowHand:=Tr40800.run_auto, canRunAuto:=GranUnlRun, timeBeforeStart:=t#3s, timeToStop:=t#1S*tcTr40800, yHand:=yRunTr40800, MH:=MhTr40800, aMH:=aMhTr40800);
+DA_Tr40800 := Tr40800.da;
+Err28.9 := Tr40800.err_AZ;
+Err28.10 := Tr40800.err_DKS;
+Err28.11 := Tr40800.err_DP;
+yRunTr40800 := Tr40800.HandOut;
+Go_Tr40800 := Tr40800.run;
+
+// ---
+asp_Gran(Az:=ErrAz_AspOhl, AzGway:=ErrAz_GwAspOhl, dks:=DKS_GwAspOhl, offDks:=OffDKS_GwAspOhl, prev:=AutoUnlOhl, HandMode:=(MHand OR NOT AutoUnlOhl OR fHand4.12), conditionToWork:=AutoUnlOhl, TTS:=t#5s, yRun:=yRunAspGr, yRunGw:=yRunGwAspGr, MHAsp:=MhAspGr, aMHAsp:=aMhAspGr, MHGw:=MhGwAspGr, aMHGw:=aMhGwAspGr);
+Go_GwAspOhl := asp_Gran.runGway;
+DA_AspOhl := asp_Gran.DA;
+DA_GwAspOhl := asp_Gran.DAGway;
+Err30.9 := asp_Gran.errAz;
+Err30.10 := asp_Gran.errdks;
+Err30.11 := asp_Gran.errAzGway;
+yRunAspGr := asp_Gran.yRunOut;
+yRunGwAspGr := asp_Gran.yRunGwOut;
+Go_AspOhl := asp_Gran.runAsp;
+
+// ---
+ZatvorOhlGr(next:=true, prev:=(GrStart OR Go_PchGr OR NOT GranIsEmpty), errAZ:=ErrAz_GwOhlGr, dks:=DKS_GwOhlGr, DKS_off:=OffDKS_GwOhl, HandMode:=(MHand OR NOT UseGran OR fHand4.10), SlowHand:=AutoUnlOhl, canRunAuto:=AutoUnlOhl, timeBeforeStart:=t#2s, timeToStop:=t#2s, yRun:=yRunGwOhl);
+DA_GwOhlGr := ZatvorOhlGr.da;
+Err18.15 := ZatvorOhlGr.err_AZ;
+Err18.13 := ZatvorOhlGr.err_DKS;
+yRunGwOhl := ZatvorOhlGr.yRunOut;
+Go_GwOhlGr := ZatvorOhlGr.run;
+
+// ---
+Ohladitel1(Next:=Go_PchTr40700, Prev:=GranIsWork AND NOT GranIsEmpty, Door:=DoorOhlGr, OffOpenDoor:=OffDoorOhlGr, DksStol:=DKS_OhlGr, DVU:=DVU_OhlGr, DSU:=(DSU_OhlGr OR (DNU_OhlGr AND GranIsEmpty)), DNU:=DNU_OhlGr, Interval0:=OhlTimeInt0, Interval1:=OhlTimeInt1, Interval2:=OhlTimeInt2, IntervalH:=OhlTimeIntH, TempVozd:=TempOhlIn, MaxTempVozd:=700, MustFree:=OhlMustEmpty AND NOT OhlIsEmpty AND NOT DNU_OhlGr, HandMode:=(MHand OR fHand4.13), canRunAuto:=(GranPath>0), yOpen:=yOpenStol, yRun:=yRunStol);
+Go_StolOhlGr := Ohladitel1.RunStol;
+SecToOpenStol := Ohladitel1.TimeToOpen;
+SecToCloseStol := Ohladitel1.TimeToClose;
+Err29.0 := Ohladitel1.ErrDoor;
+Err29.12 := Ohladitel1.ErrDksStol;
+Err29.6 := Ohladitel1.ErrTempVozd;
+yOpenStol := Ohladitel1.yOpenOut;
+yRunStol := Ohladitel1.yRunOut;
+Go_VygrOhlGr := Ohladitel1.OpenStol;
+
+// ---
+BLINK_DksOhl(ENABLE:=MEmul, TIMELOW:=t#1s, TIMEHIGH:=t#100ms);
+DKS_OhlGr := BLINK_DksOhl.OUT;
+
+// ---
+Err29.11 := (DVU_OhlGr OR DVUOhlGran_emul);
+
+// ---
+Shiber_O9(opened:=Opened_ShO9, closed:=Closed_ShO9, toOpen:=((LOpen_ShO9 AND UnBlockSilos.0) OR (LOpen_ShO9 AND UnBlockSilos.9)), toClose:=LClose_ShO9, maxTTO:=t#15s, errAZ:=ErrAz_ShO9, yOpen:=yOpenShO9, yClose:=yCloseShO9, MH:=MhShO9, aMH:=aMhShO9);
+Go_CloseShO9 := Shiber_O9.runToClose;
+Err17.9 := Shiber_O9.errLT;
+Err17.10 := Shiber_O9.errKonc;
+Err17.11 := Shiber_O9.errAZOut;
+DA_ShO9 := Shiber_O9.da;
+yOpenShO9 := Shiber_O9.yOpenOut;
+yCloseShO9 := Shiber_O9.yCloseOut;
+Go_OpenShO9 := Shiber_O9.runToOpen;
+
+// --- Лебёдка вверх-вниз
+LebUpDown(opened:=FALSE, closed:=FALSE, toOpen:=Btn_LebToUp, toClose:=Btn_LebToDn, maxTTO:=t#10h, errAZ:=ErrAz_LebUpDown, yOpen:=yLebUp, yClose:=YLebDown, notFixed:=TRUE, MH:=MhLebUD, aMH:=aMhLebUD);
+Go_LebDn := LebUpDown.runToClose;
+Err30.0 := LebUpDown.errAZOut;
+yLebUp := LebUpDown.yOpenOut;
+YLebDown := LebUpDown.yCloseOut;
+Go_LebUp := LebUpDown.runToOpen;
+
+// --- Лебёдка влево-вправо
+LebLR(opened:=Leb_Pol2, closed:=Leb_Pol1, toOpen:=Btn_LebTo2, toClose:=Btn_LebTo1, maxTTO:=t#10h, errAZ:=ErrAz_Leb12, yOpen:=yLebRight, yClose:=yLebLeft, notFixed:=TRUE, MH:=MhLebLR, aMH:=aMhLebLR);
+Go_LebTo1 := LebLR.runToClose;
+Err30.1 := LebLR.errAZOut;
+yLebRight := LebLR.yOpenOut;
+yLebLeft := LebLR.yCloseOut;
+Go_LebTo2 := LebLR.runToOpen;
+
+// ---
+TokGran := (real_to_int(int_to_real(ovenTokGran)*TokGran100/10000));
+TokPitGr := (real_to_int(int_to_real(ovenTokPit)*TokPit100/10000));
+TokTr40700 := (real_to_int(int_to_real(ovenTokTr40700)*TokTr40700_100/10000));
+
+// --- Фильтр токов c частотников
+FILTER_CURR_GRAN(START:=true, VALUE:=TokGran, LEN:=t#500ms);
+scTokGran := FILTER_CURR_GRAN.F_VALUE;
+FILTER_CURR_PitGR(START:=true, VALUE:=TokPitGr, LEN:=t#500ms);
+scTokPitGr := FILTER_CURR_PitGR.F_VALUE;
+FILTER_CURR_Tr40700(START:=true, VALUE:=TokTr40700, LEN:=t#500ms);
+scTokTr40700 := FILTER_CURR_Tr40700.F_VALUE;
+
+// ---
+Vibrator_PBGran1(RunAuto:=GrStart AND Go_PchPitGr AND OnPchPitGr AND NOT fHand4.7 AND FALSE, TimeAutoRun:=5, TimeAutoSleep:=10, MaxTimeOn:=t#55s, AZ:=ErrAz_VibrG1, yHand:=yRunVibrPBG1);
+Err30.12 := Vibrator_PBGran1.ErrAZ;
+yRunVibrPBG1 := Vibrator_PBGran1.yHandOut;
+Go_VibrG1 := Vibrator_PBGran1.Run;
+
+// ---
+Vibrator_PBGran2(RunAuto:=GrStart AND Go_PchPitGr AND OnPchPitGr AND NOT fHand4.8 AND FALSE, TimeAutoRun:=4, TimeAutoSleep:=9, MaxTimeOn:=t#60s, AZ:=ErrAz_VibrG2, yHand:=yRunVibrPBG2);
+Err30.13 := Vibrator_PBGran2.ErrAZ;
+yRunVibrPBG2 := Vibrator_PBGran2.yHandOut;
+Go_VibrG2 := Vibrator_PBGran2.Run;
+
+// ---

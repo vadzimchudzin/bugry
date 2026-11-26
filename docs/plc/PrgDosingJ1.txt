@@ -1,0 +1,137 @@
+program PrgDosingJ1
+VAR
+  local   yHandDoliv : BOOL := FALSE
+  local   yHandRecirc : BOOL := FALSE
+  local   yHandDosing : BOOL := FALSE
+  local   yHandSwD1 : BOOL := FALSE
+  local   yHandSwD2 : BOOL := FALSE
+  local   yHandTen : BOOL := FALSE
+  local   DozatorJ_1 : DozatorJ
+  local   locDone : BOOL
+  local   locDoneJ : BOOL
+  local   CanAnswUser : BOOL
+  local   ChangeJDob_0 : ChangeJDob
+  local   yTenTMP : BOOL
+  local   yCircTMP : BOOL
+  local   yProduvTMP : BOOL
+  local   CanAnswUserJ : BOOL
+  local   ChangeJDob_1 : ChangeJDob
+  local   yMasloDos1 : BOOL
+  local   yMasloDop1 : BOOL
+  local   couDos : INT
+  local   couDop : INT
+  local   MHCalcJ1Dop : MHCalc
+  local   MHCalcJ1Dos : MHCalc
+  local   CanAnswUserD : BOOL
+  local   RunDosingJ1 : BOOL
+  local   Go_MasloDopTmp : BOOL
+  local   Go_MasloDosTmp : BOOL
+  local   ClapMasloOut : PC_One
+  local   ClapMasloIn : PC_One
+  local   Produv1 : Produv
+  local   NeedProduv : BOOL
+  local   DoneProduv : BOOL
+  local   ResetProduv : BOOL
+END_VAR
+
+(* LD *)
+
+// ---
+IF Answ.7 AND NOT PauseDosingJ1 THEN tpChangeJ1 := 0; END_IF
+IF 0 /*EN=Answ.7 AND NOT PauseDosingJ1*/ THEN Answ.7 := FALSE; END_IF
+
+// ---
+ClapMasloIn(opened:=ClapInOpened, closed:=ClapInClosed, toOpen:=((msgToScadaJ1.1 AND (WantDolivJ1>0) AND false) OR Go_MasloDopTmp OR (yMasloDop AND MGod)), noOpen:=, maxTTO:=t#10s, HandMode:=(MHand OR NOT RunDosing OR fHand2.8), yOpen:=yClapIn);
+Err14.0 := ClapMasloIn.errLTOpen;
+Err14.1 := ClapMasloIn.errLTClose;
+Err14.2 := ClapMasloIn.errKonc;
+yClapIn := ClapMasloIn.yOpenOut;
+Go_ClapIn := ClapMasloIn.runToOpen;
+
+// ---
+IF NOT MGod AND NOT ClapInOpened THEN yMasloDop := FALSE; END_IF
+
+// ---
+DozatorJ_1(lPuskDos:=lPuskMasloDos AND LocalMasloDos, lStopDos:=lStopMasloDos, lPuskDop:=lPuskMasloDop AND LocalMasloDop, lStopDop:=lStopMasloDop, AzDop:=ErrAz_MasloDop, AzDos:=ErrAz_MasloDos, DVU:=DVU_Maslo, mDoliv:=msgToScadaJ1.1 AND ClapInOpened, wDoliv:=WantDolivJ1, BlockLDos:=(CurTaskJ1<>0) AND RunDosing, conditionToRun:=msgToScadaJ1.2 AND SmsMainState.1 AND NOT SmsMainState.2 AND ClapOutOpened AND NOT BlockJ1Out, Ves:=Ves4.RealValue, VesRequire:=VesZJ[1]-VesCJ[1], VesMax:=0, yVes:=yVesJ1, DONE_Reset:=(SmsMainState=0), AutoStolb:=UseAutoPSJ.0, HandMode:=(NOT RunDosing OR fHand2.8), yDop:=yMasloDop AND ClapInOpened, yHand:=yMasloDos AND ClapOutOpened, Pause:=PauseDosingJ1, tryDolivAgain:=flTryDoliv, VesStolba:=VesPsJ[1]);
+DolivJ1_Done := DozatorJ_1.DoneDoliv;
+Go_MasloDosTmp := DozatorJ_1.Go_Dos;
+Go_MasloDopTmp := DozatorJ_1.Go_Dop;
+Err13.11 := DozatorJ_1.ErrAzDop;
+Err13.14 := DozatorJ_1.ErrAzDos;
+VesDJ[1] := DozatorJ_1.VesDone;
+StMeh[72] := DozatorJ_1.state;
+noWeight1.14 := DozatorJ_1.noWeight;
+noWeight1.15 := DozatorJ_1.noDoliv;
+yMasloDop := DozatorJ_1.yDopOut;
+yMasloDos := DozatorJ_1.yHandOut;
+PauseDosingJ1 := DozatorJ_1.PauseOut;
+flTryDoliv := DozatorJ_1.tryDolivAgainOut;
+locDone := DozatorJ_1.Done;
+
+// --- долив, только когда клапан над ёмкостью открыт
+Go_MasloDop := Go_MasloDopTmp AND ClapInOpened;
+
+// --- дозировка, только когда клапан под ёмкостью открыт
+Go_MasloDos := Go_MasloDosTmp AND ClapOutOpened;
+
+// ---
+CanAnswUser := noWeight1.14;
+CanAnswUserD := noWeight1.15;
+
+// ---
+IF R_TRIG(CanAnswUser) THEN tpChangeJ1 := 1; END_IF
+IF 1 /*EN=R_TRIG(CanAnswUser)*/ THEN Answ.7 := TRUE; END_IF
+IF 1 /*EN=R_TRIG(CanAnswUser)*/ THEN PauseDosingJ1 := TRUE; END_IF
+IF NOT CanAnswUser THEN tpChangeJ1 := 0; END_IF
+IF 0 /*EN=NOT CanAnswUser*/ THEN Answ.7 := FALSE; END_IF
+
+// ---
+IF R_TRIG(CanAnswUserD) THEN tpChangeJ1 := 0; END_IF
+IF 0 /*EN=R_TRIG(CanAnswUserD)*/ THEN Answ.14 := TRUE; END_IF
+IF NOT CanAnswUserD THEN Answ.14 := FALSE; END_IF
+
+// --- решение заменить, продолжить, удалить
+ChangeJDob_0(Run:=(tpChangeJ1 > 1) /*EN=Answ.7*/, tpChange:=tpChangeJ1, idx:=1);
+IF ChangeJDob_0.Done THEN tpChangeJ1 := 0; END_IF
+IF 0 /*EN=ChangeJDob_0.Done*/ THEN Answ.7 := FALSE; END_IF
+IF 0 /*EN=ChangeJDob_0.Done*/ THEN PauseDosingJ1 := FALSE; END_IF
+
+// ---
+IF (tpChangeJ1 = 1) /*EN=Answ.14 AND true*/ THEN flTryDoliv := TRUE; END_IF
+IF (tpChangeJ1 = 2) /*EN=Answ.14*/ THEN IgnoreDolivJ1 := TRUE; END_IF
+IF (tpChangeJ1 > 0) /*EN=Answ.14*/ THEN tpChangeJ1 := 0; END_IF
+IF 0 /*EN=(tpChangeJ1 > 0) /*EN=Answ.14*/*/ THEN Answ.14 := FALSE; END_IF
+
+// ---
+IF R_TRIG(locDone) THEN VesSmsR[2] := (VesSmsR[2]+VesDJ[1]); END_IF
+IF (VesSmsR[2]+VesDJ[1]) /*EN=R_TRIG(locDone)*/ THEN msgFromScadaJ1 := 0; END_IF
+IF 0 /*EN=(VesSmsR[2]+VesDJ[1]) /*EN=R_TRIG(locDone)*/*/ THEN msgToScadaJ1 := 8; END_IF
+IF 8 /*EN=0 /*EN=(VesSmsR[2]+VesDJ[1]) /*EN=R_TRIG(locDone)*/*/*/ THEN CheckDefect4 := TRUE; END_IF
+IF 8 /*EN=0 /*EN=(VesSmsR[2]+VesDJ[1]) /*EN=R_TRIG(locDone)*/*/*/ THEN DosingJ1_Done := TRUE; END_IF
+IF 8 /*EN=0 /*EN=(VesSmsR[2]+VesDJ[1]) /*EN=R_TRIG(locDone)*/*/*/ THEN NeedProduv := TRUE; END_IF
+
+// ---
+ClapMasloOut(opened:=ClapOutOpened, closed:=ClapOutClosed, toOpen:=((msgToScadaJ1.2 AND SmsMainState.1 AND NOT locDone) OR Go_MasloDosTmp), noOpen:=BlockSMS, maxTTO:=t#10s, HandMode:=(MHand OR NOT RunDosing OR fHand2.8), yOpen:=yClapOut);
+Err14.3 := ClapMasloOut.errLTOpen;
+Err14.4 := ClapMasloOut.errLTClose;
+Err14.5 := ClapMasloOut.errKonc;
+yClapOut := ClapMasloOut.yOpenOut;
+Go_ClapOut := ClapMasloOut.runToOpen;
+
+// ---
+Produv1(RunAuto:=NeedProduv AND ClapOutClosed, HandMode:=(NOT RunDosing OR fHand2.8), yProduv:=yProduv, DONE_Reset:=ResetProduv);
+DoneProduv := Produv1.Done;
+yProduv := Produv1.yProduvOut;
+Produv := Produv1.Go_Produv;
+
+// ---
+IF ((NeedProduv AND DoneProduv) OR (NeedProduv AND (SmsMainState=0))) THEN NeedProduv := FALSE; END_IF
+IF ((NeedProduv AND DoneProduv) OR (NeedProduv AND (SmsMainState=0))) THEN ResetProduv := TRUE; END_IF
+
+// ---
+MHCalcJ1Dos(Run:=Go_MasloDos, MH:=MhMasloDos, aMH:=aMhMasloDos);
+
+// ---
+MHCalcJ1Dop(Run:=Go_MasloDop, MH:=MhMasloDop, aMH:=aMhMasloDop);
+
+// ---

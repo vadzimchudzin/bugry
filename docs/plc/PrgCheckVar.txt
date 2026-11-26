@@ -1,0 +1,10 @@
+program PrgCheckVar
+VAR
+END_VAR
+
+(* ST *)
+IF DelayK=0 THEN DelayK:=3000; END_IF
+IF DelayD=0 THEN DelayD:=3000; END_IF
+IF DelayM=0 THEN DelayM:=3000; END_IF
+IF DelayJ1=0 THEN DelayJ1:=3000; END_IF
+IF DelayJ2=0 THEN DelayJ2:=3000; END_IF

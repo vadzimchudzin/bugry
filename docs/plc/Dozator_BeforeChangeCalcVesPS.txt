@@ -1,0 +1,295 @@
+functionBlock Dozator_BeforeChangeCalcVesPS
+VAR
+  input   DP : BOOL := FALSE  // Датчик подпора
+  input   DP_off : BOOL := FALSE  // Не учитывать датчик подпора
+  input   DKS : BOOL  // ДКС
+  input   DKS_off : BOOL := TRUE  // Не учитывать ДКС
+  input   errPCH : BOOL := FALSE  // Авария от ПЧ
+  input   Cycle : BOOL  // Работать в автомате
+  input   MustHand : BOOL  // можно-ли включать вручную
+  input   NoRunPusk : BOOL := FALSE  // не включать пускатель
+  input   VesStart : REAL  // вес на весах в начале дозирования порции
+  input   VesOth : REAL  // вес сдозированный на других дозаторах
+  input   Ves : REAL := 0  // Текущий вес с весов
+  input   VesRequire : REAL := 0  // Требуемый вес дозы
+  input   VesTo3 : WORD  // *100 переход на 3 скорость
+  input   VesTo2 : WORD  // *100 переход на 2 скорость
+  input   VesTo1 : WORD  // *100 переход на 1 скорость
+  input   Freq100Prc : WORD := 50  // частота, соответствующая 100%
+  input   SPEED_4 : WORD := 100
+  input   SPEED_3 : WORD := 60
+  input   SPEED_2 : WORD := 30
+  input   SPEED_1 : WORD := 10
+  input   FreqManual : WORD  // Частота в ручном режиме
+  input   AutoStolb : BOOL
+  input   DONE_Reset : BOOL  // сброс флага выполненного дозирования
+  input   UseFreqManual : BOOL := TRUE  // при ручной дозировке использовать частоту FreqManual
+  input   TokPCH : WORD  // Выходной ток с частотника
+  input   Pause : BOOL
+  input   yVesHand : REAL
+  input   DelayDone : TIME := TIME#200ms
+  input   DelayAfterDos : TIME := TIME#5s0ms
+  input   DopPogr : REAL := 0.05
+  output  Done : BOOL := FALSE  // дозирование закончено успешно
+  output  RunPCH : BOOL := FALSE  // Включен частотник
+  output  RunPuskatel : BOOL := FALSE  // Включить пускатель на дозатор
+  output  errDP : BOOL := FALSE  // Авария по датчику подпора
+  output  errDKS : BOOL := FALSE  // Авария по ДКС
+  output  da : BOOL := FALSE  // Авария
+  output  VesDone : REAL := 0  // сдозированный вес в кг
+  output  state : WORD  // Статус дозатора (0-выключен без аварии, 1-работает, 2-авария, 3-пауза)
+  output  noWeight : BOOL
+  local   TON_DKS_ON : TON  // Таймер при пока DKS=1
+  local   TON_DKS_OFF : TON  // Таймер пока DKS=0
+  local   offState : WORD := 0  // Статус "Выключен"
+  local   runState : WORD := 1  // Статус "Включен"
+  local   alarmState : WORD := 2  // Статус "Авария"
+  local   pauseState : WORD := 3  // Статус "Пауза"
+  local   VesLDone : REAL := 0  // Сдозированный вес в текущем этапе
+  local   VesStopMin : REAL  // VesStart:REAL; //вес в начале дозирования
+  local   VesStopMax : REAL
+  local   temp : BOOL
+  local   rr : BOOL := TRUE  // Готовность к работе
+  local   TON_STOP : TON  // Время для остановки частотника
+  local   TP_1 : TP
+  local   StopRun : BOOL := FALSE
+  local   TON_wakeUp : TON
+  local   TOF_off_pusk : TP  // Таймер на выключение пускателя
+  local   TON_Done : TON
+  local   TmpCount : WORD
+  local   flCalcSpeed : BOOL  // flWakeUp: BOOL; flRun : BOOL;
+  local   WeightControl_K : WeightControl
+  local   noWeightFlag : BOOL
+  local   RunDos : BOOL
+  local   TON_Run_PCH_m : TON  // Таймер на включение частотника
+  local   tOff : TOF
+  local   DoStopPusk : BOOL
+  local   yVesStart : REAL
+  local   NewVesStolba : REAL
+  local   TON_DelayDone : TON
+  local   TP_yHand : TP
+  local   tmpr : REAL
+  local   SPEED_SLOWt : WORD
+  local   WeightControl_LowSpeed : WeightControl
+  local   noWeightLowSpeed : BOOL
+  local   ControlLowSpeed : BOOL
+  local   notReduce : BOOL := FALSE
+  local   flStop : BOOL  // устанавливается, когда первый раз вес дошел до нужного
+  local   TON_Stop_2S : TON
+  local   StopMinMax : BOOL
+  local   CalcStolb : BOOL
+  local   MalStolb : BOOL
+  local   InDopusk : BOOL
+  local   CountStolb : WORD := 0
+  local   InDopusk2 : BOOL
+  local   CountBad : WORD
+  local   SavsemHrenovo : BOOL
+  local   res2 : WORD
+  local   yVesDone : REAL
+  local   rVesTo1 : REAL
+  local   rVesTo2 : REAL
+  local   rVesTo3 : REAL
+  local   wtmp : WORD
+  local   CheckParam : BOOL
+  local   CheckSpeedAndWeight1 : CheckSpeedAndWeight
+  local   MHCalc_1 : MHCalc
+  local   OFF_Pusk : TOF
+  local   flCalcSpeedH : BOOL
+  local   FreqTmp : REAL
+  local   tmpL21 : BOOL
+  local   yHandStop : BOOL
+  local   TON_yHandStop : TON
+  local   OstVes : REAL
+  local   SetFreq : BOOL
+  local   TON_0 : TON
+  local   CountRepeat : WORD
+  local   tmpFC : WORD
+  local   TON_Start_DKS : TON
+  local   aa : WORD
+  local   bbb : BOOL
+  inOut   SPEED_FREQ : WORD  // Выходная частота
+  inOut   VesStolba : REAL  // Вес падающего стола
+  inOut   yHand : BOOL
+  inOut   MH : DWORD
+  inOut   aMH : DWORD
+END_VAR
+
+(* LD *)
+
+// --- Авария от ДП
+IF DP AND NOT DP_off THEN errDP := TRUE; END_IF
+
+// ---
+IF (SPEED_FREQ <= 100) /*EN=true*/ THEN tmpFC := 100; END_IF
+IF (SPEED_FREQ <= 100) /*EN=true*/ THEN tmpFC := SPEED_FREQ; END_IF
+
+// ---
+IF (VesStolba > (VesRequire*0.8)) /*EN=(VesRequire > 0) /*EN=true*/*/ THEN VesStolba := (VesRequire*0.8); END_IF
+
+// --- Таймеры на аварию ДКС
+TON_Start_DKS(IN:=RunPCH AND RunPuskatel, PT:=t#5s);
+TON_DKS_ON(IN:=TON_Start_DKS.Q AND (SPEED_FREQ>50) AND NOT DKS, PT:=t#3s*5000/tmpFC);
+TON_DKS_OFF(IN:=TON_Start_DKS.Q AND (SPEED_FREQ>50) AND DKS, PT:=t#3s*5000/tmpFC);
+
+// --- Авария по ДКС
+IF (TON_DKS_OFF.Q OR TON_DKS_ON.Q) AND NOT DKS_off THEN errDKS := TRUE; END_IF
+
+// --- Сброс аварий
+IF ResetErrors THEN errDP := FALSE; END_IF
+IF ResetErrors THEN errDKS := FALSE; END_IF
+
+// --- Готовность к работе / авария
+rr := NOT errDP AND NOT errDKS AND NOT errPCH AND NOT GEmer;
+da := NOT (NOT errDP AND NOT errDKS AND NOT errPCH);
+
+// ---
+IF DONE_Reset THEN VesDone := 0; END_IF
+IF 0 /*EN=DONE_Reset*/ THEN VesLDone := 0; END_IF
+IF 0 /*EN=0 /*EN=DONE_Reset*/*/ THEN yVesStart := 0; END_IF
+IF 0 /*EN=0 /*EN=0 /*EN=DONE_Reset*/*/*/ THEN Done := FALSE; END_IF
+IF 0 /*EN=0 /*EN=0 /*EN=DONE_Reset*/*/*/ THEN StopRun := FALSE; END_IF
+IF 0 /*EN=0 /*EN=0 /*EN=DONE_Reset*/*/*/ THEN noWeight := FALSE; END_IF
+
+// ---
+IF (NOT rr OR NOT MustHand) THEN yHand := FALSE; END_IF
+IF R_TRIG(yHand) AND NOT yHandStop THEN yVesStart := (Ves-VesDone); END_IF
+IF R_TRIG(yHand) THEN yHandStop := FALSE; END_IF
+IF ((VesDone+VesStolba) >= yVesHand) /*EN=(yVesHand > 0) /*EN=yHand*/*/ THEN aa := (aa+1); END_IF
+bbb := (aa+1) /*EN=((VesDone+VesStolba) >= yVesHand) /*EN=(yVesHand > 0) /*EN=yHand*/*/*/;
+IF (aa+1) /*EN=((VesDone+VesStolba) >= yVesHand) /*EN=(yVesHand > 0) /*EN=yHand*/*/*/ THEN yHandStop := TRUE; END_IF
+
+// ---
+IF yHandStop THEN yHand := FALSE; END_IF
+
+// ---
+TON_yHandStop(IN:=yHandStop, PT:=DelayAfterDos);
+IF TON_yHandStop.Q AND RunDosing THEN VesDone := VesLDone; END_IF
+IF TON_yHandStop.Q AND NOT RunDosing THEN VesDone := (Ves-yVesStart); END_IF
+IF TON_yHandStop.yHandStop THEN yHandStop := FALSE; END_IF
+
+// ---
+IF Cycle AND NOT Done THEN VesLDone := (Ves-VesStart-VesOth); END_IF
+
+// ---
+IF NOT Cycle THEN StopRun := FALSE; END_IF
+IF NOT Cycle AND yHand THEN VesLDone := (Ves-yVesStart); END_IF
+IF NOT Cycle AND NOT yHand AND NOT RunDos THEN VesLDone := 0; END_IF
+
+// ---
+IF (VesLDone < 0) /*EN=true*/ THEN VesLDone := 0; END_IF
+IF ((true AND RunDos) OR (true AND yHand)) THEN VesDone := VesLDone; END_IF
+
+// ---
+IF R_TRIG(Cycle) THEN Done := FALSE; END_IF
+IF R_TRIG(Cycle) THEN CheckParam := TRUE; END_IF
+IF (VesLDone < VesRequire) /*EN=(VesRequire > 0.009) /*EN=R_TRIG(Cycle)*/*/ THEN StopRun := FALSE; END_IF
+IF (((VesRequire <= 0.009) /*EN=R_TRIG(Cycle)*/) OR ((VesLDone >= VesRequire) /*EN=R_TRIG(Cycle)*/)) THEN StopRun := TRUE; END_IF
+IF R_TRIG(Cycle) THEN CountRepeat := 0; END_IF
+
+// --- проверка и корректировка параметров дозирования
+CheckSpeedAndWeight1(Check:=CheckParam, VesTo1:=VesTo1, VesTo2:=VesTo2, VesTo3:=VesTo3, SPEED_1:=speed_1, SPEED_2:=speed_2, SPEED_3:=speed_3, SPEED_4:=speed_4, Linear2to1:=tmpL21 //Linear2to1);
+
+// --- Включение дозирования
+RunDos := (((Cycle AND NOT Pause AND NOT StopRun AND NOT Done) OR yHand) AND NOT NoRunPusk) AND rr;
+
+// --- Работа частотника и пускателя
+OFF_Pusk(IN:=RunDos, PT:=t#400ms);
+RunPuskatel := OFF_Pusk.Q;
+TON_Run_PCH_m(IN:=RunDos AND RunPuskatel, PT:=t#500ms);
+RunPCH := TON_Run_PCH_m.Q;
+
+// --- Ждем устаканивания веса и устанавливаем Done, или возвращаемся к дозировке, если большой недовес
+TON_Done(IN:=Cycle AND NOT Done AND StopRun AND NOT RunPuskatel, PT:=DelayAfterDos);
+IF (((VesLDone >= (VesRequire-DopPogr)) /*EN=TON_Done.Q*/) OR ((CountRepeat > 3) /*EN=TON_Done.Q AND true*/)) THEN VesDone := VesLDone; END_IF
+IF VesLDone /*EN=(((VesLDone >= (VesRequire-DopPogr)) /*EN=TON_Done.Q*/) OR ((CountRepeat > 3) /*EN=TON_Done.Q AND true*/))*/ THEN Done := TRUE; END_IF
+IF (CountRepeat < 4) /*EN=(VesLDone < VesRequire) /*EN=TON_Done.Q AND NOT Done*/*/ THEN CountRepeat := (CountRepeat+1); END_IF
+IF TON_Done.StopRun THEN StopRun := FALSE; END_IF
+
+// --- Расчет нового выбега
+IF R_TRIG(Done) AND AutoStolb THEN CalcStolb := TRUE; END_IF
+
+// ---
+MalStolb := (VesStolba <= 0.2) /*EN=CalcStolb AND true*/;
+IF ((ABS(VesDone-VesRequire)) <= DopPogr) /*EN=CalcStolb*/ THEN CountStolb := (CountStolb+1); END_IF
+IF (CountStolb+1) /*EN=((ABS(VesDone-VesRequire)) <= DopPogr) /*EN=CalcStolb*/*/ THEN CountBad := 0; END_IF
+IF 0 /*EN=(CountStolb+1) /*EN=((ABS(VesDone-VesRequire)) <= DopPogr) /*EN=CalcStolb*/*/*/ THEN InDopusk := TRUE; END_IF
+IF (CountStolb <= 2) /*EN=((ABS(VesDone-VesRequire)) <= (DopPogr*2)) /*EN=((ABS(VesDone-VesRequire)) > DopPogr) /*EN=CalcStolb*/*/*/ THEN InDopusk2 := TRUE; END_IF
+IF (CountStolb <= 2) /*EN=((ABS(VesDone-VesRequire)) <= (DopPogr*2)) /*EN=((ABS(VesDone-VesRequire)) > DopPogr) /*EN=CalcStolb*/*/*/ THEN InDopusk := FALSE; END_IF
+IF ((ABS(VesDone-VesRequire)) <= (DopPogr*2)) /*EN=((ABS(VesDone-VesRequire)) > DopPogr) /*EN=CalcStolb*/*/ THEN CountStolb := 0; END_IF
+IF 0 /*EN=((ABS(VesDone-VesRequire)) <= (DopPogr*2)) /*EN=((ABS(VesDone-VesRequire)) > DopPogr) /*EN=CalcStolb*/*/*/ THEN CountBad := 0; END_IF
+IF (CountStolb < 2) /*EN=((ABS(VesDone-VesRequire)) > (DopPogr*2)) /*EN=CalcStolb*/*/ THEN InDopusk := FALSE; END_IF
+IF ((ABS(VesDone-VesRequire)) > (DopPogr*2)) /*EN=CalcStolb*/ THEN CountStolb := 0; END_IF
+IF 0 /*EN=((ABS(VesDone-VesRequire)) > (DopPogr*2)) /*EN=CalcStolb*/*/ THEN CountBad := (CountBad+1); END_IF
+SavsemHrenovo := (CountBad > 1) /*EN=((ABS(VesDone-VesRequire)) > (DopPogr*2)) /*EN=CalcStolb*/*/;
+IF NOT RunDosing THEN CountStolb := 0; END_IF
+IF 0 /*EN=NOT RunDosing*/ THEN CountBad := 0; END_IF
+IF 0 /*EN=0 /*EN=NOT RunDosing*/*/ THEN InDopusk := FALSE; END_IF
+IF 0 /*EN=0 /*EN=NOT RunDosing*/*/ THEN InDopusk2 := FALSE; END_IF
+
+// --- Расчет нового столба (выбега)
+IF CalcStolb AND NOT InDopusk AND NOT InDopusk2 AND NOT SavsemHrenovo THEN VesStolba := (VesStolba+(VesDone-VesRequire)*0.6); END_IF
+IF (VesStolba+(VesDone-VesRequire)*0.6) /*EN=CalcStolb AND NOT InDopusk AND NOT InDopusk2 AND NOT SavsemHrenovo*/ THEN res2 := 1; END_IF
+IF CalcStolb AND NOT InDopusk AND NOT InDopusk2 AND SavsemHrenovo THEN VesStolba := (VesStolba+(VesDone-VesRequire)); END_IF
+IF (VesStolba+(VesDone-VesRequire)) /*EN=CalcStolb AND NOT InDopusk AND NOT InDopusk2 AND SavsemHrenovo*/ THEN res2 := 2; END_IF
+IF CalcStolb AND NOT InDopusk AND InDopusk2 THEN VesStolba := (VesStolba+(VesDone-VesRequire)*0.4); END_IF
+IF (VesStolba+(VesDone-VesRequire)*0.4) /*EN=CalcStolb AND NOT InDopusk AND InDopusk2*/ THEN res2 := 4; END_IF
+IF (CountStolb > 1) /*EN=CalcStolb AND InDopusk*/ THEN VesStolba := (VesStolba+(VesDone-VesRequire)*0.2); END_IF
+IF (VesStolba+(VesDone-VesRequire)*0.2) /*EN=(CountStolb > 1) /*EN=CalcStolb AND InDopusk*/*/ THEN res2 := 8; END_IF
+
+// ---
+IF CalcStolb THEN CalcStolb := FALSE; END_IF
+IF CalcStolb THEN InDopusk2 := FALSE; END_IF
+
+// ---
+TON_0(IN:=(VesLDone >= (VesRequire-VesStolba)) /*EN=Cycle AND NOT Done AND RunDos AND RunPCH*/, PT:=t#1s*CountRepeat);
+IF TON_0.Q THEN StopRun := TRUE; END_IF
+flCalcSpeed := Cycle AND NOT Done AND RunDos AND RunPCH;
+
+// ---
+flCalcSpeedH := (yVesHand > 0) /*EN=yHand AND NOT UseFreqManual*/;
+
+// ---
+IF ((flCalcSpeed OR flCalcSpeedH) AND NOT StopRun) AND flCalcSpeed THEN OstVes := (VesRequire-VesLDone); END_IF
+IF ((flCalcSpeed OR flCalcSpeedH) AND NOT StopRun) AND flCalcSpeedH THEN OstVes := (yVesHand-VesLDone); END_IF
+IF (OstVes >= VesTo3) /*EN=(flCalcSpeed OR flCalcSpeedH) AND NOT StopRun*/ THEN FreqTmp := SPEED_4; END_IF
+IF (OstVes > VesTo2) /*EN=(OstVes <= VesTo3) /*EN=(flCalcSpeed OR flCalcSpeedH) AND NOT StopRun*/*/ THEN FreqTmp := SPEED_3; END_IF
+IF (OstVes > VesTo1) /*EN=(OstVes <= VesTo2) /*EN=(flCalcSpeed OR flCalcSpeedH) AND NOT StopRun*/*/ THEN FreqTmp := SPEED_2; END_IF
+IF (OstVes <= VesTo1) /*EN=(flCalcSpeed OR flCalcSpeedH) AND NOT StopRun*/ THEN FreqTmp := SPEED_1; END_IF
+IF (flCalcSpeed OR flCalcSpeedH) AND NOT StopRun THEN SetFreq := TRUE; END_IF
+
+// ---
+
+// ---
+IF (Done OR (Pause AND NOT yHand) OR StopRun) AND Cycle THEN FreqTmp := 0; END_IF
+
+// ---
+IF yHand AND UseFreqManual AND RunPuskatel THEN SPEED_FREQ := FreqManual; END_IF
+IF FreqManual /*EN=yHand AND UseFreqManual AND RunPuskatel*/ THEN SetFreq := FALSE; END_IF
+
+// ---
+IF SetFreq THEN SPEED_FREQ := (Real_to_word(0.01*Freq100Prc*FreqTmp)); END_IF
+IF (Real_to_word(0.01*Freq100Prc*FreqTmp)) /*EN=SetFreq*/ THEN SetFreq := FALSE; END_IF
+
+// ---
+IF (SPEED_FREQ = 0) /*EN=RunPCH AND RunPuskatel*/ THEN SPEED_FREQ := (Real_to_word(0.1*Freq100Prc)); END_IF
+
+// ---
+WeightControl_K(RunWatch:=Cycle AND RunDos AND RunPCH, Ves:=Ves, ToInc:=true, timeDedLine:=t#10s, range:=0.1, timeOutWatch:=t#2s);
+noWeightFlag := WeightControl_K.notChange;
+
+// ---
+IF R_TRIG(noWeightFlag) THEN noWeight := TRUE; END_IF
+IF (NOT Cycle OR (Cycle AND NOT Pause AND NOT noWeightFlag) OR (F_TRIG(noWeightFlag) AND RunPCH)) THEN noWeight := FALSE; END_IF
+
+// ---
+MHCalc_1(Run:=RunPCH AND RunPuskatel, MH:=MH, aMH:=aMH);
+
+// --- Статус дозатора (0-выключен без аварии, 1-работает, 2-авария)
+IF NOT da AND RunPCH THEN state := runState; END_IF
+temp := runState /*EN=NOT da AND RunPCH*/;
+IF NOT da AND NOT RunPCH THEN state := offState; END_IF
+temp := offState /*EN=NOT da AND NOT RunPCH*/;
+IF da THEN state := alarmState; END_IF
+temp := alarmState /*EN=da*/;
+IF Pause THEN state := pauseState; END_IF
+temp := pauseState /*EN=Pause*/;

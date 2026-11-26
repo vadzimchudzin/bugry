@@ -1,0 +1,84 @@
+functionBlock Zatvor
+VAR
+  input   next : BOOL  // Следующий механизм (транспортер запустится через
+  input   prev : BOOL  // Предыдущий механизм
+  input   errAZ : BOOL := FALSE  // Авария от автомата защиты
+  input   dks : BOOL  // Датчик контроля скорости
+  input   DKS_off : BOOL  // Не использовать ДКС
+  input   HandMode : BOOL := FALSE
+  input   SlowHand : BOOL  // плавное переключение между ручным и автоматическим режимом
+  input   canRunAuto : BOOL  // Условие для необходимости работы в автоматическом режиме
+  input   timeBeforeStart : TIME := TIME#5s0ms  // Пауза перед запуском в автоматическом режиме
+  input   timeToStop : TIME := TIME#20s0ms  // Время на выгрузку из нории при остановке автоматического режима
+  input   yRun : BOOL  // Пуск в ручном режиме
+  output  run : BOOL := FALSE  // Включение транспотера
+  output  da : BOOL := FALSE  // Авария механизма
+  output  err_AZ : BOOL := FALSE  // Авария от автомата защиты
+  output  err_DKS : BOOL := FALSE  // Авария от ДКС
+  output  yRunOut : BOOL
+  output  state : WORD := 0  // Состояние транспортера (0 выкл.без аварии, 1-включен, 2-авария)
+  local   rr : BOOL  // Готовность к работе
+  local   t_dks_on : TON
+  local   t_dks_off : TON
+  local   run_auto : BOOL
+  local   TON_START : TON
+  local   TON_STOP : TON
+  local   offState : WORD := 0
+  local   runState : WORD := 1
+  local   alarmState : WORD := 2
+  local   temp : BOOL
+  local   HandOnBegin : BOOL
+END_VAR
+
+(* LD *)
+
+// --- Таймера на аварию ДКС
+t_dks_on(IN:=run AND dks, PT:=T#4s);
+t_dks_off(IN:=run AND NOT dks, PT:=t#4s);
+
+// --- Авария от автомата защиты
+IF errAZ THEN err_AZ := TRUE; END_IF
+
+// --- Авария ДКС
+IF (t_dks_on.Q OR t_dks_off.Q) AND NOT DKS_off THEN err_DKS := TRUE; END_IF
+
+// --- Сброс аварий
+IF (ResetErrors OR MEmul) THEN err_AZ := FALSE; END_IF
+IF (ResetErrors OR MEmul) THEN err_DKS := FALSE; END_IF
+
+// --- Готовность к работе
+rr := NOT err_DKS AND NOT err_AZ AND NOT GEmer;
+da := NOT (NOT err_DKS AND NOT err_AZ);
+
+// ---
+IF canRunAuto AND SlowHand AND R_TRIG(HandMode) THEN yRun := run; END_IF
+IF canRunAuto AND SlowHand AND F_TRIG(HandMode) THEN run_auto := yRun; END_IF
+
+// --- Запуск автоматического режима
+TON_START(IN:=canRunAuto AND rr AND next, PT:=timeBeforeStart);
+IF TON_START.Q THEN run_auto := TRUE; END_IF
+
+// --- Остановка в автоматическом режиме
+TON_STOP(IN:=NOT canRunAuto AND NOT prev, PT:=timeToStop);
+
+// --- Сброс автоматического режима
+IF (TON_STOP.Q OR NOT rr OR NOT next) THEN run_auto := FALSE; END_IF
+
+// --- Сброс yRun - ручного запуска из Скады в ручном режиме
+IF ((NOT next AND NOT MGod) OR NOT rr OR NOT HandMode) THEN yRun := FALSE; END_IF
+
+// --- Включение транспортера
+run := ((NOT HandMode AND run_auto) OR yRun);
+
+// ---
+yRunOut := yRun;
+
+// --- Статус транспортера (0-выключен без аварии, 1-работает, 2-авария)
+IF NOT da AND NOT run THEN state := offState; END_IF
+temp := offState /*EN=NOT da AND NOT run*/;
+IF NOT da AND run THEN state := runState; END_IF
+temp := runState /*EN=NOT da AND run*/;
+IF da THEN state := alarmState; END_IF
+temp := alarmState /*EN=da*/;
+
+// ---

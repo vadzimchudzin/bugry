@@ -1,0 +1,50 @@
+functionBlock WeightControl
+VAR
+  input   RunWatch : BOOL
+  input   Ves : REAL  // измеряемый вес
+  input   ToInc : BOOL := FALSE  // TRUE, если контролировать увеличение веса, FALSE-уменьшение
+  input   timeDedLine : TIME := TIME#5s0ms  // время до срабатывания
+  input   range : REAL  // диапазон не чувствительноти
+  input   timeOutWatch : TIME := TIME#2s0ms  // timeout на считывание начального значения веса
+  output  notChange : BOOL
+  local   PredVes : REAL
+  local   rRun : BOOL
+  local   timeOut : TON
+  local   flChange : BOOL
+  local   TON_watch : TON
+END_VAR
+
+(* LD *)
+
+// ---
+TON_watch(IN:=RunWatch, PT:=timeOutWatch);
+rRun := TON_watch.Q;
+
+// ---
+IF R_TRIG(rRun) THEN PredVes := Ves; END_IF
+
+// ---
+IF ((((Ves-range) > PredVes) /*EN=rRun AND ToInc*/) OR (((Ves+range) < PredVes) /*EN=rRun AND NOT ToInc*/)) THEN PredVes := Ves; END_IF
+flChange := Ves /*EN=((((Ves-range) > PredVes) /*EN=rRun AND ToInc*/) OR (((Ves+range) < PredVes) /*EN=rRun AND NOT ToInc*/))*/;
+
+// ---
+
+// ---
+timeOut(IN:=rRun AND NOT flChange, PT:=timeDedLine);
+notChange := timeOut.Q;
+
+// ---
+
+// ---
+
+// ---
+
+// ---
+
+// ---
+
+// ---
+
+// ---
+
+// ---

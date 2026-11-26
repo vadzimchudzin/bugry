@@ -1,0 +1,99 @@
+functionBlock AutoShiber
+VAR
+  input   opened : BOOL  // Открыт
+  input   closed : BOOL  // Закрыт
+  input   toOpen : BOOL  // Открыть в авто режиме
+  input   toClose : BOOL  // Закрыть в авто режиме
+  input   maxTTO : TIME := TIME#10s0ms  // максимальное время на переключение
+  input   errAZ : BOOL  // Авария АЗ
+  input   HandMode : BOOL
+  input   yOpen : BOOL  // Кнопка "Открыть" в ручном режиме со скады
+  input   yClose : BOOL  // Кнопка "Закрыть" в ручном режиме со скады
+  output  runToOpen : BOOL  // Открыть шибер
+  output  runToClose : BOOL  // Закрыть шибер
+  output  errLT : BOOL  // Авария "Долгое переключение"
+  output  errKonc : BOOL  // Авария концевиков
+  output  errAZOut : BOOL
+  output  da : BOOL  // Необходимость сигнализации об аварии
+  output  openedOut : BOOL  // Открыт
+  output  closedOut : BOOL  // Закрыт
+  output  yOpenOut : BOOL  // Кнопка "Открыть" в ручном режиме со скады
+  output  yCloseOut : BOOL  // Кнопка "Закрыть" в ручном режиме со скады
+  output  state : WORD  // Состояние: 0-Закрыт, 1-Открыт, 2-Переключение, 3-Авария, 4-Промежуточное положение
+  inOut   MH : DWORD
+  inOut   aMH : DWORD
+  local   TON_LT : TON  // Таймер на аварию долгого переключения
+  local   rr : BOOL  // Готовность к работе
+  local   temp : BOOL
+  local   TON_Konc : TON
+  local   MHCalc_0 : MHCalc
+  local   outOC : TON
+END_VAR
+
+(* LD *)
+
+// ---
+IF R_TRIG(MEmul) THEN closed := TRUE; END_IF
+IF R_TRIG(MEmul) THEN opened := FALSE; END_IF
+
+// --- Долгое переключение шибера
+TON_LT(IN:=((runToOpen AND NOT opened) OR (runToClose AND NOT closed)), PT:=maxTTO);
+IF TON_LT.Q THEN errLT := TRUE; END_IF
+
+// --- Авария концевиков
+TON_Konc(IN:=NOT MGod AND opened AND closed, PT:=t#1s);
+IF TON_Konc.Q THEN errKonc := TRUE; END_IF
+
+// ---
+IF errAZ THEN errAZOut := TRUE; END_IF
+
+// --- Сброс Аварий
+IF (ResetErrors OR (R_TRIG(MEmul))) THEN errAZOut := FALSE; END_IF
+IF (ResetErrors OR (R_TRIG(MEmul))) THEN errLT := FALSE; END_IF
+IF (ResetErrors OR (R_TRIG(MEmul))) THEN errKonc := FALSE; END_IF
+
+// --- Готовность к работе
+rr := NOT errAZ AND NOT errLT AND NOT errKonc AND NOT GEmer;
+da := NOT (NOT errAZ AND NOT errLT AND NOT errKonc);
+
+// --- Сброс yOpen, yClose
+IF (opened OR (R_TRIG(yClose))) THEN yOpen := FALSE; END_IF
+IF (closed OR (R_TRIG(yOpen))) THEN yClose := FALSE; END_IF
+
+// --- Сброс yOpen, yClose
+IF (NOT HandMode OR NOT rr OR (yOpen AND yClose)) THEN yOpen := FALSE; END_IF
+IF (NOT HandMode OR NOT rr OR (yOpen AND yClose)) THEN yClose := FALSE; END_IF
+
+// --- Открытие
+runToOpen := (((rr AND yOpen) OR (rr AND NOT HandMode AND toOpen)) AND NOT runToClose) AND NOT opened;
+
+// --- Закрытие
+runToClose := (((rr AND yClose) OR (rr AND NOT HandMode AND toClose)) AND NOT runToOpen) AND NOT closed;
+
+// ---
+IF MEmul AND R_TRIG(runToOpen) THEN closed := FALSE; END_IF
+IF MEmul AND R_TRIG(runToClose) THEN opened := FALSE; END_IF
+outOC(IN:=((MEmul AND runToOpen) OR (MEmul AND runToClose)), PT:=T#2S);
+IF outOC.Q AND runToOpen THEN opened := TRUE; END_IF
+IF outOC.Q AND runToClose THEN closed := TRUE; END_IF
+
+// ---
+MHCalc_0(Run:=(runToOpen OR runToClose), MH:=MH, aMH:=aMH);
+
+// ---
+yOpenOut := yOpen;
+yCloseOut := yClose;
+
+// ---
+openedOut := opened;
+closedOut := closed;
+
+// --- Состояние: 0-Закрыт, 1-Открыт, 2-Переключение, 3-Переключение, 4-Авария
+IF NOT da AND closed THEN state := 0; END_IF
+temp := 0 /*EN=NOT da AND closed*/;
+IF NOT da AND opened THEN state := 1; END_IF
+temp := 1 /*EN=NOT da AND opened*/;
+IF ((NOT da AND NOT closed AND NOT opened AND runToOpen) OR (NOT da AND NOT closed AND NOT opened AND runToClose)) THEN state := 3; END_IF
+temp := 3 /*EN=((NOT da AND NOT closed AND NOT opened AND runToOpen) OR (NOT da AND NOT closed AND NOT opened AND runToClose))*/;
+IF da THEN state := 4; END_IF
+temp := 4 /*EN=da*/;

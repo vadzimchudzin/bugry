@@ -1,0 +1,254 @@
+program PrgUnLoad
+VAR
+  local   NextL50300 : BOOL
+  local   NextR50300 : BOOL
+  local   NextL50400 : BOOL
+  local   NextR50400 : BOOL
+  local   Next50200 : BOOL
+  local   Next50300 : BOOL
+  local   Next50400 : BOOL
+  local   Next50500 : BOOL
+  local   Pred30640 : BOOL
+  local   Go_Trg : BOOL
+  local   TP_ResetErrPCH_TrSms : TP
+  local   UseKonv50300 : BOOL
+  local   UseKonv50400 : BOOL
+  local   NextTrSms : BOOL
+  local   HandMode50300 : BOOL
+  local   HandMode50400 : BOOL
+  local   HandMode50300a : BOOL
+  local   HandMode50200 : BOOL
+  local   TON_PolnSilos : TON
+  local   TON_ClearCAS3 : TON
+  local   TON_DP_Tr7 : TON
+  local   count_dks : WORD
+  local   ForceUnloadPath : BOOL
+  local   Next50300h : BOOL
+  local   Next50300a : BOOL
+  local   Next50400a : BOOL
+  local   Next50400h : BOOL
+  local   NextL50400a : BOOL
+  local   Nor4 : Noria
+END_VAR
+
+(* LD *)
+
+// --- Очистка CloseAllSh3, если что-то пошло не так с его нормальной очисткой
+TON_ClearCAS3(IN:=CloseAllSh3, PT:=t#15s);
+IF TON_ClearCAS3.Q THEN CloseAllSh3 := FALSE; END_IF
+
+// ---
+UseKonv50300 := UnloadSt.1 AND (UnloadBunk[1] OR UnloadBunk[2] OR UnloadBunk[3] or UnloadBunk[4]);
+UseKonv50400 := UnloadSt.1 AND (UnloadBunk[5] or UnloadBunk[6] OR UnloadBunk[7] OR UnloadBunk[8]);
+GranUnl309 := UnloadSt.1 AND UnloadBunk[9];
+GranUnl310 := UnloadSt.1 AND UnloadBunk[10];
+
+// ---
+GranUnl8 := ((UnloadSt.1 AND UseKonv50300) OR (UnloadSt.1 AND UseKonv50400)) AND UseGran;
+
+// ---
+Shiber_50310(opened:=Opened_Sh50310, closed:=Closed_Sh50310, toOpen:=UnloadBunk[1] AND NOT Opened_Sh50310 AND NOT CloseAllSh3, toClose:=(NOT UnloadBunk[1] OR CloseAllSh3) AND NOT Closed_Sh50310, maxTTO:=t#15s, errAZ:=ErrAz_Sh50310, HandMode:=(MHand OR NOT UnloadSt.1 OR fHand3.4) AND NOT CloseAllSh3, yOpen:=yOpenSh50310, yClose:=yCloseSh50310, MH:=MhShGP1, aMH:=aMhShGP1);
+Go_Close_Sh50310 := Shiber_50310.runToClose;
+Err2.0 := Shiber_50310.errLT;
+Err2.1 := Shiber_50310.errKonc;
+Err2.2 := Shiber_50310.errAZOut;
+DA_Sh50310 := Shiber_50310.da;
+Opened_Sh50310 := Shiber_50310.openedOut;
+Closed_Sh50310 := Shiber_50310.closedOut;
+yOpenSh50310 := Shiber_50310.yOpenOut;
+yCloseSh50310 := Shiber_50310.yCloseOut;
+StMeh[22] := Shiber_50310.state;
+Go_Open_Sh50310 := Shiber_50310.runToOpen;
+
+// ---
+Shiber_50320(opened:=Opened_Sh50320, closed:=Closed_Sh50320, toOpen:=UnloadBunk[2] AND NOT Opened_Sh50320 AND NOT CloseAllSh3, toClose:=(NOT UnloadBunk[2] OR CloseAllSh3) AND NOT Closed_Sh50320, maxTTO:=t#15s, errAZ:=ErrAz_Sh50320, HandMode:=(MHand OR NOT UnloadSt.1 OR fHand3.5) AND NOT CloseAllSh3, yOpen:=yOpenSh50320, yClose:=yCloseSh50320, MH:=MhShGP2, aMH:=aMhShGP2);
+Go_Close_Sh50320 := Shiber_50320.runToClose;
+Err2.3 := Shiber_50320.errLT;
+Err2.4 := Shiber_50320.errKonc;
+Err2.5 := Shiber_50320.errAZOut;
+DA_Sh50320 := Shiber_50320.da;
+Opened_Sh50320 := Shiber_50320.openedOut;
+Closed_Sh50320 := Shiber_50320.closedOut;
+yOpenSh50320 := Shiber_50320.yOpenOut;
+yCloseSh50320 := Shiber_50320.yCloseOut;
+StMeh[22] := Shiber_50320.state;
+Go_Open_Sh50320 := Shiber_50320.runToOpen;
+
+// ---
+Shiber_50330(opened:=Opened_Sh50330, closed:=Closed_Sh50330, toOpen:=UnloadBunk[3] AND NOT Opened_Sh50330 AND NOT CloseAllSh3, toClose:=(NOT UnloadBunk[3] OR CloseAllSh3) AND NOT Closed_Sh50330, maxTTO:=t#15s, errAZ:=ErrAz_Sh50330, HandMode:=(MHand OR NOT UnloadSt.1 OR fHand3.6) AND NOT CloseAllSh3, yOpen:=yOpenSh50330, yClose:=yCloseSh50330, MH:=MhShGP3, aMH:=aMhShGP3);
+Go_Close_Sh50330 := Shiber_50330.runToClose;
+Err2.6 := Shiber_50330.errLT;
+Err2.7 := Shiber_50330.errKonc;
+Err2.8 := Shiber_50330.errAZOut;
+DA_Sh50330 := Shiber_50330.da;
+Opened_Sh50330 := Shiber_50330.openedOut;
+Closed_Sh50330 := Shiber_50330.closedOut;
+yOpenSh50330 := Shiber_50330.yOpenOut;
+yCloseSh50330 := Shiber_50330.yCloseOut;
+StMeh[22] := Shiber_50330.state;
+Go_Open_Sh50330 := Shiber_50330.runToOpen;
+
+// ---
+Shiber_50410(opened:=Opened_Sh50410, closed:=Closed_Sh50410, toOpen:=UnloadBunk[5] AND NOT Opened_Sh50410 AND NOT CloseAllSh3, toClose:=(NOT UnloadBunk[5] OR CloseAllSh3) AND NOT Closed_Sh50410, maxTTO:=t#15s, errAZ:=ErrAz_Sh50410, HandMode:=(MHand OR NOT UnloadSt.1 OR fHand3.7) AND NOT CloseAllSh3, yOpen:=yOpenSh50410, yClose:=yCloseSh50410, MH:=MhShGP5, aMH:=aMhShGP5);
+Go_Close_Sh50410 := Shiber_50410.runToClose;
+Err24.0 := Shiber_50410.errLT;
+Err24.1 := Shiber_50410.errKonc;
+Err24.2 := Shiber_50410.errAZOut;
+DA_Sh50410 := Shiber_50410.da;
+Opened_Sh50410 := Shiber_50410.openedOut;
+Closed_Sh50410 := Shiber_50410.closedOut;
+yOpenSh50410 := Shiber_50410.yOpenOut;
+yCloseSh50410 := Shiber_50410.yCloseOut;
+StMeh[22] := Shiber_50410.state;
+Go_Open_Sh50410 := Shiber_50410.runToOpen;
+
+// ---
+Shiber_50420(opened:=Opened_Sh50420, closed:=Closed_Sh50420, toOpen:=UnloadBunk[6] AND NOT Opened_Sh50420 AND NOT CloseAllSh3, toClose:=(NOT UnloadBunk[6] OR CloseAllSh3) AND NOT Closed_Sh50420, maxTTO:=t#15s, errAZ:=ErrAz_Sh50420, HandMode:=(MHand OR NOT UnloadSt.1 OR fHand3.8) AND NOT CloseAllSh3, yOpen:=yOpenSh50420, yClose:=yCloseSh50420, MH:=MhShGP6, aMH:=aMhShGP6);
+Go_Close_Sh50420 := Shiber_50420.runToClose;
+Err24.3 := Shiber_50420.errLT;
+Err24.4 := Shiber_50420.errKonc;
+Err24.5 := Shiber_50420.errAZOut;
+DA_Sh50420 := Shiber_50420.da;
+Opened_Sh50420 := Shiber_50420.openedOut;
+Closed_Sh50420 := Shiber_50420.closedOut;
+yOpenSh50420 := Shiber_50420.yOpenOut;
+yCloseSh50420 := Shiber_50420.yCloseOut;
+StMeh[22] := Shiber_50420.state;
+Go_Open_Sh50420 := Shiber_50420.runToOpen;
+
+// ---
+Shiber_50430(opened:=Opened_Sh50430, closed:=Closed_Sh50430, toOpen:=UnloadBunk[7] AND NOT Opened_Sh50430 AND NOT CloseAllSh3, toClose:=(NOT UnloadBunk[7] OR CloseAllSh3) AND NOT Closed_Sh50430, maxTTO:=t#15s, errAZ:=ErrAz_Sh50430, HandMode:=(MHand OR NOT UnloadSt.1 OR fHand3.9) AND NOT CloseAllSh3, yOpen:=yOpenSh50430, yClose:=yCloseSh50430, MH:=MhShGP7, aMH:=aMhShGP7);
+Go_Close_Sh50430 := Shiber_50430.runToClose;
+Err24.6 := Shiber_50430.errLT;
+Err24.7 := Shiber_50430.errKonc;
+Err24.8 := Shiber_50430.errAZOut;
+DA_Sh50430 := Shiber_50430.da;
+Opened_Sh50430 := Shiber_50430.openedOut;
+Closed_Sh50430 := Shiber_50430.closedOut;
+yOpenSh50430 := Shiber_50430.yOpenOut;
+yCloseSh50430 := Shiber_50430.yCloseOut;
+StMeh[22] := Shiber_50430.state;
+Go_Open_Sh50430 := Shiber_50430.runToOpen;
+
+// ---
+Shiber_50210(opened:=Opened_Sh50210, closed:=Closed_Sh50210, toOpen:=UseKonv50300 AND NOT Opened_Sh50210 AND NOT CloseAllSh3, toClose:=(NOT UseKonv50300 OR CloseAllSh3) AND NOT Closed_Sh50210, maxTTO:=t#15s, errAZ:=ErrAz_Sh50210, HandMode:=(MHand OR NOT UnloadSt.1 OR fHand3.3) AND NOT CloseAllSh3, yOpen:=yOpenSh50210, yClose:=yCloseSh50210, MH:=MhShGP01, aMH:=aMhShGP01);
+Go_Close_Sh50210 := Shiber_50210.runToClose;
+Err31.0 := Shiber_50210.errLT;
+Err31.1 := Shiber_50210.errKonc;
+Err31.2 := Shiber_50210.errAZOut;
+DA_Sh50210 := Shiber_50210.da;
+Opened_Sh50210 := Shiber_50210.openedOut;
+Closed_Sh50210 := Shiber_50210.closedOut;
+yOpenSh50210 := Shiber_50210.yOpenOut;
+yCloseSh50210 := Shiber_50210.yCloseOut;
+StMeh[22] := Shiber_50210.state;
+Go_Open_Sh50210 := Shiber_50210.runToOpen;
+
+// --- Силос для выгрузки заполнен
+Err21.0 := UnloadBunk[1] AND DVU_Silo[1];
+Err21.1 := UnloadBunk[2] AND DVU_Silo[2];
+Err21.2 := UnloadBunk[3] AND DVU_Silo[3];
+Err21.3 := UnloadBunk[4] AND DVU_Silo[4];
+Err21.4 := UnloadBunk[5] AND DVU_Silo[5];
+Err21.5 := UnloadBunk[6] AND DVU_Silo[6];
+Err21.6 := UnloadBunk[7] AND DVU_Silo[7];
+Err21.7 := UnloadBunk[8] AND DVU_Silo[8];
+Err21.8 := UnloadBunk[9] AND DVU_Silo[9];
+
+// --- //маска - слово без 15го бита
+TON_PolnSilos(IN:=((Err21 AND 2#111111111111111) > 0) /*EN=true*/, PT:=t#1s*TimeoutPolnSilos);
+PolnSiloCur := TON_PolnSilos.Q;
+
+// --- Снимаем режим выгрузки, если под смесителем ничего нет / или начинаем перестраиваться с выгрузки брака на кач.прод
+IF F_TRIG(DNU_DownBunk) AND UnloadSt.1 AND UnloadSt.0 AND UnloadSt.1 AND UnloadSt.7 THEN UnloadSt.7 := FALSE; END_IF
+IF F_TRIG(DNU_DownBunk) AND UnloadSt.1 AND UnloadSt.0 AND UnloadSt.1 AND UnloadSt.7 THEN UnloadSt.3 := TRUE; END_IF
+IF ((F_TRIG(DNU_DownBunk) AND UnloadSt.1 AND NOT UnloadSt.0) OR (F_TRIG(DNU_DownBunk) AND UnloadSt.1 AND NOT UnloadSt.1)) AND (UnloadSt>0) THEN UnloadSt := 2; END_IF
+
+// ---
+canAutoUnl := UnloadSt.0 AND UnloadSt.1 AND UnloadSt.9;
+HandUnl := (UnloadSt = 0);
+
+// ---
+HandMode50300 := (MHand OR NOT UseKonv50300 OR fHand3.1);
+
+// ---
+Next50300a := ((UnloadSt.1 AND UnloadBunk[1] AND Opened_Sh50310 AND Closed_Sh50320 AND Closed_Sh50330) OR (UnloadSt.1 AND UnloadBunk[2] AND Closed_Sh50310 AND Opened_Sh50320 AND Closed_Sh50330) OR (UnloadSt.1 AND UnloadBunk[3] AND Closed_Sh50310 AND Closed_Sh50320 AND Opened_Sh50330) OR (UnloadSt.1 AND UnloadBunk[4] AND Closed_Sh50310 AND Closed_Sh50320 AND Closed_Sh50330));
+
+// ---
+Next50300h := ((NOT DVU_Silo[1] AND Opened_Sh50310) OR (NOT DVU_Silo[2] AND Opened_Sh50320 AND Closed_Sh50310) OR (NOT DVU_Silo[3] AND Closed_Sh50310 AND Closed_Sh50320 AND Opened_Sh50330) OR (NOT DVU_Silo[4] AND Closed_Sh50310 AND Closed_Sh50320 AND Closed_Sh50330));
+
+// ---
+Next50300 := ((HandMode50300 AND Next50300h) OR (NOT HandMode50300 AND Next50300a));
+
+// ---
+Tr50300(localStop:=LStop_TrGP1, localPusk:=Local_TrGP1 AND LPusk_TrGP1, next:=Next50300, prev:=Go_TrGP AND Opened_Sh50210, errAZ:=ErrAz_TrGP1, dks:=DKS_TrGP1, dksMustBlink:=true, DKS_off:=OffDKS_TrGP1, DP:=DP_TrGP1, DP_off:=OffDP_TrGP1, HandMode:=HandMode50300, SlowHand:=UnloadSt.1, canRunAuto:=canAutoUnl AND NOT Local_TrGP1, timeBeforeStart:=t#2s, timeToStop:=t#1S*tcTrGP12, yHand:=yRunTrGP1, MH:=MhTrGP1, aMH:=aMhTrGP1);
+DA_TrGP1 := Tr50300.da;
+Err28.3 := Tr50300.err_AZ;
+Err28.4 := Tr50300.err_DKS;
+Err28.5 := Tr50300.err_DP;
+yRunTrGP1 := Tr50300.HandOut;
+Go_TrGP1 := Tr50300.run;
+
+// ---
+HandMode50400 := (MHand OR NOT UseKonv50400 OR fHand3.2);
+
+// ---
+Next50400a := ((UnloadSt.1 AND UnloadBunk[5] AND Opened_Sh50410 AND Closed_Sh50420 AND Closed_Sh50430) OR (UnloadSt.1 AND UnloadBunk[6] AND Closed_Sh50410 AND Opened_Sh50420 AND Closed_Sh50430) OR (UnloadSt.1 AND UnloadBunk[7] AND Closed_Sh50410 AND Closed_Sh50420 AND Opened_Sh50430) OR (UnloadSt.1 AND UnloadBunk[8] AND Closed_Sh50410 AND Closed_Sh50420 AND Closed_Sh50430));
+
+// ---
+Next50400h := ((true AND NOT DVU_Silo[5] AND Opened_Sh50410) OR (true AND NOT DVU_Silo[6] AND Closed_Sh50410 AND Opened_Sh50420) OR (true AND DVU_Silo[7] AND Closed_Sh50410 AND Closed_Sh50420 AND Opened_Sh50430) OR (true AND DVU_Silo[8] AND Closed_Sh50410 AND Closed_Sh50420 AND Closed_Sh50430));
+
+// ---
+Next50400 := ((true AND HandMode50400 AND Next50400h) OR (true AND NOT HandMode50400 AND Next50400a));
+
+// ---
+Tr50400(localStop:=LStop_TrGP2, localPusk:=Local_TrGP2 AND LPusk_TrGP2, next:=Next50400, prev:=Go_TrGP AND Closed_Sh50210, errAZ:=ErrAz_TrGP2, dks:=DKS_TrGP2, dksMustBlink:=true, DKS_off:=OffDKS_TrGP2, DP:=DP_TrGP2, DP_off:=OffDP_TrGP2, HandMode:=HandMode50400, SlowHand:=UnloadSt.1, canRunAuto:=canAutoUnl AND NOT Local_TrGP2, timeBeforeStart:=t#2s, timeToStop:=t#1S*tcTrGP12, yHand:=yRunTrGP2, MH:=MhTrGP2, aMH:=aMhTrGP2);
+DA_TrGP2 := Tr50400.da;
+Err28.0 := Tr50400.err_AZ;
+Err28.1 := Tr50400.err_DKS;
+Err28.2 := Tr50400.err_DP;
+yRunTrGP2 := Tr50400.HandOut;
+Go_TrGP2 := Tr50400.run;
+
+// ---
+HandMode50200 := (MHand OR HandUnl OR fHand3.0);
+
+// ---
+Next50200 := ((((((NOT HandMode50200 AND UnloadSt.1) OR HandMode50200) AND Opened_Sh50210) AND Next50300) AND Go_TrGP1) OR (((((NOT HandMode50200 AND UnloadSt.1) OR HandMode50200) AND Closed_Sh50210) AND Next50400) AND Go_TrGP2));
+
+// ---
+Tr50200(localStop:=LStop_TrGP, localPusk:=LPusk_TrGP AND Local_TrGP, next:=Next50200, prev:=Go_Nor4, errAZ:=ErrAz_TrGP, dks:=DKS_TrGP, dksMustBlink:=false, DKS_off:=OffDKS_TrGP, DP:=DP_TrGP, DP_off:=OffDP_TrGP, HandMode:=HandMode50200, SlowHand:=UnloadSt.1, canRunAuto:=canAutoUnl, timeBeforeStart:=t#3s, timeToStop:=t#1S*tcTrGP, yHand:=yRunTrGP, MH:=MhTrGP, aMH:=aMhTrGP);
+DA_TrGP := Tr50200.da;
+Err8.9 := Tr50200.err_AZ;
+Err8.10 := Tr50200.err_DKS;
+Err8.11 := Tr50200.err_DP;
+yRunTrGP := Tr50200.HandOut;
+StMeh[33] := Tr50200.state;
+Go_TrGP := Tr50200.run;
+
+// ---
+Nor4(localPusk:=LPusk_Nor4 AND Local_Nor4, localStop:=(LStopD_Nor4 OR LStopU_Nor4), next:=Go_TrGP, prev:=(Go_TrSms OR Go_Tr51200), dp:=false, off_dp:=true, dks:=DKS_Nor4, off_dks:=OffDKS_Nor4, dsl1:=DSL1_Nor4, dsl2:=DSL2_Nor4, off_dsl1:=OffDSL1_Nor4, off_dsl2:=OffDSL2_Nor4, AZ:=ErrAz_Nor4, HandMode:=(MHand OR HandUnl OR fHand2.15), SlowHand:=UnloadSt.1, canRunAuto:=canAutoUnl, timeBeforeStart:=t#5S, timeToStop:=t#1S*tcNor4, yRun:=yRunNor4, MH:=MhNor4, aMH:=aMhNor4);
+DA_Nor4 := Nor4.da;
+Err10.10 := Nor4.errAZ;
+Err10.11 := Nor4.errDKS;
+Err10.12 := Nor4.errDP;
+Err10.13 := Nor4.errDSL1;
+Err10.14 := Nor4.errDSL2;
+yRunNor4 := Nor4.yRunOut;
+StMeh[36] := Nor4.state;
+Go_Nor4 := Nor4.run;
+
+// ---
+NextTrSms := ((UnloadSt.1 AND NOT UseGran AND Closed_ShTrSms AND Go_Nor4 AND UnloadSt.6) OR (UnloadSt.1 AND NOT UseGran AND Closed_ShTrSms AND Go_Nor4 AND UnloadSt.7 AND NOT Answ.10) OR (UnloadSt.1 AND UseGran AND Opened_ShTrSms AND Go_Tr40100 AND NOT DVU_PBGran) OR (NOT UnloadSt.1 AND Closed_ShTrSms AND Go_Nor4) OR (NOT UnloadSt.1 AND Opened_ShTrSms AND Go_Tr40100));
+
+// ---
+TrSms(localStop:=LStop_TrSms, localPusk:=LPusk_TrSms AND Local_TrSms, next:=NextTrSms, prev:=canAutoUnl, errAZ:=ErrPCH_TrSms, dks:=DKS_TrSms, dksMustBlink:=true, DKS_off:=OffDKS_TrSms, DP:=DP_TrSms, DP_off:=OffDP_TrSms, HandMode:=(MHand OR HandUnl OR fHand2.14), SlowHand:=UnloadSt.1, canRunAuto:=canAutoUnl, timeBeforeStart:=t#3s, timeToStop:=t#1S*tcTrSms, yHand:=yRunTrSms, MH:=MhTrSms, aMH:=aMhTrSms);
+DA_TrSms := TrSms.da;
+Err7.12 := TrSms.err_AZ;
+Err7.13 := TrSms.err_DKS;
+Err7.14 := TrSms.err_DP;
+yRunTrSms := TrSms.HandOut;
+StMeh[35] := TrSms.state;
+Go_TrSms := TrSms.run;
+
+// ---

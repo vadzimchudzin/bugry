@@ -1,0 +1,11 @@
+function NextTask
+VAR
+  input   CurTaskIn : WORD
+END_VAR
+
+(* ST *)
+IF CurTaskIn<5 THEN 
+	NextTask:=CurTaskIn+1; 
+ELSE 
+	NextTask:=1; 	
+END_IF

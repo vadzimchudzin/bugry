@@ -1,0 +1,231 @@
+program PrgDosingK
+VAR
+  local   timeOutNewPorc : TON  // Rst_ErrPCH_DozKomp: CHP_Reset;
+  local   TP_ResetPCHKomp : TP
+  local   CanAnswUser : BOOL
+  local   ChangeKomp_0 : ChangeKomp
+  local   NoRunPuskK1 : BOOL
+  local   NoRunPuskK2 : BOOL
+  local   NoRunPuskK3 : BOOL
+  local   NoRunPuskK4 : BOOL
+  local   NoRunPuskK5 : BOOL
+  local   NoRunPuskK6 : BOOL
+  local   NoRunPuskK7 : BOOL
+  local   NoRunPuskK8 : BOOL
+  local   NoRunPuskK9 : BOOL
+  local   NoRunPuskK10 : BOOL
+  local   tttt : BOOL
+  local   ResetDozatorsK : BOOL
+  local   ChangeKTo1 : WORD
+  local   ChangeKTo2 : WORD
+  local   ResetNoWeight : BOOL
+  local   ii : WORD
+  local   onlyN : WORD
+END_VAR
+
+(* ST *)
+//остаться должет только один или никого
+yRunDoz[1]	:=	yRunDoz1;
+yRunDoz[2]	:=	yRunDoz2 ;
+yRunDoz[3]	:=	yRunDoz3 ;
+yRunDoz[4]	:=	yRunDoz4 ;
+yRunDoz[5]	:=	yRunDoz5 ;
+yRunDoz[6]	:=	yRunDoz6 ;
+//yRunDoz[7]	:=	yRunDoz7 ;
+//yRunDoz[8]	:=	yRunDoz8 ;
+//yRunDoz[9]	:=	yRunDoz9 ;
+//yRunDoz[10]	:=	yRunDoz10;
+onlyN:=0;
+FOR ii:=1 TO CBK DO
+	IF yRunDoz[ii] AND NOT yRunDozPred[ii] THEN
+		onlyN:=ii;	// находим того, который появился
+	END_IF
+END_FOR
+FOR ii:=1 TO CBK DO
+	IF (OnlyN>0) AND (ii<>onlyN) THEN 
+		yRunDoz[ii]:=0;
+	END_IF
+	yRunDozPred[ii]:=yRunDoz[ii];
+END_FOR
+
+(* ST *)
+yRunDoz1 := yRunDoz[1]	;
+yRunDoz2 := yRunDoz[2]	;
+yRunDoz3 := yRunDoz[3]	;
+yRunDoz4 := yRunDoz[4]	;
+yRunDoz5 := yRunDoz[5]	;
+yRunDoz6 := yRunDoz[6]	;
+//yRunDoz7 := yRunDoz[7]	;
+//yRunDoz8 := yRunDoz[8]	;
+//yRunDoz9 := yRunDoz[9]	;
+//yRunDoz10:= yRunDoz[10]	;
+
+(* LD *)
+
+// --- Новая порция. Через 2 сек устанавливаем 1первую позицию
+timeOutNewPorc(IN:=(PosOrd1 = 0) /*EN=msgToScadaK.2*/, PT:=t#3s);
+IF timeOutNewPorc.Q AND HaveKomp THEN PosOrd1 := 1; END_IF
+IF 1 /*EN=timeOutNewPorc.Q AND HaveKomp*/ THEN Ves01 := Ves1.RealValue; END_IF
+IF timeOutNewPorc.Q AND NOT HaveKomp THEN DosingK_Done := TRUE; END_IF
+
+// --- В NumBunkK заносим № бункера из которого дозируется
+NumBunkK := 0;
+IF (PosOrd1 <= LenOrd1) /*EN=(PosOrd1 > 0) /*EN=0 AND msgToScadaK.2*/*/ THEN NumBunkK := Order1[PosOrd1]; END_IF
+
+// ---
+DosingK := 0;
+IF (PosOrd1 = 0) /*EN=0 AND msgToScadaK.2*/ THEN DosingK := 1; END_IF
+IF 1 /*EN=(PosOrd1 = 0) /*EN=0 AND msgToScadaK.2*/*/ THEN SumVes1 := 0; END_IF
+
+// --- В DosingK устанавливаем тот бит, который соответствует текущему дозируемому компоненту или 0й бит(1)-reset
+IF (NumBunkK > 0) /*EN=msgToScadaK.2*/ THEN DosingK := SHL(In2:=1, In3:=NumBunkK); END_IF
+
+// ---
+IF ErrPCH_DozKomp THEN DA_DozKomp := TRUE; END_IF
+IF ErrPCH_DozKomp THEN Err12.13 := TRUE; END_IF
+
+// ---
+IF ResetErrors THEN Err12.13 := FALSE; END_IF
+IF ResetErrors THEN DA_DozKomp := FALSE; END_IF
+TP_ResetPCHKomp(IN:=ResetErrors, PT:=t#1s);
+RstErrPCH_DozKomp := TP_ResetPCHKomp.Q;
+
+// ---
+Err15.0 := ((VesZ[1]-VesC[1]) > 0) /*EN=RunDosing AND NOT DNU_BunkK[1]*/;
+Err15.1 := ((VesZ[2]-VesC[2]) > 0) /*EN=RunDosing AND NOT DNU_BunkK[2]*/;
+Err15.2 := ((VesZ[3]-VesC[3]) > 0) /*EN=RunDosing AND NOT DNU_BunkK[3]*/;
+Err15.3 := ((VesZ[4]-VesC[4]) > 0) /*EN=RunDosing AND NOT DNU_BunkK[4]*/;
+Err15.4 := ((VesZ[5]-VesC[5]) > 0) /*EN=RunDosing AND NOT DNU_BunkK[5]*/;
+Err15.5 := ((VesZ[6]-VesC[6]) > 0) /*EN=RunDosing AND NOT DNU_BunkK[6]*/;
+Err15.6 := ((VesZ[7]-VesC[7]) > 0) /*EN=RunDosing AND NOT DNU_BunkK[7]*/;
+Err15.7 := ((VesZ[8]+VesC[8]) > 0) /*EN=RunDosing AND NOT DNU_BunkK[8]*/;
+
+// ---
+NoRunPuskK1 := NOT (NOT Go_Pusk_K2 AND NOT Go_Pusk_K3 AND NOT Go_Pusk_K4 AND NOT Go_Pusk_K5 AND NOT Go_Pusk_K6 AND NOT LStop_K1);
+NoRunPuskK2 := NOT (NOT Go_Pusk_K1 AND NOT Go_Pusk_K3 AND NOT Go_Pusk_K4 AND NOT Go_Pusk_K5 AND NOT Go_Pusk_K6 AND NOT LStop_K2);
+NoRunPuskK3 := NOT (NOT Go_Pusk_K1 AND NOT Go_Pusk_K2 AND NOT Go_Pusk_K4 AND NOT Go_Pusk_K5 AND NOT Go_Pusk_K6 AND NOT LStop_K3);
+NoRunPuskK4 := NOT (NOT Go_Pusk_K1 AND NOT Go_Pusk_K2 AND NOT Go_Pusk_K3 AND NOT Go_Pusk_K5 AND NOT Go_Pusk_K6 AND NOT LStop_K4);
+NoRunPuskK5 := NOT (NOT Go_Pusk_K1 AND NOT Go_Pusk_K2 AND NOT Go_Pusk_K3 AND NOT Go_Pusk_K4 AND NOT Go_Pusk_K6 AND NOT LStop_K5);
+NoRunPuskK6 := NOT (NOT Go_Pusk_K1 AND NOT Go_Pusk_K2 AND NOT Go_Pusk_K3 AND NOT Go_Pusk_K4 AND NOT Go_Pusk_K5 AND NOT LStop_K6);
+
+// ---
+ResetDozatorsK := (DosingK.0 OR (NOT RunDosing AND Go_TrKomp) OR (RunDosing AND (idK=0)));
+
+// ---
+Before(In1:=true);
+
+// --- Дозатор с бункера компонентов 101
+Dozators[1](DP:=DP_K1, DP_off:=OffDP_K1, DKS:=true, DKS_off:=true, errPCH:=Err12.13, Cycle:=DosingK.1, MustHand:=((NOT RunDosing) OR ((DosingK>1) AND PauseDosingK)), NoRunPusk:=NoRunPuskK1, VesStart:=Ves01, VesOth:=SumVesD1(1), Ves:=Ves1.RealValue, VesRequire:=VesZ[1]-VesC[1], VesTo3:=VesTo3[1], VesTo2:=VesTo2[1], VesTo1:=VesTo1[1], Freq100Prc:=5000, SPEED_4:=Speed4[1], SPEED_3:=Speed3[1], SPEED_2:=Speed2[1], SPEED_1:=Speed1[1], FreqManual:=FreqManual1, AutoStolb:=UseAutoPSK.0, DONE_Reset:=ResetDozatorsK, UseFreqManual:=Regim.8, TokPCH:=OutTokK, Pause:=(PauseDosingK OR fHand2.11 OR ResetNoWeight), yVesHand:=yVesK[1], DelayDone:=t#200ms, DelayAfterDos:=t#1ms*DelayK, DopPogr:=2, SPEED_FREQ:=FreqDozK, VesStolba:=VesPs[1], yHand:=yRunDoz[1], MH:=MhK1, aMH:=aMhK1);
+Go_PCH_DozKomp1 := Dozators[1].RunPCH;
+Go_Pusk_K1 := Dozators[1].RunPuskatel;
+Err11.0 := Dozators[1].errDP;
+Err11.1 := Dozators[1].errDKS;
+DA_K1 := Dozators[1].da;
+VesD[1] := Dozators[1].VesDone;
+StMeh[9] := Dozators[1].state;
+noWeight1.0 := Dozators[1].noWeight;
+
+// --- Дозатор с бункера компонентов 102
+Dozators[2](DP:=DP_K2, DP_off:=OffDP_K2, DKS:=true, DKS_off:=true, errPCH:=Err12.13, Cycle:=DosingK.2, MustHand:=((NOT RunDosing) OR ((DosingK>1) AND PauseDosingK)), NoRunPusk:=NoRunPuskK2, VesStart:=Ves01, VesOth:=SumVesD1(2), Ves:=Ves1.RealValue, VesRequire:=VesZ[2]-VesC[2], VesTo3:=VesTo3[2], VesTo2:=VesTo2[2], VesTo1:=VesTo1[2], Freq100Prc:=5000, SPEED_4:=Speed4[2], SPEED_3:=Speed3[2], SPEED_2:=Speed2[2], SPEED_1:=Speed1[2], FreqManual:=FreqManual1, AutoStolb:=UseAutoPSK.1, DONE_Reset:=ResetDozatorsK, UseFreqManual:=Regim.8, TokPCH:=OutTokK, Pause:=(PauseDosingK OR fHand2.11 OR ResetNoWeight), yVesHand:=yVesK[2], DelayDone:=t#200ms, DelayAfterDos:=t#1ms*DelayK, DopPogr:=2, SPEED_FREQ:=FreqDozK, VesStolba:=VesPs[2], yHand:=yRunDoz[2], MH:=MhK2, aMH:=aMhK2);
+Go_PCH_DozKomp2 := Dozators[2].RunPCH;
+Go_Pusk_K2 := Dozators[2].RunPuskatel;
+Err11.2 := Dozators[2].errDP;
+Err11.3 := Dozators[2].errDKS;
+DA_K2 := Dozators[2].da;
+VesD[2] := Dozators[2].VesDone;
+StMeh[10] := Dozators[2].state;
+noWeight1.1 := Dozators[2].noWeight;
+
+// --- Дозатор с бункера компонентов 103
+Dozators[3](DP:=DP_K3, DP_off:=OffDP_K3, DKS:=true, DKS_off:=true, errPCH:=Err12.13, Cycle:=DosingK.3, MustHand:=((NOT RunDosing) OR ((DosingK>1) AND PauseDosingK)), NoRunPusk:=NoRunPuskK3, VesStart:=Ves01, VesOth:=SumVesD1(3), Ves:=Ves1.RealValue, VesRequire:=VesZ[3]-VesC[3], VesTo3:=VesTo3[3], VesTo2:=VesTo2[3], VesTo1:=VesTo1[3], Freq100Prc:=5000, SPEED_4:=Speed4[3], SPEED_3:=Speed3[3], SPEED_2:=Speed2[3], SPEED_1:=Speed1[3], FreqManual:=FreqManual1, AutoStolb:=UseAutoPSK.2, DONE_Reset:=ResetDozatorsK, UseFreqManual:=Regim.8, TokPCH:=OutTokK, Pause:=(PauseDosingK OR fHand2.11 OR ResetNoWeight), yVesHand:=yVesK[3], DelayDone:=t#200ms, DelayAfterDos:=t#1ms*DelayK, DopPogr:=2, SPEED_FREQ:=FreqDozK, VesStolba:=VesPs[3], yHand:=yRunDoz[3], MH:=MhK3, aMH:=aMhK3);
+Go_PCH_DozKomp3 := Dozators[3].RunPCH;
+Go_Pusk_K3 := Dozators[3].RunPuskatel;
+Err11.4 := Dozators[3].errDP;
+Err11.5 := Dozators[3].errDKS;
+DA_K3 := Dozators[3].da;
+VesD[3] := Dozators[3].VesDone;
+StMeh[11] := Dozators[3].state;
+noWeight1.2 := Dozators[3].noWeight;
+
+// --- Дозатор с бункера компонентов 104
+Dozators[4](DP:=DP_K4, DP_off:=OffDP_K4, DKS:=true, DKS_off:=true, errPCH:=Err12.13, Cycle:=DosingK.4, MustHand:=((NOT RunDosing) OR ((DosingK>1) AND PauseDosingK)), NoRunPusk:=NoRunPuskK4, VesStart:=Ves01, VesOth:=SumVesD1(4), Ves:=Ves1.RealValue, VesRequire:=VesZ[4]-VesC[4], VesTo3:=VesTo3[4], VesTo2:=VesTo2[4], VesTo1:=VesTo1[4], Freq100Prc:=5000, SPEED_4:=Speed4[4], SPEED_3:=Speed3[4], SPEED_2:=Speed2[4], SPEED_1:=Speed1[4], FreqManual:=FreqManual1, AutoStolb:=UseAutoPSK.3, DONE_Reset:=ResetDozatorsK, UseFreqManual:=Regim.8, TokPCH:=OutTokK, Pause:=(PauseDosingK OR fHand2.11 OR ResetNoWeight), yVesHand:=yVesK[4], DelayDone:=t#200ms, DelayAfterDos:=t#1ms*DelayK, DopPogr:=2, SPEED_FREQ:=FreqDozK, VesStolba:=VesPs[4], yHand:=yRunDoz[4], MH:=MhK4, aMH:=aMhK4);
+Go_PCH_DozKomp4 := Dozators[4].RunPCH;
+Go_Pusk_K4 := Dozators[4].RunPuskatel;
+Err11.6 := Dozators[4].errDP;
+Err11.7 := Dozators[4].errDKS;
+DA_K4 := Dozators[4].da;
+VesD[4] := Dozators[4].VesDone;
+StMeh[12] := Dozators[4].state;
+noWeight1.3 := Dozators[4].noWeight;
+
+// --- Дозатор с бункера компонентов 105
+Dozators[5](DP:=DP_K5, DP_off:=OffDP_K5, DKS:=true, DKS_off:=true, errPCH:=Err12.13, Cycle:=DosingK.5, MustHand:=((NOT RunDosing) OR ((DosingK>1) AND PauseDosingK)), NoRunPusk:=NoRunPuskK5, VesStart:=Ves01, VesOth:=SumVesD1(5), Ves:=Ves1.RealValue, VesRequire:=VesZ[5]-VesC[5], VesTo3:=VesTo3[5], VesTo2:=VesTo2[5], VesTo1:=VesTo1[5], Freq100Prc:=5000, SPEED_4:=Speed4[5], SPEED_3:=Speed3[5], SPEED_2:=Speed2[5], SPEED_1:=Speed1[5], FreqManual:=FreqManual1, AutoStolb:=UseAutoPSK.4, DONE_Reset:=ResetDozatorsK, UseFreqManual:=Regim.8, TokPCH:=OutTokK, Pause:=(PauseDosingK OR fHand2.11 OR ResetNoWeight), yVesHand:=yVesK[5], DelayDone:=t#200ms, DelayAfterDos:=t#1ms*DelayK, DopPogr:=2, SPEED_FREQ:=FreqDozK, VesStolba:=VesPs[5], yHand:=yRunDoz[5], MH:=MhK5, aMH:=aMhK5);
+Go_PCH_DozKomp5 := Dozators[5].RunPCH;
+Go_Pusk_K5 := Dozators[5].RunPuskatel;
+Err11.8 := Dozators[5].errDP;
+Err11.9 := Dozators[5].errDKS;
+DA_K5 := Dozators[5].da;
+VesD[5] := Dozators[5].VesDone;
+StMeh[13] := Dozators[5].state;
+noWeight1.4 := Dozators[5].noWeight;
+
+// --- Дозатор с бункера компонентов 106
+Dozators[6](DP:=DP_K6, DP_off:=OffDP_K6, DKS:=true, DKS_off:=true, errPCH:=Err12.13, Cycle:=DosingK.6, MustHand:=((NOT RunDosing) OR ((DosingK>1) AND PauseDosingK)), NoRunPusk:=NoRunPuskK6, VesStart:=Ves01, VesOth:=SumVesD1(6), Ves:=Ves1.RealValue, VesRequire:=VesZ[6]-VesC[6], VesTo3:=VesTo3[6], VesTo2:=VesTo2[6], VesTo1:=VesTo1[6], Freq100Prc:=5000, SPEED_4:=Speed4[6], SPEED_3:=Speed3[6], SPEED_2:=Speed2[6], SPEED_1:=Speed1[6], FreqManual:=FreqManual1, AutoStolb:=UseAutoPSK.5, DONE_Reset:=ResetDozatorsK, UseFreqManual:=Regim.8, TokPCH:=OutTokK, Pause:=(PauseDosingK OR fHand2.11 OR ResetNoWeight), yVesHand:=yVesK[6], DelayDone:=t#200ms, DelayAfterDos:=t#1ms*DelayK, DopPogr:=2, SPEED_FREQ:=FreqDozK, VesStolba:=VesPs[6], yHand:=yRunDoz[6], MH:=MhK6, aMH:=aMhK6);
+Go_PCH_DozKomp6 := Dozators[6].RunPCH;
+Go_Pusk_K6 := Dozators[6].RunPuskatel;
+Err11.10 := Dozators[6].errDP;
+Err11.11 := Dozators[6].errDKS;
+DA_K6 := Dozators[6].da;
+VesD[6] := Dozators[6].VesDone;
+StMeh[14] := Dozators[6].state;
+noWeight1.5 := Dozators[6].noWeight;
+
+// ---
+After();
+
+// ---
+IF TRUE THEN ResetNoWeight := FALSE; END_IF
+
+// ---
+IF (PosOrd1 <= LenOrd1) /*EN=(PosOrd1 > 0) /*EN=true*/*/ AND Dozators[Order1[PosOrd1]].Done THEN PosOrd1 := (PosOrd1+1); END_IF
+
+// ---
+IF (PosOrd1 > LenOrd1) /*EN=(LenOrd1 > 0) /*EN=true*/*/ THEN DosingK_Done := TRUE; END_IF
+
+// --- флаг для скады - записать время окончания дозирования компонентов
+IF R_TRIG(DosingK_Done) THEN SumVes1 := (SumVesD1(0)); END_IF
+IF (SumVesD1(0)) /*EN=R_TRIG(DosingK_Done)*/ THEN CheckDefect1 := TRUE; END_IF
+
+// ---
+Go_PCH_DozKomp := (Go_PCH_DozKomp1 OR Go_PCH_DozKomp2 OR Go_PCH_DozKomp3 OR Go_PCH_DozKomp4 OR Go_PCH_DozKomp5 OR Go_PCH_DozKomp6);
+
+// ---
+FreqDozKtoPCH := (FreqDozK*2);
+
+// ---
+IF NOT Go_PCH_DozKomp THEN FreqDozK := 0; END_IF
+
+// ---
+IF (((DosingK < 2) /*EN=true*/) OR (true AND NOT HaveKomp)) THEN Regim.11 := FALSE; END_IF
+
+// --- Не хватает одного из компонентов
+CanAnswUser := ((noWeight1.0 AND DosingK.1) OR (noWeight1.1 AND DosingK.2) OR (noWeight1.2 AND DosingK.3) OR (noWeight1.3 AND DosingK.4) OR (noWeight1.4 AND DosingK.5) OR (noWeight1.5 AND DosingK.6) OR Regim.11);
+
+// ---
+IF R_TRIG(CanAnswUser) THEN tpChangeK := 1; END_IF
+IF 1 /*EN=R_TRIG(CanAnswUser)*/.Answ.4 THEN Answ.4 := TRUE; END_IF
+IF 1 /*EN=R_TRIG(CanAnswUser)*/ AND Regim.11 THEN PauseDosingK := TRUE; END_IF
+IF NOT CanAnswUser THEN tpChangeK := 0; END_IF
+IF 0 /*EN=NOT CanAnswUser*/ THEN ChangeKTo := 0; END_IF
+IF 0 /*EN=0 /*EN=NOT CanAnswUser*/*/ THEN Answ.4 := FALSE; END_IF
+
+// --- решение заменить, продолжить, удалить
+ChangeKomp_0(Run:=(tpChangeK > 1) /*EN=Answ.4*/, tpChange:=tpChangeK, ChangeTo:=ChangeKTo);
+IF ChangeKomp_0.Done THEN ChangeKTo := 0; END_IF
+IF 0 /*EN=ChangeKomp_0.Done*/ THEN tpChangeK := 0; END_IF
+IF 0 /*EN=0 /*EN=ChangeKomp_0.Done*/*/ THEN ResetNoWeight := TRUE; END_IF
+IF 0 /*EN=0 /*EN=ChangeKomp_0.Done*/*/ THEN Answ.4 := FALSE; END_IF
+IF 0 /*EN=0 /*EN=ChangeKomp_0.Done*/*/ THEN Regim.11 := FALSE; END_IF
+IF 0 /*EN=0 /*EN=ChangeKomp_0.Done*/*/ THEN PauseDosingK := FALSE; END_IF
+
+// ---

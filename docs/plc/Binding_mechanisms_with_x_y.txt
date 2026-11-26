@@ -1,0 +1,1512 @@
+program Binding_mechanisms_with_x_y
+VAR
+  local   TON_ErrPCH_DozKomp : TON
+  local   TON_ErrPCH_DozDob : TON
+  local   TON_ErrPCH_Pit1 : TON
+  local   TON_ErrPCH_Pit2 : TON
+  local   TON_ErrPCH_TrSms : TON
+  local   TON_Opened2 : TON
+  local   TON_Closed2 : TON
+  local   TON_Opened3 : TON
+  local   TON_Closed3 : TON
+  local   TON_Opened4 : TON
+  local   TON_Closed4 : TON
+  local   TON_OpenedSm1 : TON
+  local   TON_ClosedSm1 : TON
+  local   TonDPNor1 : Ton
+  local   TonDPNor2 : TON
+  local   TonDPNorHoleD : TON
+  local   TonDPNor3 : TON
+  local   TonDPNor4 : TON
+  local   TonDPNor6 : TON
+  local   TonDP1_TR1 : TON
+  local   TonDP2_TR1 : TON
+  local   TonDPNorHole : Ton
+  local   TonDP_Tr1L : TON
+  local   TonDP_Tr1R : TON
+  local   TonDP_TrKomp : TON
+  local   TonDP_NorHoleD : TON
+  local   TonDP_Tr2 : TON
+  local   TonDP_Tr3 : TON
+  local   TonDP_Nor3 : TON
+  local   TonDP_TrDrob : TON
+  local   TonDP_TrSms : TON
+  local   TonDP_Nor4 : TON
+  local   TonDP_TrOhl : TON
+  local   TonDP_Nor5 : TON
+  local   TonDP_Tr6 : TON
+  local   TonDP_Nor7 : TON
+  local   TonDP_Nor8 : TON
+  local   TonDP_TrGP : TON
+  local   TonDP1_TrGP1 : TON
+  local   TonDP2_TrGP1 : TON
+  local   TonDP1_TrGP2 : TON
+  local   TonDP2_TrGP2 : TON
+  local   TonDP1_TrGP3 : TON
+  local   TonDP2_TrGP3 : TON
+  local   TonDP_Tr7 : TON
+  local   StartMEmul : R_TRIG
+END_VAR
+
+(* ST *)
+// Привязка Входов-Выходов к тэгам 
+	//Общие Механизмы И Кнопки	
+IF NOT mEmul THEN		
+		EmerPuskBtn		:= NOT X01_0; //Пуск На Шкафу 
+		EmerStopShkaf 	:= NOT X01_1;	//Аварийный Стоп На Шкафу
+		EmerStopScalp 	:= NOT X01_2;	//Аварийный Стоп На Зав. Яме
+		EmerStopBunkZ 	:= NOT X01_3;	//Аварийный стоп у бункеров загрузки
+		EmerStopBunkD 	:= NOT X01_4;	//Аварийный Стоп у бункеров для добавок
+		EmerStopBunkV 	:= NOT X01_5;	//Аварийный Стоп у бункеров выгрузки
+		EmerStopExit 	:= NOT X01_6;	//аварийный стоп возле лестницы
+		EmerStopUdjk 	:= NOT X01_7;	//аварийный стоп возле УДЖК
+		EmerStopFire	:= NOT X15_20;	//Пожар
+		
+		mErrRKF:=NOT X01_8;		
+		TonErrRKF(IN:=mErrRKF,  PT:=T#10S, Q=>ErrRKF);		
+	
+		Y01_0 := RunSirena ;	//Включить Сирену
+		Y01_1 := RunLamp;		//Лампа Аварии На Шкафу
+		
+		
+	//Конвейер шнековый (поз.21110)
+		TON_ErrPCH_TrDob(IN:=(NOT X01_9) AND Go_TrDob AND RunPCH_TrDob, PT:=T#500MS, Q=>ErrPCH_TrDob) ; //+Авария с ЧП 
+		DKS_TrDob 	:= X01_10;	
+		DP_TrDob 	:= NOT X01_11;
+		Local_TrDob	:= X01_12;
+		LPusk_TrDob := X01_13;	//Местный Пуск 
+		LStop_TrDob := NOT X01_14;	//Местный Стоп 
+		Y01_2	:=	Go_TrDob ; 	//Запустить конвейер 
+		Y01_3	:=	ResetErrors; //Сброс аварии ПЧ 
+		Y01_4	:=	RunPCH_TrDob; //Включить ПЧ
+
+	//Скальператор
+		ErrPCH_Scalp 	:= (NOT X01_15) AND Go_Scalp AND RunPCH_Scalp; //Авария с ЧП 
+		Y01_5	:=	Go_Scalp   		; //Запустить 
+		Y01_6	:=	RstErrPCH_Scalp ; //Сброс аварии ПЧ 
+		Y01_7	:=	RunPCH_Scalp 	; //Включить ПЧ 
+
+			//Дозаторы компонентов
+		TON_ErrPCH_DozKomp(IN:=(NOT X01_16) AND Go_PCH_DozKomp, PT:=T#2000MS, Q=>ErrPCH_DozKomp) ; //+Авария с ЧП 
+		//ErrPCH_DozKomp := 0;
+		Y01_8	:=	Go_PCH_DozKomp; //Запустить ПЧ дозаторов
+		Y01_9	:=	RstErrPCH_DozKomp;  //Сбросить аварии ПЧ
+		Y01_10  :=  Go_Pusk_K1; //Включить пускатель на дозатор 1
+		Y01_11  :=  Go_Pusk_K2; //Включить пускатель на дозатор 2
+		Y01_12  :=  Go_Pusk_K3; //Включить пускатель на дозатор 3
+		Y01_13  :=  Go_Pusk_K4; //Включить пускатель на дозатор 4
+		Y01_14  :=  Go_Pusk_K5; //Включить пускатель на дозатор 5
+		Y01_15  :=  Go_Pusk_K6; //Включить пускатель на дозатор 6
+		DKS_K1 := X01_17;	
+		DP_K1 := NOT X01_18;	
+		LStop_K1 := NOT X01_19;	 
+		DKS_K2 := X01_20;	
+		DP_K2 := NOT X01_21;	
+		LStop_K2 := NOT X01_22;	 
+		DKS_K3 := X01_23;	
+		DP_K3 := NOT X11_0;	
+		LStop_K3 := NOT X11_1;	 
+		DKS_K4 := X11_2;	
+		DP_K4 := NOT X11_3;	
+		LStop_K4 := NOT X11_4;	 
+		DKS_K5 := X11_5;	
+		DP_K5 := NOT X11_6;	
+		LStop_K5 := NOT X11_7;	 
+		DKS_K6 := X11_8;	
+		DP_K6 := NOT X11_9;	
+		LStop_K6 := NOT X11_10;	 
+
+//Дозатор добавок
+		TON_ErrPCH_DozDob(IN:=(NOT X11_11) AND Go_PCH_DozDob, PT:=T#2000MS, Q=>ErrPCH_DozDob) ; //+Авария с ЧП 
+		//ErrPCH_DozDob := 0;
+		Y16_0 := Go_PCH_DozDob; //Запустить ПЧ дозаторов
+		Y16_1 := RstErrPCH_DozDob; //+Сбросить аварии ПЧ
+		Y16_2 := Go_Pusk_D1; //+Включить пускатель на дозатор 1
+		Y16_3 := Go_Pusk_D2; //+Включить пускатель на дозатор 2
+		Y16_4 := Go_Pusk_D3; //+Включить пускатель на дозатор 3
+		Y16_5 := Go_Pusk_D4; //+Включить пускатель на дозатор 4
+		Y16_6 := Go_Pusk_D5; //+Включить пускатель на дозатор 5
+		Y16_7 := Go_Pusk_D6; //+Включить пускатель на дозатор 6
+		Y16_8 := Go_Pusk_D7; //+Включить пускатель на дозатор 7
+		Y16_9 := Go_Pusk_D8; //+Включить пускатель на дозатор 8
+		LStop_D1 := NOT X11_12;	 
+		LStop_D2 := NOT X11_13;	 
+		LStop_D3 := NOT X11_14;	 
+		LStop_D4 := NOT X11_15;	 
+		LStop_D5 := NOT X11_16;	 
+		LStop_D6 := NOT X11_17;	 
+		LStop_D7 := NOT X11_18;	 
+		LStop_D8 := NOT X11_19;	 
+		
+	//Питатель дробилки 30210
+		TON_ErrPCH_Pit1(IN:=(NOT X11_20) AND Go_Pit1, PT:=T#2000MS, Q=>ErrPCH_Pit1) ; //+Авария с ЧП 
+		//ErrPCH_Pit1 := 0; //+Ошибка с ЧП 
+		Y16_10 := Go_Pit1; //+Запустить питатель
+		Y16_11 := RstErrPCH_Pit1; //+Сброс аварии ПЧ 
+		Y16_12 := RunPCH_Pit1; //Включить ПЧ 
+		
+	//Питатель дробилки 30220
+		TON_ErrPCH_Pit2(IN:=(NOT X11_21) AND Go_Pit2 , PT:=T#2000MS, Q=>ErrPCH_Pit2) ; //+Авария с ЧП 
+		//ErrPCH_Pit2 := 0; //+Ошибка с ЧП 
+		Y16_13 := Go_Pit2; //+Запустить питатель
+		Y16_14 := RstErrPCH_Pit2; //+Сброс аварии ПЧ 
+		Y16_15 := RunPCH_Pit2; //Включить ПЧ 
+		
+	//Конвейер шнековый 30800 из под смесителя, по технологии 30700
+		TON_ErrPCH_TrSms(IN:=(NOT X11_22) AND Go_TrSms AND RunPCH_TrSms , PT:=T#2000MS, Q=>ErrPCH_TrSms) ; //+Авария с ЧП 
+		//ErrPCH_TrSms := 0; //+Ошибка с ЧП 
+		Y16_16 := Go_TrSms; //+Запустить питатель
+		Y16_17 := ResetErrors ; //+Сброс аварии ПЧ 
+		Y16_18 := RunPCH_TrSms ; //Включить ПЧ 
+		DKS_TrSms 	:= X11_23;	
+		DP_TrSms 	:= NOT X11_24;
+		Local_TrSms	:= X11_25;
+		LPusk_TrSms := X11_26;	//Местный Пуск 
+		LStop_TrSms := NOT X11_27;	//Местный Стоп 
+		
+	//Транспортер завальной ямы (10110)
+		DKS_TrHole 	:= X11_28; //ДКС
+		DP_TrHole	 := NOT X11_29;	//ДП 
+		Local_TrHole := X11_30;
+		LPusk_TrHole := X11_31;	//Местный Пуск 
+		LStop_TrHole := NOT X12_0;	//Местный Стоп 
+		ErrAz_TrHole := NOT X12_1;	//Аз
+		Y16_19 := Go_TrHole; 	//Включить пускатель на транспортер 
+
+	//Нория Зав Ямы (10200)
+		DKS_NorHole := X12_2;	//Дкс - Нория Зав.Ямы
+		DSL1_NorHole := NOT X12_3;	//Дсл1 - Нория Зав.Ямы
+		DSL2_NorHole := NOT X12_4;	//Дсл2 - Нория Зав.Ямы
+		Local_NorHole := X12_5;	//ручной режим работы
+		LPusk_NorHole := X12_6;	//Местный пуск
+		LStopD_NorHole := NOT X12_7;	//Местный Стоп верхний - Нория Зав.Ямы
+		LStopU_NorHole := NOT X12_8;	//Местный Стоп нижний - Нория Зав.Ямы
+		ErrAz_NorHole := NOT X12_9;	//Аз - Нория Зав.Ямы
+		Y16_20 := Go_NorHole ;	//Включить - Нория Зав. Ямы
+
+	// Двухпоточник (10210) 	
+		ErrAz_DVPT := NOT X12_10;		//Аз - 
+		DVPT_Na_Scalp := X12_11;	//На Скальператор - 
+		DVPT_Na_Nor1 := X12_12;	//На Норию 10400 - 
+		Y16_21 := Go_DVPT_Na_Scalp;	// На Скальператор - 
+		Y16_22 := Go_DVPT_Na_Nor1;	//На Норию 1 - 
+
+	// Нория 10400 (1)
+		//DP_Nor1:= ; //ДП
+		DKS_Nor1 	:= X12_13;	//Дкс
+		DSL1_Nor1 	:= NOT X12_14;	//Дсл1
+		DSL2_Nor1 	:= NOT X12_15;	//Дсл2
+		Local_Nor1 	:= X12_16;	 
+		LPusk_Nor1 	:= X12_17;	//Местный Стоп низ
+		LStopD_Nor1 := NOT X12_18;	//Местный Стоп низ
+		LStopU_Nor1 := NOT X12_19;	//Местный Стоп верх
+		ErrAz_Nor1 := NOT X12_20;	//Аз 
+		Y16_23 := Go_Nor1;	//Включить 
+		
+	//Конвейер шнековый КШU-250 6М/15 (поз.10500)
+		DKS_Tr1	:= X12_21;	//Дкс - Транспортер Загрузки Компонентов
+		DP1_Tr1 := NOT X12_22;	//Дп1 - Транспортер Загрузки Компонентов
+		DP2_Tr1 := NOT X12_23;	//Дп2 - Транспортер Загрузки Компонентов
+		Local_Tr1 := X12_24; //Местный режим
+		Auto_Tr1 := X12_25;	//Управление от контроллера
+		LStop_Tr1 := NOT X12_26;	//Местный Стоп 
+		ErrAz_Tr1 := NOT X12_27;	//Аз - Транспортер Загрузки Компонентов
+		Y16_24 := GoL_Tr1;	//К Транспортеру Бункеров 1-5 - Транспортер Загрузки Компонентов
+		Y16_25 := GoR_Tr1;	//К Транспортеру Бункеров 6-10 - Транспортер Загрузки Компонентов
+
+	//Конвейер скребковый КЦСв-60-13 (поз.10600)
+		DKS_Tr1L	:= X12_28;	//Дкс - Транспортер Загрузки Компонентов
+		DP_Tr1L 	:= NOT X12_29;	//Дп1 - Транспортер Загрузки Компонентов
+		Local_Tr1L 	:= X12_30; //Местный режим
+		LPusk_Tr1L 	:= X12_31; //Местный пуск
+		LStop_Tr1L 	:= NOT X13_0;	//Местный стоп
+		ErrAz_Tr1L 	:= NOT X13_1;	//Аз - Транспортер Загрузки Компонентов
+		Y16_26 := Go_Tr1L;	//К Транспортеру Бункеров 1-4 - Транспортер Загрузки Компонентов
+
+	//Конвейер скребковый КЦСв-60-13 (поз.10700)
+		DKS_Tr1R	:= X13_2;	//Дкс - Транспортер Загрузки Компонентов
+		DP_Tr1R 	:= NOT X13_3;	//Дп1 - Транспортер Загрузки Компонентов
+		Local_Tr1R 	:= X13_4; //Местный режим
+		LPusk_Tr1R 	:= X13_5;  //Местный пуск
+		LStop_Tr1R 	:= NOT X13_6;	//Местный стоп
+		ErrAz_Tr1R	:= NOT X13_7;	//Аз - Транспортер Загрузки Компонентов
+		Y16_27 := Go_Tr1R;	//К Транспортеру Бункеров 1-4 - Транспортер Загрузки Компонентов
+		
+	//Шибер 10610 
+		Opened_ShL1 := NOT X13_8;	//Открыт 
+		Closed_ShL1 := NOT X13_9;	//Закрыт 
+		ErrAz_ShL1 	:= NOT X13_10;	//Аз 
+		Y16_28 := Go_OpenShL1  ;	//Открыть 
+		Y16_29 := Go_CloseShL1  ;	//Закрыть 
+		
+	//Шибер 10620 
+		Opened_ShL2 := NOT X13_11;	//Открыт 
+		Closed_ShL2 := NOT X13_12;	//Закрыт 
+		ErrAz_ShL2 	:= NOT X13_13;	//Аз 
+		Y16_30 := Go_OpenShL2  ;	//Открыть 
+		Y16_31 := Go_CloseShL2  ;	//Закрыть 
+		
+	//Шибер 10710 
+		Opened_ShR1 := NOT X13_14;	//Открыт 
+		Closed_ShR1 := NOT X13_15;	//Закрыт 
+		ErrAz_ShR1 	:= NOT X13_16;	//Аз 
+		Y17_0 := Go_OpenShR1  ;	//Открыть 
+		Y17_1 := Go_CloseShR1  ;	//Закрыть 
+		
+	//Шибер 10720 
+		Opened_ShR2 := NOT X13_17;	//Открыт 
+		Closed_ShR2 := NOT X13_18;	//Закрыт 
+		ErrAz_ShR2 	:= NOT X13_19;	//Аз 
+		Y17_2 := Go_OpenShR2 ;	//Открыть 
+		Y17_3 := Go_CloseShR2 ;	//Закрыть 
+		
+	//Транспортер Весов Компонентов (20110) 
+		DKS_TrKomp := X13_20;	//Дкс 
+		DP_TrKomp := NOT X13_21;	//Дп  
+		Local_TrKomp := X13_22;	
+		LPusk_TrKomp := X13_23;	
+		LStop_TrKomp := NOT X13_24;	
+		ErrAz_TrKomp := NOT X13_25;	//Аз
+		Y17_4 := Go_TrKomp  ;	//Включить 
+
+	// Нория 20200 (2)
+		DKS_Nor2:= X13_26;	//Дкс
+		DSL1_Nor2 := NOT X13_27;	//Дсл1
+		DSL2_Nor2 := NOT X13_28;	//Дсл2
+		Local_Nor2 := X13_29;	//Датчик Противовзрывный 
+		LPusk_Nor2 := X13_30;	//Местный спуск
+		LStopD_Nor2 := NOT X13_31;	//Местный Стоп низ
+		LStopU_Nor2 := NOT X14_0;	//Местный Стоп верх
+		ErrAz_Nor2 := NOT X14_1;	//Аз 
+		Y17_5 := Go_Nor2  ;	//Включить 
+
+	//Конвейер (20300) 
+		DKS_TrPBD := X14_2;	//Дкс 
+		DP_TrPBD := NOT X14_3;	//Дп  
+		Local_TrPBD := X14_4;	
+		LPusk_TrPBD := X14_5;	
+		LStop_TrPBD := NOT X14_6;	
+		ErrAz_TrPBD := NOT X14_7;	//Аз
+		Y17_6 := Go_TrPBD  ;	//Включить 
+
+	//Конвейер (30500)  из под дробилки 
+		DKS_TrDrob := X14_8;	//Дкс 
+		DP_TrDrob := NOT X14_9;	//Дп  
+		Local_TrDrob := X14_10;	//Местное управление
+		LPusk_TrDrob := X14_11;	//Местный пуск
+		LStop1_TrDrob := NOT X14_12;	//Местный стоп
+		LStop2_TrDrob := NOT X14_13;	//Местный стоп
+		ErrAz_TrDrob := NOT X14_14;	//Аз
+		Y17_7 := Go_TrDrob;	//Включить 
+
+	// Нория 30600 (3)
+		DKS_Nor3:= X14_15;	//Дкс
+		DSL1_Nor3 := NOT X14_16;	//Дсл1
+		DSL2_Nor3 := NOT X14_17;	//Дсл2
+		Local_Nor3 := X14_18; 
+		LPusk_Nor3 := X14_19;	//Местный пуск
+		LStopD_Nor3 := NOT X14_20;	//Местный Стоп низ
+		LStopU_Nor3 := NOT X14_21;	//Местный Стоп верх
+		ErrAz_Nor3 := NOT X14_22;	//Аз 
+		Y17_8 := Go_Nor3  ;	//Включить 
+		
+// Смеситель горизонтальный СГП-1.8 поз. 30700
+		KlapOpened := X14_23;
+		KlapClosed := X14_24;
+		DoorUpOpened := NOT X14_25;
+		ZaslDownOpened := X14_26;
+		ZaslDownClosed := X14_27;
+		DoorDownOpened := NOT X14_28;
+		DKS_Sms 	:= X14_29;			//Датчик оборотов вала
+		DoorSmsOpened := NOT X14_30;
+		DoorRVOpened := NOT X14_31;
+		Az_Sms 	:= NOT X15_0;			//Защита двигателя
+		Y17_9 := Go_Sms	;			//Включить двигатель
+		Y17_10 := Go_Klap ;
+		Y17_11 := Go_ZaslDown ;
+		DNU_UpBunk := NOT X15_1;
+		DNU_DownBunk := NOT X15_2;
+		LowPress := NOT X23_12;		//Низкое давление воздуха
+
+	// Нория 50100 (4)
+		DKS_Nor4:= X15_3;	//Дкс
+		DSL1_Nor4 := NOT X15_4;	//Дсл1
+		DSL2_Nor4 := NOT X15_5;	//Дсл2
+		Local_Nor4 := X15_6;	//Местный режим
+		LPusk_Nor4 := X15_7;	//Местный пуск
+		LStopD_Nor4 := NOT X15_8;	//Местный Стоп низ
+		LStopU_Nor4 := NOT X15_9;	//Местный Стоп верх
+		ErrAz_Nor4 := NOT X15_10;	//Аз 
+		Y17_12 := Go_Nor4  ;	//Включить 
+		
+	//Конвейер шнековый КШU-250 7М/15 (поз.50200)
+		DKS_TrGP := X15_11;	//Дкс 
+		DP_TrGP := NOT X15_12;	//Дп  
+		Local_TrGP := X15_13;	//Местное управление
+		LPusk_TrGP := X15_14;	//Местный пуск
+		LStop_TrGP := NOT X15_15;	//Местный Стоп 
+		ErrAz_TrGP := NOT X15_16;	//Аз
+		Y17_13 := Go_TrGP  ;	//Включить 
+
+	//Шибер 50210
+		Opened_Sh50210 := NOT X15_17;	//Открыт 
+		Closed_Sh50210 := NOT X15_18;	//Закрыт 
+		ErrAz_Sh50210 := NOT X15_19;	//Аз 
+		Y17_14 := Go_Open_Sh50210  ;	//Открыть 
+		Y17_15 := Go_Close_Sh50210  ;	//Закрыть 
+
+	//Конвейер шнековый КШU-250 10,5М/15 (поз.50300)
+		DKS_TrGP1 := X02_0;	//Дкс 
+		DP_TrGP1 := NOT X02_1;	//Дп  
+		Local_TrGP1 := X02_2; //Местный режим
+		LPusk_TrGP1 := X02_3;	//Местный пуск
+		LStop_TrGP1 := NOT X02_4;	//Местный Стоп 
+		ErrAz_TrGP1 := NOT X02_5;	//Аз
+		Y02_0 := Go_TrGP1  ;	//Включить  
+
+	//Конвейер шнековый КШU-250 10,5М/15 (поз.50400)
+		DKS_TrGP2 := X02_6;	//Дкс 
+		DP_TrGP2 := NOT X02_7;	//Дп  
+		Local_TrGP2 := X02_8; //Местный режим
+		LPusk_TrGP2 := X02_9;	//Местный пуск
+		LStop_TrGP2 := NOT X02_10;	//Местный Стоп 
+		ErrAz_TrGP2 := NOT X02_11;	//Аз
+		Y02_1 := Go_TrGP2  ;	//Включить  
+		
+	//Шибер 50310
+		Opened_Sh50310 := NOT X02_12;	//Открыт 
+		Closed_Sh50310 := NOT X02_13;	//Закрыт 
+		ErrAz_Sh50310 := NOT X02_14;	//Аз 
+		Y02_2 := Go_Open_Sh50310;	//Открыть 
+		Y02_3 := Go_Close_Sh50310;	//Закрыть 
+
+	//Шибер 50320
+		Opened_Sh50320 := NOT X02_15;	//Открыт 
+		Closed_Sh50320 := NOT X02_16;	//Закрыт 
+		ErrAz_Sh50320 := NOT X02_17;	//Аз 
+		Y02_4 := Go_Open_Sh50320;	//Открыть 
+		Y02_5 := Go_Close_Sh50320;	//Закрыть 
+
+	//Шибер 50330
+		Opened_Sh50330 := NOT X02_18;	//Открыт 
+		Closed_Sh50330 := NOT X02_19;	//Закрыт 
+		ErrAz_Sh50330 := NOT X02_20;	//Аз 
+		Y02_6 := Go_Open_Sh50330;	//Открыть 
+		Y02_7 := Go_Close_Sh50330;	//Закрыть 
+
+	//Шибер 50410
+		Opened_Sh50410 := NOT X02_21;	//Открыт 
+		Closed_Sh50410 := NOT X02_22;	//Закрыт 
+		ErrAz_Sh50410 := NOT X02_23;	//Аз 
+		Y02_8 := Go_Open_Sh50410;	//Открыть 
+		Y02_9 := Go_Close_Sh50410;	//Закрыть 
+
+	//Шибер 50420
+		Opened_Sh50420 := NOT X21_0;	//Открыт 
+		Closed_Sh50420 := NOT X21_1;	//Закрыт 
+		ErrAz_Sh50420 := NOT X21_2;	//Аз 
+		Y02_10 := Go_Open_Sh50420;	//Открыть 
+		Y02_11 := Go_Close_Sh50420;	//Закрыть 
+
+	//Шибер 50430
+		Opened_Sh50430 := NOT X21_3;	//Открыт 
+		Closed_Sh50430 := NOT X21_4;	//Закрыт 
+		ErrAz_Sh50430 := NOT X21_5;	//Аз 
+		Y02_12 := Go_Open_Sh50430;	//Открыть 
+		Y02_13 := Go_Close_Sh50430;	//Закрыть 
+
+	//Шиберы выгрузки готовой продукции	
+		//Шибер (ShO1) Из Силоса 1 (50610)
+			Opened_ShO1 := NOT X21_6;	//Открыт 
+			Closed_ShO1 := NOT X21_7;	//Закрыт 
+			Local_ShO1 := X21_8;	 
+			LOpen_ShO1 := X21_9;	//локально Открыть 
+			LClose_ShO1 := X21_10;	//локально Закрыть 
+			ErrAz_ShO1 := NOT X21_11;	//Аз 
+			Y02_14 := Go_OpenShO1  ;	//Открыть 
+			Y02_15 := Go_CloseShO1  ;	//Закрыть			
+
+		//Шибер (ShO2) Из Силоса 2 (50620)
+			Opened_ShO2 := NOT X21_12;	//Открыт 
+			Closed_ShO2 := NOT X21_13;	//Закрыт 
+			Local_ShO2 := X21_14;	 
+			LOpen_ShO2 := X21_15;	//локально Открыть 
+			LClose_ShO2 := X21_16;	//локально Закрыть 
+			ErrAz_ShO2 := NOT X21_17;	//Аз 
+			Y25_0 := Go_OpenShO2  ;	//Открыть 
+			Y25_1 := Go_CloseShO2  ;	//Закрыть			
+
+		//Шибер (ShO3) Из Силоса 3 (50630)
+			Opened_ShO3 := NOT X21_18;	//Открыт 
+			Closed_ShO3 := NOT X21_19;	//Закрыт 
+			Local_ShO3 := X21_20;	 
+			LOpen_ShO3 := X21_21;	//локально Открыть 
+			LClose_ShO3 := X21_22;	//локально Закрыть 
+			ErrAz_ShO3 := NOT X21_23;	//Аз 
+			Y25_2 := Go_OpenShO3  ;	//Открыть 
+			Y25_3 := Go_CloseShO3  ;	//Закрыть			
+
+		//Шибер (ShO4) Из Силоса 4 (50640)
+			Opened_ShO4 := NOT X21_24;	//Открыт 
+			Closed_ShO4 := NOT X21_25;	//Закрыт 
+			Local_ShO4 := X21_26;	 
+			LOpen_ShO4 := X21_27;	//локально Открыть 
+			LClose_ShO4 := X21_28;	//локально Закрыть 
+			ErrAz_ShO4 := NOT X21_29;	//Аз 
+			Y25_4 := Go_OpenShO4  ;	//Открыть 
+			Y25_5 := Go_CloseShO4  ;	//Закрыть			
+
+		//Шибер (ShO5) Из Силоса 5 (50650)
+			Opened_ShO5 := NOT X21_30;	//Открыт 
+			Closed_ShO5 := NOT X21_31;	//Закрыт 
+			Local_ShO5 := X22_0;	 
+			LOpen_ShO5 := X22_1;	//локально Открыть 
+			LClose_ShO5 := X22_2;	//локально Закрыть 
+			ErrAz_ShO5 := NOT X22_3;	//Аз 
+			Y25_6 := Go_OpenShO5  ;	//Открыть 
+			Y25_7 := Go_CloseShO5  ;	//Закрыть			
+
+		//Шибер (ShO6) Из Силоса 6 (50660)
+			Opened_ShO6 := NOT X22_4;	//Открыт 
+			Closed_ShO6 := NOT X22_5;	//Закрыт 
+			Local_ShO6 := X22_6; 
+			LOpen_ShO6 := X22_7;	//локально Открыть 
+			LClose_ShO6 := X22_8;	//локально Закрыть 
+			ErrAz_ShO6 := NOT X22_9;	//Аз 
+			Y25_8 := Go_OpenShO6  ;	//Открыть 
+			Y25_9 := Go_CloseShO6  ;	//Закрыть			
+
+		//Шибер (ShO7) Из Силоса 7 (50670)
+			Opened_ShO7 := NOT X22_10;	//Открыт 
+			Closed_ShO7 := NOT X22_11;	//Закрыт 
+			Local_ShO7 := X22_12;	 
+			LOpen_ShO7 := X22_13;	//локально Открыть 
+			LClose_ShO7 := X22_14;	//локально Закрыть 
+			ErrAz_ShO7 := NOT X22_15;	//Аз 
+			Y25_10 := Go_OpenShO7  ;	//Открыть 
+			Y25_11 := Go_CloseShO7  ;	//Закрыть			
+
+		//Шибер (ShO8) Из Силоса 8 (50680)
+			Opened_ShO8 := NOT X22_16;	//Открыт 
+			Closed_ShO8 := NOT X22_17;	//Закрыт 
+			Local_ShO8 := X22_18;	 
+			LOpen_ShO8 := X22_19;	//локально Открыть 
+			LClose_ShO8 := X22_20;	//локально Закрыть 
+			ErrAz_ShO8 := NOT X22_21;	//Аз 
+			Y25_12 := Go_OpenShO8  ;	//Открыть 
+			Y25_13 := Go_CloseShO8  ;	//Закрыть			
+
+	//Аспирация
+		ErrAz_Asp1 := NOT X22_22;	//Аз Вентилятора 
+		DKS_Gway1 := X22_23;	//Дкс Шлюза
+		ErrAz_Gway1 := NOT X22_24;	//Аз Шлюза
+		Y25_14 := Go_Asp1  ;	//Включить Вентилятор 
+		Y25_15 := Go_Gway1  ;	//Включить Шлюз	
+			
+	//Аспирация АС-2
+		ErrAz_Asp2 := NOT X22_25;	//Аз Вентилятора 
+		DKS_Gway21 := X22_26;	//Дкс Шлюза
+		ErrAz_Gway21 := NOT X22_27;	//Аз Шлюза
+		DKS_Gway22 := X24_16;	//Дкс Шлюза
+		ErrAz_Gway22 := NOT X24_17;	//Аз Шлюза
+		Y25_16 := Go_Asp2  ;	//Включить Вентилятор 
+		Y25_17 := Go_Gway21  ;	//Включить Шлюз	
+		Y25_28 := Go_Gway22  ;	//Включить Шлюз	
+
+	//Вибратор №1
+		ErrAz_Vibr1 := NOT X22_28;
+		Y25_18 := Go_Vibr1;
+		
+	//Вибратор №2
+		ErrAz_Vibr2 := NOT X22_29;
+		Y25_19 := Go_Vibr2;
+		
+	//УДЖК-1-БП (поз.21700) масло
+		localMasloDop 	:= X22_30;	
+		lPuskMasloDop 	:= X22_31;	
+		lStopMasloDop 	:= X23_0; 
+		ErrAz_MasloDop	:= NOT X23_1;	
+		localMasloDos 	:= X23_2;	
+		lPuskMasloDos 	:= X23_3;	
+		lStopMasloDos 	:= X23_4; 
+		ErrAz_MasloDos	:= NOT X23_5;	
+		Y25_20 := Go_MasloDop ;	//Включить насос 2
+		Y25_21 := Go_MasloDos ;	//Включить насос дозировочный
+	
+		DVU_Maslo 	:= X23_6;
+		DNU_Maslo	:= X23_7;
+		ClapInOpened	:= NOT X23_8;
+		ClapInClosed 	:= NOT X23_9;		
+		ClapOutOpened	:= NOT X23_10;
+		ClapOutClosed 	:= NOT X23_11;		
+		Y25_22 := Go_ClapIn	;
+		Y25_23 := Go_ClapOut	;
+		Y25_24 := Produv		;
+		Y25_25 := ClapMasloOpen ;
+
+	//Датчики Уровней бункеров зерна
+		TonDVUBunk1(IN := NOT X23_13, PT:=T#2S, Q=> DVU_BunkK[1]);	
+		TonDVUBunk2(IN := NOT X23_14, PT:=T#2S, Q=> DVU_BunkK[2]);	
+		TonDVUBunk3(IN := NOT X23_15, PT:=T#2S, Q=> DVU_BunkK[3]);	
+		TonDNUBunk1(IN := NOT X23_16, PT:=T#2S, Q=> DNU_BunkK[1]);	
+		TonDNUBunk2(IN := NOT X23_17, PT:=T#2S, Q=> DNU_BunkK[2]);	
+		TonDNUBunk3(IN := NOT X23_18, PT:=T#2S, Q=> DNU_BunkK[3]);	
+		TonDVUBunk4(IN := NOT X23_19, PT:=T#2S, Q=> DVU_BunkK[4]);	
+		TonDVUBunk5(IN := NOT X23_20, PT:=T#2S, Q=> DVU_BunkK[5]);	
+		TonDVUBunk6(IN := NOT X23_21, PT:=T#2S, Q=> DVU_BunkK[6]);	
+		TonDNUBunk4(IN := NOT X23_22, PT:=T#2S, Q=> DNU_BunkK[4]);	
+		TonDNUBunk5(IN := NOT X23_23, PT:=T#2S, Q=> DNU_BunkK[5]);	
+		TonDNUBunk6(IN := NOT X23_24, PT:=T#2S, Q=> DNU_BunkK[6]);	
+		
+		TonDNUHole(IN := NOT X23_25, PT:=T#30S, Q=> DNU_Hole);
+				
+		TonDVUPBD (IN := NOT X23_26, PT:=T#2S, Q=> DVU_PBD); 
+		TonDNUPBD (IN := NOT X23_27, PT:=T#2S, Q=> DNU_PBD);
+
+		TonDVUSilo1(IN := NOT X23_28, PT:=T#2S, Q=> DVU_Silo[1]);	
+		TonDVUSilo2(IN := NOT X23_29, PT:=T#2S, Q=> DVU_Silo[2]);	
+		TonDVUSilo3(IN := NOT X23_30, PT:=T#2S, Q=> DVU_Silo[3]);	
+		TonDVUSilo4(IN := NOT X23_31, PT:=T#2S, Q=> DVU_Silo[4]);	
+		TonDNUSilo1(IN := NOT X24_0, PT:=T#2S, Q=> DNU_Silo[1]);	
+		TonDNUSilo2(IN := NOT X24_1, PT:=T#2S, Q=> DNU_Silo[2]);	
+		TonDNUSilo3(IN := NOT X24_2, PT:=T#2S, Q=> DNU_Silo[3]);	
+		TonDNUSilo4(IN := NOT X24_3, PT:=T#2S, Q=> DNU_Silo[4]);	
+		TonDVUSilo5(IN := NOT X24_4, PT:=T#2S, Q=> DVU_Silo[5]);	
+		TonDVUSilo6(IN := NOT X24_5, PT:=T#2S, Q=> DVU_Silo[6]);	
+		TonDVUSilo7(IN := NOT X24_6, PT:=T#2S, Q=> DVU_Silo[7]);	
+		TonDVUSilo8(IN := NOT X24_7, PT:=T#2S, Q=> DVU_Silo[8]);	
+		TonDNUSilo5(IN := NOT X24_8, PT:=T#2S, Q=> DNU_Silo[5]);	
+		TonDNUSilo6(IN := NOT X24_9, PT:=T#2S, Q=> DNU_Silo[6]);	
+		TonDNUSilo7(IN := NOT X24_10, PT:=T#2S, Q=> DNU_Silo[7]);	
+		TonDNUSilo8(IN := NOT X24_11, PT:=T#2S, Q=> DNU_Silo[8]);	
+
+	//Дробилки
+		ErrAz_Drob1 := NOT X24_12;
+		ErrAz_Drob2 := NOT X24_13;
+		OpenDoor_Drob1 := NOT X24_14;
+		OpenDoor_Drob2 := NOT X24_15;
+		Y25_26 := Go_Drob1;
+		Y25_27 := Go_Drob2;
+		
+
+
+//Участок гранулирования
+	// Пуск На Шкафу
+		EmerStopShkafGr := NOT X011_0;	//Аварийный Стоп На Шкафу
+		EmerStopGran := NOT X011_1;	//Аварийный Стоп На Зав. Яме
+		EmerStopNorGr := NOT X011_2;	//Аварийный стоп у бункеров загрузки_
+		TonErrRKFGr(IN:=NOT X011_3,  PT:=T#10S, Q=>ErrRKFGr);		
+		
+	//Шибер 41100 
+		Opened_ShTrSms := NOT X011_4;	//Открыт 
+		Closed_ShTrSms := NOT X011_5;	//Закрыт 
+		ErrAz_ShTrSms := NOT X011_6;	//Аз 
+		Y011_0 := Go_OpenShTrSms;	//Открыть 
+		Y011_1 := Go_CloseShTrSms;	//Закрыть 
+		
+	//Конвейер шнековый КШU-250 7,5М/20 (поз.40100)
+		DKS_Tr40100 := X011_7;	//Дкс 
+		DP_Tr40100 := NOT X011_8;	//Дп  
+		Local_Tr40100 := X011_9; //Местный режим
+		LPusk_Tr40100 := X011_10;	//Местный пуск
+		LStop1_Tr40100 := NOT X011_11;	//Местный Стоп 
+		LStop2_Tr40100 := NOT X011_12;	//Местный Стоп 
+		ErrAz_Tr40100 := NOT X011_13;	//Аз
+		Y011_2 := Go_Tr40100;	//Включить  
+
+	// Нория НЗ-В.40.11 (поз.40200) (5)
+		DKS_Nor5 := X011_14;	//Дкс
+		DSL1_Nor5 := X011_15;	//Дсл1
+		DSL2_Nor5 := X011_16;	//Дсл2
+		OffDSL1_Nor5 := 1;
+		OffDSL2_Nor5 := 1;
+		DP_Nor5:= NOT X011_17; //ДП
+		Local_Nor5 := X011_18;	 
+		LPusk_Nor5 := X011_19;	//Местный Стоп низ
+		LStopD_Nor5 := NOT X011_20;	//Местный Стоп низ
+		LStopU_Nor5 := NOT X011_21;	//Местный Стоп верх
+		ErrAz_Nor5 := NOT X011_22;	//Аз 
+		Y011_3 := Go_Nor5;	//Включить 
+
+	//Конвейер шнековый КШU-250 3М/20 (поз.40300)
+		DKS_Tr40300 := X011_23;	//Дкс 
+		DP_Tr40300 := NOT X011_24;	//Дп  
+		Local_Tr40300 := X011_25; //Местный режим
+		LPusk_Tr40300 := X011_26;	//Местный пуск
+		LStop1_Tr40300 := NOT X011_27;	//Местный Стоп 
+		LStop2_Tr40300 := NOT X011_28;	//Местный Стоп 
+		ErrAz_Tr40300 := NOT X011_29;	//Аз
+		Y011_4 := Go_Tr40300;	//Включить  
+
+	//Система аспирации нории (поз.40200)
+		ErrAz_FiltNor5 := NOT X011_30;	//Аз Вентилятора 
+		Y011_5 := Go_FiltNor5;	//Включить Вентилятор 
+
+	//Главный привод пресс-гранулятора (поз.40500)
+		DKS_Gran := X012_0;
+		Shtift := NOT X012_1;	//датчик срезного штифта
+		OpenDoorGr := NOT X012_2;	//датчик открытой двери
+		BypassOpened := X012_3;
+		BypassClosed := X012_4;
+		ErrPCHGr	:= X012_5;	//Авария ПЧ главного привода			
+		isWorkPCHGr := X012_6;
+		Y011_6 := Go_PchGr;	//Пуск ПЧ
+		Y011_7 := RstPchGr;	//сброс аварии ПЧ
+		Y011_8 := OnPchGr;		//включить ПЧ
+		Y011_9 := GoBypass;	//закрыть клапан
+		Y011_10 := Go_Smazka;	//вкл. станцию смазки
+		FreqGran := scFreqGran;
+		ovenFreqGranOut:=scFreqGran/5;//5000=>1000
+
+		
+	//Питатель пресс-гранулятора (поз.40500)
+		DKS_PitGr := X012_7;	//Дкс 
+		DP_PitGr := NOT X012_8;	//Дп  
+		ErrPchPitGr := X012_9;	//Аз
+		isWorkPchPitGr := X012_10;
+		Y011_11 := Go_PchPitGr;		//Включить  
+		Y011_12 := RstPchPitGr;		//сброс аварии ПЧ
+		Y011_13 := OnPchPitGr;		//включить ПЧ
+		//scTokPitGr	:= REAL_TO_WORD(WORD_TO_REAL(TokPitGr)*1.0);
+		scFreqPitGr := FreqPitGr;
+		ovenFreqPitOut:=FreqPitGr/5;//5000=>1000
+
+	//Кондиционер пресс-гранулятора (поз.40500)
+		DKS_KondGr := X012_11;	//Дкс 
+		Door_KondGr := NOT X012_12;	//  
+		ErrAz_KondGr := NOT X012_13;	//Аз
+		Y011_14 := Go_KondGr;	//Включить  
+
+	//Аналоговые измерения
+		scTempKond := TempKond ;	//Датчик температуры продукта на выходе из конд-ра
+		scTempOhlIn := TempOhlIn ;	//Датчик температуры гранул в охладителе
+		scTempOhlOut := TempOhlOut ;	//Датчик температуры гранул на выходе из охладителя
+		ppParOut	:= scParOut;
+
+	//Шлюзовый затвор охладителя гранул (поз.40600)
+		ErrAz_GwOhlGr := NOT X012_14;	//Аз шлюза
+		//DKS_GwOhlGr := X014_34;	//описано в конце	 
+		Y011_15 := Go_GwOhlGr;		//Включить затвор 
+		
+	//Привод стола охладителя гранул (поз.40600)
+		DKS_OhlGr := NOT X012_15;	//привод стола охлад-ля закрыт
+		DoorOhlGr := NOT X012_16;
+		ErrAz_OhlGr := NOT X012_17;
+		
+		TON_DVU_OhlGr(IN:=NOT X012_18,  PT:=T#3S, Q=>DVU_OhlGr);		
+		TON_DSU_OhlGr(IN:=NOT X012_19,  PT:=T#3S, Q=>DSU_OhlGr);		
+		TOF_DNU_OhlGr(IN:=NOT X012_20,  PT:=T#3S, Q=>DNU_OhlGr);		
+		Y011_16 := Go_StolOhlGr;
+		Y011_17 := Go_VygrOhlGr;	//Открыть заслонку выгрузки из охладителя
+
+	//Вентилятор системы аспирации охладителя (поз.60100)
+		ErrAz_AspOhl := NOT X012_21;	//Аз аспирации
+		Y011_18 := Go_AspOhl;		//Включить аспирацию 
+		
+	//Шлюзовый затвор ЗШ-17 системы аспирации охладителя (поз.60100)
+		DKS_GwAspOhl := X012_22;	//Дкс Шлюза
+		ErrAz_GwAspOhl := NOT X012_23;	//Аз Шлюза
+		Y011_19 := Go_GwAspOhl;	//Включить Шлюз	
+			
+	//Конвейер цепной скребковый КЦСв-20-05 (поз.40700)
+		DKS_Tr40700 := X012_24;	//Дкс 
+		DP_Tr40700 := NOT X012_25;	//Дп  
+		Local_Tr40700 := X012_26; //Местный режим
+		LPusk_Tr40700 := X012_27;	//Местный пуск
+		LStop1_Tr40700 := NOT X012_28;	//Местный Стоп 
+		LStop2_Tr40700 := NOT X012_29;	//Местный Стоп 
+		ErrPch_Tr40700 := X012_30;	//Аз
+		Y011_20 := Go_PchTr40700;	//Включить  
+		Y011_21 := RstPchTr40700;
+		Y011_22 := onPchTr40700;
+		FreqTr40700:=scFreqTr40700;
+		ovenFreqTr40700Out:=scFreqTr40700/5;
+
+	//Конвейер шнековый КШU-150 7М/5 (поз.40800)
+		DKS_Tr40800 := X012_31;	//Дкс 
+		DP_Tr40800 := NOT X012_32;	//Дп  
+		Local_Tr40800 := X012_33; //Местный режим
+		LPusk_Tr40800 := X012_34;	//Местный пуск
+		LStop1_Tr40800 := NOT X012_35;	//Местный Стоп 
+		LStop2_Tr40800 := NOT X012_36;	//Местный Стоп 
+		ErrAz_Tr40800 := NOT X012_37;	//Аз
+		Y011_23 := Go_Tr40800;	//Включить  
+
+	// Нория НЗ-В.20.12 (поз.40900) (6)
+		DKS_Nor6:= X012_38;	//Дкс
+		DSL1_Nor6 := X012_39;	//Дсл1
+		DSL2_Nor6 := X013_0;	//Дсл2
+		OffDSL1_Nor6 := 1;
+		OffDSL2_Nor6 := 1;
+		DP_Nor6:= NOT X013_1; //ДП
+		Local_Nor6 := X013_2;	 
+		LPusk_Nor6 := X013_3;	//Местный Стоп низ
+		LStopD_Nor6 := NOT X013_4;	//Местный Стоп низ
+		LStopU_Nor6 := NOT X013_5;	//Местный Стоп верх
+		ErrAz_Nor6 := NOT X013_6;	//Аз 
+		Y011_24 := Go_Nor6;	//Включить 
+
+	//Система аспирации нории (поз.40900)
+		ErrAz_FiltNor6 := NOT X013_7;	//Аз Вентилятора 
+		Y011_25 := Go_FiltNor6;	//Включить Вентилятор 
+
+	// Переключатель потока ППМ-2.200-0/45 (поз.40910) от нории (поз.40900) 	
+		ErrAz_PP1 := NOT X013_8;		//Аз - 
+		PP1_Pos1 := X013_9;	//На 40950 
+		PP1_Pos2 := X013_10;	//На 51300 
+		Y011_26 := PP1_ToPos1;	//  
+		Y011_27 := PP1_ToPos2;	// 
+		
+	// Переключатель потока ППМ-2.200-0/45 (поз.40960) от просеивателя (поз.40950)	
+		ErrAz_PP2 := NOT X013_11;		//Аз - 
+		PP2_Pos1 := X013_12;	//На 51300 
+		PP2_Pos2 := X013_13;	//На 51100 
+		Y011_28 := PP2_ToPos1;	//  
+		Y011_29 := PP2_ToPos2;	// 
+		
+	// Конвейер скребковый КЦСв-20-10 (поз.51100)
+		DKS_Tr51100 := X013_14;	//Дкс 
+		DP_Tr51100 := NOT X013_15;	//Дп  
+		Local_Tr51100 := X013_16; //Местный режим
+		LPusk_Tr51100 := X013_17;	//Местный пуск
+		LStop1_Tr51100 := NOT X013_18;	//Местный Стоп 
+		LStop2_Tr51100 := NOT X013_19;	//Местный Стоп 
+		ErrAz_Tr51100 := NOT X013_20;	//Аз
+		Y011_30 := Go_Tr51100;	//Включить  
+
+	// Переключатель потока ППМ-2.200-0/45 (поз.51110) от конвейера (поз.51100)	
+		ErrAz_PP3 := NOT X013_21;		//Аз - 
+		PP3_Pos1 := X013_22;	//На 51200 
+		PP3_Pos2 := X013_23;	//На 50100 
+		Y011_31 := PP3_ToPos1;	//  
+		Y013_0 := PP3_ToPos2;	// 
+		
+	// Нория НЗ-В.20.13 (поз.50100) (7) (50200)
+		DKS_Nor7:= X013_24;	//Дкс
+		DSL1_Nor7 := X013_25;	//Дсл1
+		DSL2_Nor7 := X013_26;	//Дсл2
+		OffDSL1_Nor7 := 1;
+		OffDSL2_Nor7 := 1;
+		DP_Nor7 := NOT X013_27; //ДП
+		Local_Nor7 := X013_28;	 
+		LPusk_Nor7 := X013_29;	//Местный Стоп низ
+		LStopD_Nor7 := NOT X013_30;	//Местный Стоп низ
+		LStopU_Nor7 := NOT X013_31;	//Местный Стоп верх
+		ErrAz_Nor7 := NOT X014_0;	//Аз 
+		Y013_1 := Go_Nor7;	//Включить 
+
+	//Система аспирации нории (поз.50100)
+		ErrAz_FiltNor7 := NOT X014_1;	//Аз Вентилятора 
+		Y013_2 := Go_FiltNor7;	//Включить Вентилятор 
+
+	// Конвейер скребковый КЦСв-20-08 (поз.51200)
+		DKS_Tr51200 := X014_2;	//Дкс 
+		DP_Tr51200 := NOT X014_3;	//Дп  
+		Local_Tr51200 := X014_4; //Местный режим
+		LPusk_Tr51200 := X014_5;	//Местный пуск
+		LStop1_Tr51200 := NOT X014_6;	//Местный Стоп 
+		LStop2_Tr51200 := NOT X014_7;	//Местный Стоп 
+		ErrAz_Tr51200 := NOT X014_8;	//Аз
+		Y013_3 := Go_Tr51200;	//Включить  
+
+	//Шибер (ShO9) Из Силоса 9 (50300)
+		Opened_ShO9 := NOT X014_9;	//Открыт 
+		Closed_ShO9 := NOT X014_10;	//Закрыт 
+		ErrAz_ShO9 := NOT X014_11;	//Аз 
+		LOpen_ShO9 := X014_31;	//локально Открыть 
+		LClose_ShO9 := X014_32;	//локально Закрыть 
+		Y013_4 := Go_OpenShO9;	//Открыть 
+		Y013_5 := Go_CloseShO9;	//Закрыть			
+		
+	//Лебёдка
+		ErrAz_LebUpDown := NOT X014_12;
+		Y013_6 := Go_LebUp;
+		Y013_7 := Go_LebDn;
+		Leb_Pol1	:= NOT X014_13;
+		Leb_Pol2	:= NOT X014_14;
+		ErrAz_Leb12	:= NOT X014_15;
+		Y013_8 := Go_LebTo1;
+		Y013_9 := Go_LebTo2;
+		Btn_LebToUp := X014_16;
+		Btn_LebToDn := X014_17;
+		Btn_LebTo1 := X014_18;
+		Btn_LebTo2 := X014_19;
+		
+	//
+		ErrAz_Torba := NOT X014_20;
+		TonDVU_Torba(IN:=NOT X014_22, PT:=T#2S, Q=>DVU_Torba);
+		TonDNU_Torba(IN:=NOT X014_21, PT:=T#2S, Q=>DNU_Torba);
+		DVU_Silo[10]:=DVU_Torba;
+		DNU_Silo[10]:=DNU_Torba;
+
+		Gran_LStop	:= NOT X014_33;
+		
+		//дву и дну силоса описаны со всеми силосами
+		TonDVUSilo9(IN := NOT X014_23, PT:=T#2S, Q=> DVU_Silo[9]);	
+		TonDNUSilo9(IN := NOT X014_24, PT:=T#2S, Q=> DNU_Silo[9]);	
+
+		TonDVU_PBGran(IN:=NOT X014_25, PT:=T#2S, Q=>DVU_PBGran);
+		TonDNU_PBGran(IN:=NOT X014_26, PT:=T#2S, Q=>DNU_PBGran);
+
+	// Электровибраторы ИВ-01-50 бункера оперативного БО-5 (поз.40400)
+		ErrAz_VibrG1 := NOT X014_27;
+		ErrAz_VibrG2 := NOT X014_28;
+	 	Y013_10 := Go_VibrG1;
+		Y013_11 := Go_VibrG2;
+		
+	// Просеиватель PVE1 (поз.40950)
+		ErrAz_Pros1 := NOT X014_29;
+		ErrAz_Pros2 := NOT X014_30;
+		Y013_12 := Go_Pros1;
+		Y013_13 := Go_Pros2;
+		
+		DKS_GwOhlGr := X014_34;	 
+		ErrAz_Kompr := NOT X014_35;	 
+		Err29.13 := ErrAz_Kompr;
+
+		
+//Конец
+END_IF
+StartMEmul(CLK:=MEmul);
+IF StartMEmul.Q THEN
+		EmerPuskBtn		:= 0; //Пуск На Шкафу 
+		EmerStopShkaf 	:= 0;	//Аварийный Стоп На Шкафу
+		EmerStopScalp 	:= 0;	//Аварийный Стоп На Зав. Яме
+		EmerStopBunkZ 	:= 0;	//Аварийный стоп у бункеров загрузки
+		EmerStopBunkD 	:= 0;	//Аварийный Стоп у бункеров для добавок
+		EmerStopBunkV 	:= 0;	//Аварийный Стоп у бункеров выгрузки
+		EmerStopExit 	:= 0;	//аварийный стоп возле лестницы
+		EmerStopUdjk 	:= 0;	//аварийный стоп возле УДЖК
+		EmerStopFire	:= 0;	//Пожар
+		
+		mErrRKF:=0;		
+		ErrRKF:=0;		
+	
+		
+		
+	//Конвейер шнековый (поз.21110)
+		ErrPCH_TrDob:=0 ; //+Авария с ЧП 
+		DKS_TrDob 	:= 0;	
+		DP_TrDob 	:= 0;
+		Local_TrDob	:= 0;
+		LPusk_TrDob := 0;	//Местный Пуск 
+		LStop_TrDob := 0;	//Местный Стоп 
+
+	//Скальператор
+		ErrPCH_Scalp 	:= 0; 
+
+			//Дозаторы компонентов
+		ErrPCH_DozKomp:=0 ; //+Авария с ЧП 
+		DKS_K1 := 	
+		DP_K1 := 	
+		LStop_K1 :=	 
+		DKS_K2 := 	
+		DP_K2 := 	
+		LStop_K2 :=	 
+		DKS_K3 := 	
+		DP_K3 := 	
+		LStop_K3 :=	 
+		DKS_K4 := 	
+		DP_K4 := 	
+		LStop_K4 := 	 
+		DKS_K5 :=	
+		DP_K5 := 	
+		LStop_K5 := 	 
+		DKS_K6 := 	
+		DP_K6 := 	
+		LStop_K6 := 0;	 
+
+//Дозатор добавок
+		ErrPCH_DozDob:= 
+		LStop_D1 :=  
+		LStop_D2 :=  
+		LStop_D3 :=  
+		LStop_D4 :=  
+		LStop_D5 :=  
+		LStop_D6 :=  
+		LStop_D7 :=  
+		LStop_D8 := 0; 
+		
+	//Питатель дробилки 30210
+		ErrPCH_Pit1:=0 ; //+Авария с ЧП 
+		//ErrPCH_Pit1 := 0; //+Ошибка с ЧП 
+		
+	//Питатель дробилки 30220
+		ErrPCH_Pit2:=0 ; //+Авария с ЧП 
+		//ErrPCH_Pit2 := 0; //+Ошибка с ЧП 
+		
+	//Конвейер шнековый 30800 из под смесителя, по технологии 30700
+		ErrPCH_TrSms:=0 ; //+Авария с ЧП 
+		//ErrPCH_TrSms := 0; //+Ошибка с ЧП 
+		DKS_TrSms 	:= 	
+		DP_TrSms 	:= 
+		Local_TrSms	:= 
+		LPusk_TrSms :=  
+		LStop_TrSms := 0; 
+		
+	//Транспортер завальной ямы (10110)
+		DKS_TrHole 	:= 
+		DP_TrHole	 :=  
+		Local_TrHole := 
+		LPusk_TrHole :=  
+		LStop_TrHole :=  
+		ErrAz_TrHole := 0;
+
+	//Нория Зав Ямы (10200)
+		DKS_NorHole := 
+		DSL1_NorHole :=
+		DSL2_NorHole :=
+		Local_NorHole :=
+		LPusk_NorHole :=
+		LStopD_NorHole :=
+		LStopU_NorHole := 
+		ErrAz_NorHole := 0;
+
+	// Двухпоточник (10210) 	
+		ErrAz_DVPT := 0; 
+		DVPT_Na_Scalp := 1; 
+		DVPT_Na_Nor1 := 0;	//На Норию 10400 - 
+
+	// Нория 10400 (1)
+		//DP_Nor1:= ; //ДП
+		DKS_Nor1 	:= 
+		DSL1_Nor1 	:= 
+		DSL2_Nor1 	:= 
+		Local_Nor1 	:= 	 
+		LPusk_Nor1 	:= 
+		LStopD_Nor1 := 
+		LStopU_Nor1 := 
+		ErrAz_Nor1 := 0; 
+		
+	//Конвейер шнековый КШU-250 6М/15 (поз.10500)
+		DKS_Tr1	:= 
+		DP1_Tr1 := 
+		DP2_Tr1 := 
+		Local_Tr1 :=
+		Auto_Tr1 := 
+		LStop_Tr1 :=  
+		ErrAz_Tr1 := 0;
+
+	//Конвейер скребковый КЦСв-60-13 (поз.10600)
+		DKS_Tr1L	:= 
+		DP_Tr1L 	:= 
+		Local_Tr1L 	:= 
+		LPusk_Tr1L 	:= 
+		LStop_Tr1L 	:= 
+		ErrAz_Tr1L 	:= 0;	//Аз - Транспортер Загрузки Компонентов
+
+	//Конвейер скребковый КЦСв-60-13 (поз.10700)
+		DKS_Tr1R	:= 
+		DP_Tr1R 	:= 
+		Local_Tr1R 	:= 
+		LPusk_Tr1R 	:= 
+		LStop_Tr1R 	:= 
+		ErrAz_Tr1R	:= 0;
+		
+	//Шибер 10610 
+		Opened_ShL1 := 0;	//Открыт 
+		Closed_ShL1 := 1;	//Закрыт 
+		ErrAz_ShL1 	:= 0;	//Аз 
+		
+	//Шибер 10620 
+		Opened_ShL2 := 0;	//Открыт 
+		Closed_ShL2 := 1;	//Закрыт 
+		ErrAz_ShL2 	:= 0;	//Аз     
+		
+	//Шибер 10710 
+		Opened_ShR1 := 0;	//Открыт 
+		Closed_ShR1 := 1;	//Закрыт 
+		ErrAz_ShR1 	:= 0;	//Аз     
+		
+	//Шибер 10720 
+		Opened_ShR2 := 0;	//Открыт 
+		Closed_ShR2 := 1;	//Закрыт 
+		ErrAz_ShR2 	:= 0;	//Аз     
+		
+	//Транспортер Весов Компонентов (20110) 
+		DKS_TrKomp :=  
+		DP_TrKomp :=   
+		Local_TrKomp :=	
+		LPusk_TrKomp :=	
+		LStop_TrKomp :=	
+		ErrAz_TrKomp := 0;	//Аз
+
+	// Нория 20200 (2)
+		DKS_Nor2:= 
+		DSL1_Nor2 :=
+		DSL2_Nor2 :=
+		Local_Nor2 := 
+		LPusk_Nor2 := 
+		LStopD_Nor2 :=
+		LStopU_Nor2 :=
+		ErrAz_Nor2 := 0;	//Аз 
+
+	//Конвейер (20300) 
+		DKS_TrPBD :=  
+		DP_TrPBD :=   
+		Local_TrPBD :=	
+		LPusk_TrPBD :=	
+		LStop_TrPBD :=	
+		ErrAz_TrPBD :=0;	//Аз
+
+	//Конвейер (30500)  из под дробилки 
+		DKS_TrDrob :=  
+		DP_TrDrob :=   
+		Local_TrDrob :=
+		LPusk_TrDrob :=
+		LStop1_TrDrob :=
+		LStop2_TrDrob :=
+		ErrAz_TrDrob := 0;
+
+	// Нория 30600 (3)
+		DKS_Nor3:= 
+		DSL1_Nor3 :=
+		DSL2_Nor3 :=
+		Local_Nor3 := 
+		LPusk_Nor3 :=
+		LStopD_Nor3 :=
+		LStopU_Nor3 :=
+		ErrAz_Nor3 := 0;	//Аз 
+		
+// Смеситель горизонтальный СГП-1.8 поз. 30700
+		KlapOpened := 0;
+		KlapClosed := 1;
+		DoorUpOpened := 0;
+		ZaslDownOpened := 0;
+		ZaslDownClosed := 1;
+		DoorDownOpened := 0;
+		DKS_Sms 	:= 0;			//Датчик оборотов вала
+		DoorSmsOpened := 0;
+		DoorRVOpened := 0;
+		Az_Sms 	:= 0;			//Защита двигателя
+		DNU_UpBunk := 0;
+		DNU_DownBunk := 0;
+		LowPress := 0;		//Низкое давление воздуха
+
+	// Нория 50100 (4)
+		DKS_Nor4:= 
+		DSL1_Nor4 :=
+		DSL2_Nor4 :=
+		Local_Nor4 :=
+		LPusk_Nor4 :=
+		LStopD_Nor4 :=
+		LStopU_Nor4 :=
+		ErrAz_Nor4 := 0;	//Аз 
+		
+	//Конвейер шнековый КШU-250 7М/15 (поз.50200)
+		DKS_TrGP :=  
+		DP_TrGP :=   
+		Local_TrGP :=
+		LPusk_TrGP :=
+		LStop_TrGP := 
+		ErrAz_TrGP :=0;	//Аз
+
+	//Шибер 50210
+		Opened_Sh50210 := 0;	//Открыт 
+		Closed_Sh50210 := 1;	//Закрыт 
+		ErrAz_Sh50210 := 0;	//Аз 
+
+	//Конвейер шнековый КШU-250 10,5М/15 (поз.50300)
+		DKS_TrGP1 :=  
+		DP_TrGP1 :=   
+		Local_TrGP1 :=
+		LPusk_TrGP1 :=
+		LStop_TrGP1 := 
+		ErrAz_TrGP1 := 0;	//Аз
+
+	//Конвейер шнековый КШU-250 10,5М/15 (поз.50400)
+		DKS_TrGP2 :=  
+		DP_TrGP2 :=   
+		Local_TrGP2 := 
+		LPusk_TrGP2 := 
+		LStop_TrGP2 :=  
+		ErrAz_TrGP2 := 0;	//Аз
+		
+	//Шибер 50310
+		Opened_Sh50310 := 0;	//Открыт 
+		Closed_Sh50310 := 1;	//Закрыт 
+		ErrAz_Sh50310 := 0;	//Аз 
+
+	//Шибер 50320
+		Opened_Sh50320 := 0;	//Открыт 
+		Closed_Sh50320 := 1;	//Закрыт 
+		ErrAz_Sh50320 := 0;	//Аз 
+
+	//Шибер 50330
+		Opened_Sh50330 := 0;	//Открыт 
+		Closed_Sh50330 := 1;	//Закрыт 
+		ErrAz_Sh50330 := 0;	//Аз 
+
+	//Шибер 50410
+		Opened_Sh50410 := 0;	//Открыт 
+		Closed_Sh50410 := 1;	//Закрыт 
+		ErrAz_Sh50410 := 0;	//Аз 
+
+	//Шибер 50420
+		Opened_Sh50420 := 0;	//Открыт 
+		Closed_Sh50420 := 1;	//Закрыт 
+		ErrAz_Sh50420 := 0;	//Аз 
+
+	//Шибер 50430
+		Opened_Sh50430 := 0;	//Открыт 
+		Closed_Sh50430 := 1;	//Закрыт 
+		ErrAz_Sh50430 := 0;	//Аз 
+
+	//Шиберы выгрузки готовой продукции	
+		//Шибер (ShO1) Из Силоса 1 (50610)
+			Opened_ShO1 := 0;	//Открыт 
+			Closed_ShO1 := 1;	//Закрыт 
+			Local_ShO1  := 0;	 
+			LOpen_ShO1  := 0;	//локально Открыть 
+			LClose_ShO1 := 0;	//локально Закрыть 
+			ErrAz_ShO1  := 0;	//Аз 
+
+		//Шибер (ShO2) Из Силоса 2 (50620)
+			Opened_ShO2:= 0;
+			Closed_ShO2:= 1;
+			Local_ShO2 := 0;
+			LOpen_ShO2 := 0;
+			LClose_ShO2:= 0;
+			ErrAz_ShO2 := 0;
+
+		//Шибер (ShO3) Из Силоса 3 (50630)
+			Opened_ShO3:= 0;
+			Closed_ShO3:= 1;
+			Local_ShO3 := 0;
+			LOpen_ShO3 := 0;
+			LClose_ShO3:= 0;
+			ErrAz_ShO3 := 0;
+
+		//Шибер (ShO4) Из Силоса 4 (50640)
+			Opened_ShO4:= 0;
+			Closed_ShO4:= 1;
+			Local_ShO4 := 0;
+			LOpen_ShO4 := 0; 
+			LClose_ShO4:= 0; 
+			ErrAz_ShO4 := 0;
+
+		//Шибер (ShO5) Из Силоса 5 (50650)
+			Opened_ShO5:= 0;
+			Closed_ShO5:= 1;
+			Local_ShO5 := 0;
+			LOpen_ShO5 := 0;
+			LClose_ShO5:= 0;
+			ErrAz_ShO5 := 0;
+
+		//Шибер (ShO6) Из Силоса 6 (50660)
+			Opened_ShO6:= 0;
+			Closed_ShO6:= 1;
+			Local_ShO6 := 0;
+			LOpen_ShO6 := 0;
+			LClose_ShO6:= 0;
+			ErrAz_ShO6 := 0;
+
+		//Шибер (ShO7) Из Силоса 7 (50670)
+			Opened_ShO7:= 0;
+			Closed_ShO7:= 1;
+			Local_ShO7 := 0;
+			LOpen_ShO7 := 0;
+			LClose_ShO7:= 0;
+			ErrAz_ShO7 := 0;
+
+		//Шибер (ShO8) Из Силоса 8 (50680)
+			Opened_ShO8:= 0;
+			Closed_ShO8:= 1;
+			Local_ShO8 := 0;
+			LOpen_ShO8 := 0;
+			LClose_ShO8:= 0;
+			ErrAz_ShO8 := 0;
+
+	//Аспирация
+		ErrAz_Asp1 := 
+		DKS_Gway1 := 
+		ErrAz_Gway1 := 0;	//Аз Шлюза
+			
+	//Аспирация АС-2
+		ErrAz_Asp2 :=  
+		DKS_Gway21 := 
+		ErrAz_Gway21 := 
+		DKS_Gway22 := 
+		ErrAz_Gway22 := 0;	//Аз Шлюза
+
+	//Вибратор №1
+		ErrAz_Vibr1 := 0;
+		
+	//Вибратор №2
+		ErrAz_Vibr2 := 0;
+		
+	//УДЖК-1-БП (поз.21700) масло
+		localMasloDop 	:= 	
+		lPuskMasloDop 	:= 	
+		lStopMasloDop 	:=  
+		ErrAz_MasloDop	:= 	
+		localMasloDos 	:= 	
+		lPuskMasloDos 	:= 	
+		lStopMasloDos 	:=  
+		ErrAz_MasloDos	:= 0;	
+	
+		DVU_Maslo 	:= 0;
+		DNU_Maslo	:= 0;
+		ClapInOpened	:= 0;
+		ClapInClosed 	:= 1;		
+		ClapOutOpened	:= 0;
+		ClapOutClosed 	:= 1;		
+
+	//Датчики Уровней бункеров зерна
+		DVU_BunkK[1]:=0;	
+		DVU_BunkK[2]:=0;	
+		DVU_BunkK[3]:=0;	
+		DNU_BunkK[1]:=0;	
+		DNU_BunkK[2]:=0;	
+		DNU_BunkK[3]:=0;	
+		DVU_BunkK[4]:=0;	
+		DVU_BunkK[5]:=0;	
+		DVU_BunkK[6]:=0;	
+		DNU_BunkK[4]:=0;	
+		DNU_BunkK[5]:=0;	
+		DNU_BunkK[6]:=0;	
+		
+		DNU_Hole:=0;
+				
+		DVU_PBD:=0; 
+		DNU_PBD:=0;
+
+		DVU_Silo[1]:=0;	
+		DVU_Silo[2]:=0;	
+		DVU_Silo[3]:=0;	
+		DVU_Silo[4]:=0;	
+		DNU_Silo[1]:=0;	
+		DNU_Silo[2]:=0;	
+		DNU_Silo[3]:=0;	
+		DNU_Silo[4]:=0;	
+		DVU_Silo[5]:=0;	
+		DVU_Silo[6]:=0;	
+		DVU_Silo[7]:=0;	
+		DVU_Silo[8]:=0;	
+		DNU_Silo[5]:=0;	
+		DNU_Silo[6]:=0;	
+		DNU_Silo[7]:=0;	
+		DNU_Silo[8]:=0;	
+
+	//Дробилки
+		ErrAz_Drob1 := 
+		ErrAz_Drob2 := 
+		OpenDoor_Drob1 := 
+		OpenDoor_Drob2 := 0;
+		
+
+
+//Участок гранулирования
+	// Пуск На Шкафу
+		EmerStopShkafGr := 0;	//Аварийный Стоп На Шкафу
+		EmerStopGran := 0;	//Аварийный Стоп На Зав. Яме
+		EmerStopNorGr := 0;	//Аварийный стоп у бункеров загрузки_
+		ErrRKFGr:=0;		
+		
+	//Шибер 41100 
+		Opened_ShTrSms := 0;	//Открыт 
+		Closed_ShTrSms := 1;	//Закрыт 
+		ErrAz_ShTrSms := 0;	//Аз 
+		
+	//Конвейер шнековый КШU-250 7,5М/20 (поз.40100)
+		DKS_Tr40100 :=  
+		DP_Tr40100 :=   
+		Local_Tr40100 := 
+		LPusk_Tr40100 := 
+		LStop1_Tr40100 := 
+		LStop2_Tr40100 := 
+		ErrAz_Tr40100 := 0;	//Аз
+
+	// Нория НЗ-В.40.11 (поз.40200) (5)
+		DKS_Nor5 := 
+		DSL1_Nor5 :=
+		DSL2_Nor5 :=0;
+		OffDSL1_Nor5 := 1;
+		OffDSL2_Nor5 := 1;
+		DP_Nor5:= 
+		Local_Nor5 :=	 
+		LPusk_Nor5 :=
+		LStopD_Nor5 := 
+		LStopU_Nor5 := 
+		ErrAz_Nor5 := 0;	//Аз 
+
+	//Конвейер шнековый КШU-250 3М/20 (поз.40300)
+		DKS_Tr40300 :=  
+		DP_Tr40300 :=   
+		Local_Tr40300 :=
+		LPusk_Tr40300 :=
+		LStop1_Tr40300 := 
+		LStop2_Tr40300 := 
+		ErrAz_Tr40300 := 0;	//Аз
+
+	//Система аспирации нории (поз.40200)
+		ErrAz_FiltNor5 := 0;	//Аз Вентилятора 
+
+	//Главный привод пресс-гранулятора (поз.40500)
+		DKS_Gran := 0;
+		Shtift := 0;	//датчик срезного штифта
+		OpenDoorGr := 0;	//датчик открытой двери
+		BypassOpened := 1;
+		BypassClosed := 0;
+		ErrPCHGr	:= 0;	//Авария ПЧ главного привода			
+		isWorkPCHGr := 1;
+
+		
+	//Питатель пресс-гранулятора (поз.40500)
+		DKS_PitGr := 0;	//Дкс 
+		DP_PitGr := 0;	//Дп  
+		ErrPchPitGr := 0;	//Аз
+		isWorkPchPitGr := 1;
+
+	//Кондиционер пресс-гранулятора (поз.40500)
+		DKS_KondGr := 0;	//Дкс 
+		Door_KondGr := 0;	//  
+		ErrAz_KondGr := 0;	//Аз
+
+	//Шлюзовый затвор охладителя гранул (поз.40600)
+		ErrAz_GwOhlGr := 0;	//Аз шлюза
+		
+	//Привод стола охладителя гранул (поз.40600)
+		DKS_OhlGr := 0;	//ДКС привода стола охлад-ля
+		DoorOhlGr := 0;
+		ErrAz_OhlGr := 0;
+		
+		DVU_OhlGr:=0;		
+		DSU_OhlGr:=0;		
+		DNU_OhlGr:=0;		
+
+	//Вентилятор системы аспирации охладителя (поз.60100)
+		ErrAz_AspOhl := 0;	//Аз аспирации
+		
+	//Шлюзовый затвор ЗШ-17 системы аспирации охладителя (поз.60100)
+		DKS_GwAspOhl := 0;	//Дкс Шлюза
+		ErrAz_GwAspOhl := 0;	//Аз Шлюза
+			
+	//Конвейер цепной скребковый КЦСв-20-05 (поз.40700)
+		DKS_Tr40700 :=  
+		DP_Tr40700 :=   
+		Local_Tr40700 :=
+		LPusk_Tr40700 :=
+		LStop1_Tr40700 := 
+		LStop2_Tr40700 := 
+		ErrPch_Tr40700 :=0;	//Аз
+
+	//Конвейер шнековый КШU-150 7М/5 (поз.40800)
+		DKS_Tr40800 :=  
+		DP_Tr40800 :=   
+		Local_Tr40800 :=
+		LPusk_Tr40800 :=
+		LStop1_Tr40800 := 
+		LStop2_Tr40800 := 
+		ErrAz_Tr40800 := 0;	//Аз
+
+	// Нория НЗ-В.20.12 (поз.40900) (6)
+		DKS_Nor6:=
+		DSL1_Nor6 :=
+		DSL2_Nor6 :=0;
+		OffDSL1_Nor6 := 1;
+		OffDSL2_Nor6 := 1;
+		DP_Nor6:= 
+		Local_Nor6 :=	 
+		LPusk_Nor6 :=
+		LStopD_Nor6 :=
+		LStopU_Nor6 :=
+		ErrAz_Nor6 := 0;	//Аз 
+
+	//Система аспирации нории (поз.40900)
+		ErrAz_FiltNor6 := 0;	//Аз Вентилятора 
+
+	// Переключатель потока ППМ-2.200-0/45 (поз.40910) от нории (поз.40900) 	
+		ErrAz_PP1 := 0;		//Аз - 
+		PP1_Pos1 := 1;	//На 40950 
+		PP1_Pos2 := 0;	//На 51300 
+		
+	// Переключатель потока ППМ-2.200-0/45 (поз.40960) от просеивателя (поз.40950)	
+		ErrAz_PP2 := 0;		//Аз - 
+		PP2_Pos1 := 1;	//На 51300 
+		PP2_Pos2 := 0;	//На 51100 
+		
+	// Конвейер скребковый КЦСв-20-10 (поз.51100)
+		DKS_Tr51100 :=  
+		DP_Tr51100 :=   
+		Local_Tr51100 := 
+		LPusk_Tr51100 := 
+		LStop1_Tr51100 :=  
+		LStop2_Tr51100 :=  
+		ErrAz_Tr51100 := 0;	//Аз
+
+	// Переключатель потока ППМ-2.200-0/45 (поз.51110) от конвейера (поз.51100)	
+		ErrAz_PP3 := 0;		//Аз - 
+		PP3_Pos1 := 1;	//На 51200 
+		PP3_Pos2 := 0;	//На 50100 
+		
+	// Нория НЗ-В.20.13 (поз.50100) (7) (50200)
+		DKS_Nor7:= 
+		DSL1_Nor7 := 
+		DSL2_Nor7 := 0;
+		OffDSL1_Nor7 := 1;
+		OffDSL2_Nor7 := 1;
+		DP_Nor7 := 
+		Local_Nor7 := 	 
+		LPusk_Nor7 := 
+		LStopD_Nor7 := 
+		LStopU_Nor7 := 
+		ErrAz_Nor7 := 0; 
+
+	//Система аспирации нории (поз.50100)
+		ErrAz_FiltNor7 := 0; 
+
+	// Конвейер скребковый КЦСв-20-08 (поз.51200)
+		DKS_Tr51200 := 
+		DP_Tr51200 :=   
+		Local_Tr51200 :=
+		LPusk_Tr51200 :=
+		LStop1_Tr51200 :=  
+		LStop2_Tr51200 := ErrAz_Tr51200 := 0;
+
+	//Шибер (ShO9) Из Силоса 9 (50300)
+		Opened_ShO9 := 0;	//Открыт 
+		Closed_ShO9 := 1;	//Закрыт 
+		ErrAz_ShO9 := 0;	//Аз 
+		LOpen_ShO9 := 0;	//локально Открыть 
+		LClose_ShO9 := 0;	//локально Закрыть 
+		
+	//Лебёдка
+		ErrAz_LebUpDown := 0;
+		Leb_Pol1	:= 0;
+		Leb_Pol2	:= 0;
+		ErrAz_Leb12	:= 0;
+		Btn_LebToUp := 0;
+		Btn_LebToDn := 0;
+		Btn_LebTo1 := 0;
+		Btn_LebTo2 := 0;
+		
+	//
+		ErrAz_Torba := 0;
+		DVU_Torba:=0;
+		DNU_Torba:=0;
+		DVU_Silo[10]:=0;
+		DNU_Silo[10]:=0;
+
+		Gran_LStop	:= 0;
+		
+		//дву и дну силоса описаны со всеми силосами
+		DVU_Silo[9]:=0;	
+		DNU_Silo[9]:=0;	
+
+		DVU_PBGran:=0;
+		DNU_PBGran:=0;
+
+	// Электровибраторы ИВ-01-50 бункера оперативного БО-5 (поз.40400)
+		ErrAz_VibrG1 := 0;
+		ErrAz_VibrG2 := 0;
+		
+	// Просеиватель PVE1 (поз.40950)
+		ErrAz_Pros1 := 0;
+		ErrAz_Pros2 := 0;
+		
+		DKS_GwOhlGr := 0;	 
+		ErrAz_Kompr := 0;	 
+		Err29.13 := 0;
+	
+END_IF

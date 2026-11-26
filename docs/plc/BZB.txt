@@ -1,0 +1,90 @@
+functionBlock BZB
+VAR
+  input   AutoMode : BOOL
+  input   LocalMode : BOOL
+  input   Emerg : BOOL  // Авария оборудования
+  input   Opened : BOOL  // Открыт
+  input   errAZ : BOOL  // Авария АЗ
+  input   HandMode : BOOL
+  input   yOpen : BOOL  // Кнопка "Открыть" в ручном режиме со скады
+  input   yClose : BOOL  // Кнопка "Закрыть" в ручном режиме со скады
+  output  runToOpen : BOOL  // Открыть шибер
+  output  runToClose : BOOL  // Закрыть шибер
+  output  Alarm : BOOL
+  output  errLT : BOOL  // Авария "Долгое переключение"
+  output  errEmerg : BOOL  // Авария от оборудования
+  output  errAZOut : BOOL
+  output  da : BOOL  // Необходимость сигнализации об аварии
+  output  state : WORD  // Состояние: 0-Закрыт, 1-Открыт, 2-Переключение, 3-Авария, 4-Промежуточное положение
+  output  yOpenOut : BOOL
+  output  yCloseOut : BOOL
+  local   TON_LT : TON  // Таймер на аварию долгого переключения
+  local   rr : BOOL  // Готовность к работе
+  local   temp : BOOL
+  local   TON_Emerg : TON
+  local   MHCalc_0 : MHCalc
+  local   TON_yClose : TON
+  local   TP_Close : TP
+  local   TON_yClose2 : TON
+  local   TP_Open : TP
+  local   TON_yOpen : TON
+  local   TON_Alarm : TON
+END_VAR
+
+(* LD *)
+
+// --- Долгое переключение шибера
+TON_LT(IN:=((runToOpen AND NOT opened) OR (runToClose AND Opened)), PT:=t#2000ms);
+errLT := TON_LT.Q;
+
+// --- Авария оборудования
+TON_Emerg(IN:=Emerg, PT:=t#200ms);
+errEmerg := TON_Emerg.Q;
+
+// ---
+errAZOut := errAZ;
+
+// --- Сброс Аварий
+IF (ResetErrors OR MEmul) THEN errAZOut := FALSE; END_IF
+IF (ResetErrors OR MEmul) THEN errLT := FALSE; END_IF
+IF (ResetErrors OR MEmul) THEN errEmerg := FALSE; END_IF
+
+// --- Готовность к работе
+rr := NOT errAZ;
+da := NOT NOT errAZ;
+
+// --- Сброс yOpen, yClose
+IF ((R_TRIG(yClose)) OR (yOpen AND Opened)) THEN yOpen := FALSE; END_IF
+IF R_TRIG(yOpen) THEN yClose := FALSE; END_IF
+TON_yClose(IN:=yClose, PT:=t#500ms);
+IF TON_yClose.Q THEN yClose := FALSE; END_IF
+
+// --- Сброс yOpen, yClose
+IF (NOT HandMode OR NOT rr OR errLT OR (NOT MGod AND errEmerg) OR (yOpen AND yClose)) THEN yOpen := FALSE; END_IF
+IF (NOT HandMode OR NOT rr OR errLT OR (NOT MGod AND errEmerg) OR (yOpen AND yClose)) THEN yClose := FALSE; END_IF
+
+// --- Закрытие
+TP_Close(IN:=((rr AND yClose) OR (rr AND NOT HandMode AND AutoMode AND NOT LocalMode AND Emerg AND Opened)), PT:=t#700ms);
+runToClose := TP_Close.Q;
+
+// --- Открытие
+TP_Open(IN:=((rr AND yOpen) OR (rr AND NOT HandMode AND AutoMode AND NOT LocalMode AND NOT errEmerg AND NOT Opened)) AND NOT runToClose, PT:=t#700ms);
+runToOpen := TP_Open.Q;
+
+// ---
+
+// ---
+TON_Alarm(IN:=(errEmerg OR errAZOut OR NOT Opened), PT:=t#1s);
+Alarm := TON_Alarm.Q;
+
+// ---
+yOpenOut := yOpen;
+yCloseOut := yClose;
+
+// --- Состояние: 0-Закрыт, 1-Открыт, 2-Переключение, 3-Переключение, 4-Авария
+IF NOT da AND NOT Opened THEN state := 0; END_IF
+temp := 0 /*EN=NOT da AND NOT Opened*/;
+IF NOT da AND opened THEN state := 1; END_IF
+temp := 1 /*EN=NOT da AND opened*/;
+IF da THEN state := 4; END_IF
+temp := 4 /*EN=da*/;

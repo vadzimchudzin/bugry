@@ -1,0 +1,129 @@
+functionBlock Ohladitel
+VAR
+  input   Next : BOOL
+  input   Prev : BOOL  // гранулы поступают в охладитель
+  input   Door : BOOL  // Датчик двери
+  input   OffOpenDoor : BOOL
+  input   DksStol : BOOL
+  input   DVU : BOOL
+  input   DSU : BOOL
+  input   DNU : BOOL
+  input   Interval0 : WORD  // интервал в мс между открытием стола когда надо опустошить
+  input   Interval1 : WORD  // интервал в мс между открытием стола когда нет ДСУ
+  input   Interval2 : WORD  // интервал в мс между открытием стола когда нет ДВУ
+  input   IntervalH : WORD
+  input   TempVozd : WORD
+  input   MaxTempVozd : WORD
+  input   MustFree : BOOL  // надо освободить охладитель
+  input   HandMode : BOOL  // Работа в ручном режиме
+  input   canRunAuto : BOOL  // Условие для необходимости работы в автоматическом режиме
+  input   yOpen : BOOL
+  input   yRun : BOOL
+  output  OpenStol : BOOL  // Открыть стол
+  output  RunStol : BOOL  // запустить стол
+  output  isEmpty : BOOL := TRUE  // Охладитель пустой
+  output  Ready : BOOL  // можно добавлять материал. По возможности
+  output  TimeToOpen : WORD  // время в сек до открытия стола
+  output  TimeToClose : WORD  // время в сек до закрытия стола
+  output  ErrDoor : BOOL
+  output  ErrDksStol : BOOL
+  output  ErrTempVozd : BOOL
+  output  yOpenOut : BOOL
+  output  yRunOut : BOOL
+  local   TON_TempVozd : TON
+  local   TON_TempGran : TON
+  local   TON_Empty : TON
+  local   TON_StopOpenSt : TON
+  local   TON_StopCloseSt : TON
+  local   MustVigr : BOOL  // должна идти выгрузка
+  local   TON_Auto1 : TON
+  local   BLINK_Auto1 : BLINK
+  local   TON_OpenSt1 : TON
+  local   TON_CloseSt1 : TON
+  local   TON_OpenSt2 : TON
+  local   TON_CloseSt2 : TON
+  local   BLINK_MinNotFound : BLINK
+  local   Timer_Empty : MyTimer
+  local   MustEmpty : BOOL
+  local   ResetTimer : BOOL
+  local   TON_resetVigr : TON
+  local   MustOpenStol : BOOL
+  local   TON_emptyOhl : TON
+  local   TON_RunStol : TON
+  local   TON_OnDksStol : TON
+  local   TON_OffDksStol : TON
+  local   Vygr0 : BOOL
+  local   Vygr2 : BOOL
+  local   Vygr1 : BOOL
+  local   AutoStol : BOOL
+  local   Interval : WORD
+  local   TON_Sbros : TON
+  local   Vygr : BOOL
+  local   AutoStolStep1 : BOOL
+END_VAR
+
+(* LD *)
+
+// ---
+IF ResetErrors THEN ErrDoor := FALSE; END_IF
+
+// ---
+IF Door AND NOT OffOpenDoor THEN ErrDoor := TRUE; END_IF
+
+// ---
+MustEmpty := canRunAuto AND NOT Prev AND NOT HandMode AND NOT isEmpty;
+
+// ---
+IF (DNU OR DSU OR DVU OR Prev) THEN isEmpty := FALSE; END_IF
+
+// ---
+IF ((F_TRIG(MustEmpty)) OR (R_TRIG(DNU))) THEN ResetTimer := TRUE; END_IF
+
+// ---
+Timer_Empty(run:=NOT DNU AND OpenStol AND RunStol, pause:=((MustEmpty AND NOT RunStol) OR (MustEmpty AND NOT OpenStol)), reset:=ResetTimer);
+
+// ---
+TON_emptyOhl(IN:=(Timer_Empty.seconds >= 20) /*EN=MustEmpty*/ AND Next, PT:=t#1s*TimeClearOhl);
+IF TON_emptyOhl.Q THEN isEmpty := TRUE; END_IF
+
+// ---
+TON_TempVozd(IN:=(TempVozd >= MaxTempVozd) /*EN=true*/, PT:=t#5s);
+IF TON_TempVozd.Q THEN ErrTempVozd := TRUE; END_IF
+
+// ---
+IF ((canRunAuto AND NOT HandMode AND NOT isEmpty) OR (HandMode AND yRun)) AND MustFree THEN Interval := Interval0; END_IF
+Vygr0 := Interval0 /*EN=((canRunAuto AND NOT HandMode AND NOT isEmpty) OR (HandMode AND yRun)) AND MustFree*/;
+IF (((canRunAuto AND NOT HandMode AND NOT isEmpty) OR (HandMode AND yRun)) AND DVU) AND NOT MustFree THEN Interval := Interval2; END_IF
+Vygr2 := Interval2 /*EN=(((canRunAuto AND NOT HandMode AND NOT isEmpty) OR (HandMode AND yRun)) AND DVU) AND NOT MustFree*/;
+IF ((((canRunAuto AND NOT HandMode AND NOT isEmpty) OR (HandMode AND yRun)) AND DSU) AND NOT DVU) AND NOT MustFree THEN Interval := Interval1; END_IF
+Vygr1 := Interval1 /*EN=((((canRunAuto AND NOT HandMode AND NOT isEmpty) OR (HandMode AND yRun)) AND DSU) AND NOT DVU) AND NOT MustFree*/;
+
+// ---
+IF HandMode AND yRun THEN Interval := IntervalH; END_IF
+
+// ---
+Vygr := (Vygr0 OR Vygr1 OR Vygr2 OR (HandMode AND YRun));
+
+// ---
+TON_Sbros(IN:=NOT AutoStol AND Vygr, PT:=T#10m);
+
+// ---
+IF (TON_Sbros.ET >= (t#1ms*Interval)) /*EN=Vygr*/ THEN AutoStol := TRUE; END_IF
+
+// ---
+IF AutoStol AND NOT DksStol THEN AutoStolStep1 := TRUE; END_IF
+IF AutoStol AND R_TRIG(DksStol) AND AutoStolStep1 THEN AutoStol := FALSE; END_IF
+IF NOT AutoStol THEN AutoStolStep1 := FALSE; END_IF
+
+// ---
+OpenStol := ((canRunAuto AND MustFree) OR yOpen);
+
+// ---
+RunStol := AutoStol;
+
+// ---
+Ready := ((NOT ErrDoor AND NOT ErrDksStol AND NOT ErrTempVozd AND Next) OR (NOT ErrDoor AND NOT ErrDksStol AND NOT ErrTempVozd AND MHand AND MGod));
+
+// ---
+yOpenOut := yOpen;
+yRunOut := yRun;

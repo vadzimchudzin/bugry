@@ -1,0 +1,74 @@
+functionBlock MSeparator
+VAR
+  input   Opened : BOOL
+  input   Closed : BOOL
+  input   next : BOOL  // Следующий механизм (транспортер запустится через
+  input   canRunAuto : BOOL  // Условие для необходимости работы в автоматическом режиме
+  input   resetFl : BOOL  // сбросить флаг отработанного авторежима runWork
+  input   timeBeforeStart : TIME := TIME#2s0ms  // Пауза перед запуском в автоматическом режиме
+  input   timeToRun : TIME := TIME#10s0ms  // Время на выгрузку автоматического режима
+  input   yHand : BOOL
+  output  Open : BOOL
+  output  runWork : BOOL  // флаг отработанного авторежима
+  output  ErrLTO : BOOL
+  output  ErrLTC : BOOL
+  output  DA : BOOL
+  output  HandSet : BOOL
+  output  HandReset : BOOL
+  local   RR : BOOL
+  local   runAuto : BOOL
+  local   TON_LTO : TON
+  local   TON_LTC : TON
+  local   TON_RunAuto : TON
+  local   TON_Work : TON
+  local   TP_Work : TP
+  local   HandOnBegin : BOOL
+END_VAR
+
+(* LD *)
+
+// ---
+HandOnBegin := yHand;
+
+// ---
+IF (NOT canRunAuto OR resetFl) THEN runWork := FALSE; END_IF
+
+// ---
+TON_LTO(IN:=Open AND NOT Opened, PT:=t#10s);
+IF TON_LTO.Q THEN ErrLTO := TRUE; END_IF
+
+// ---
+TON_LTC(IN:=NOT Open AND NOT Closed AND NOT ResetErrors, PT:=t#10s);
+IF TON_LTC.Q THEN ErrLTC := TRUE; END_IF
+
+// ---
+IF ResetErrors THEN ErrLTC := FALSE; END_IF
+IF ResetErrors THEN ErrLTO := FALSE; END_IF
+
+// ---
+RR := NOT ErrLTO AND NOT ErrLTC AND NOT GEmer;
+DA := NOT (NOT ErrLTO AND NOT ErrLTC);
+
+// ---
+TON_RunAuto(IN:=NOT runWork AND canRunAuto AND next AND RR, PT:=timeBeforeStart);
+IF TON_RunAuto.Q THEN runAuto := TRUE; END_IF
+
+// ---
+IF (NOT canRunAuto OR NOT next OR NOT RR) THEN runWork := FALSE; END_IF
+IF (NOT canRunAuto OR NOT next OR NOT RR) THEN runAuto := FALSE; END_IF
+
+// ---
+IF ((yHand AND canRunAuto) OR NOT RR) THEN yHand := FALSE; END_IF
+
+// ---
+Open := ((true AND runAuto) OR (true AND yHand));
+
+// ---
+TON_Work(IN:=Opened AND Open AND runAuto, PT:=timeToRun);
+IF TON_Work.Q THEN runWork := TRUE; END_IF
+
+// ---
+HandSet := yHand AND NOT HandOnBegin;
+HandReset := NOT yHand AND HandOnBegin;
+
+// ---

@@ -1,0 +1,41 @@
+functionBlock TVibrator
+VAR
+  input   RunAuto : BOOL
+  input   TimeAutoRun : WORD  // в сек. работа в автомате
+  input   TimeAutoSleep : WORD  // в сек. простой в автомате
+  input   MaxTimeOn : TIME := TIME#1m0s0ms  // максимальное время работы в ручную
+  input   AZ : BOOL := FALSE
+  input   yHand : BOOL
+  output  Run : BOOL
+  output  ErrAZ : BOOL := FALSE
+  output  yHandOut : BOOL
+  local   BLINK_0 : BLINK
+  local   ARun : BOOL
+  local   TON_0 : TON
+  local   TOF_0 : TOF
+  local   TON_1 : TON
+  local   TON_MaxTimeOn : TON
+END_VAR
+
+(* LD *)
+
+// ---
+ARun := RunAuto AND NOT TON_0.Q;
+TON_0(IN:=RunAuto AND NOT TON_1.Q, PT:=t#1s*TimeAutoRun);
+TON_1(IN:=RunAuto AND TON_0.Q, PT:=t#1s*TimeAutoSleep);
+IF RunAuto THEN yHand := FALSE; END_IF
+
+// ---
+IF az THEN yHand := FALSE; END_IF
+IF az THEN ErrAz := TRUE; END_IF
+IF ResetErrors THEN ErrAz := FALSE; END_IF
+
+// ---
+TON_MaxTimeOn(IN:=yHand, PT:=MaxTimeOn);
+IF TON_MaxTimeOn.Q THEN yHand := FALSE; END_IF
+
+// ---
+Run := ((ARun OR yHand) AND NOT GEmer) AND NOT ErrAZ;
+
+// ---
+yHandOut := yHand;

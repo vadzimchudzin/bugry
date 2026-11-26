@@ -1,0 +1,13 @@
+function SumVesD3
+VAR
+  input   WithOut : WORD
+  local   i : WORD
+END_VAR
+
+(* ST *)
+SumVesD3:=0;
+FOR i:=1 TO CBM DO
+	IF i<>WithOut THEN
+		SumVesD3:=SumVesD3+VesDM[i];
+	END_IF
+END_FOR

@@ -1,0 +1,103 @@
+program PrgUnloadToCar
+VAR
+END_VAR
+
+(* LD *)
+
+// ---
+Shiber_O1(opened:=Opened_ShO1, closed:=Closed_ShO1, toOpen:=((LOpen_ShO1 AND UnBlockSilos.0) OR (LOpen_ShO1 AND UnBlockSilos.1)), toClose:=LClose_ShO1, maxTTO:=t#15s, errAZ:=ErrAz_ShO1, yOpen:=yOpenShO1, yClose:=yCloseShO1, MH:=MhShO1, aMH:=aMhShO1);
+Go_CloseShO1 := Shiber_O1.runToClose;
+Err16.0 := Shiber_O1.errLT;
+Err16.1 := Shiber_O1.errKonc;
+Err16.2 := Shiber_O1.errAZOut;
+DA_ShO1 := Shiber_O1.da;
+StMeh[38] := Shiber_O1.state;
+yOpenShO1 := Shiber_O1.yOpenOut;
+yCloseShO1 := Shiber_O1.yCloseOut;
+Go_OpenShO1 := Shiber_O1.runToOpen;
+
+// ---
+Shiber_O2(opened:=Opened_ShO2, closed:=Closed_ShO2, toOpen:=((LOpen_ShO2 AND UnBlockSilos.0) OR (LOpen_ShO2 AND UnBlockSilos.2)), toClose:=LClose_ShO2, maxTTO:=t#15s, errAZ:=ErrAz_ShO2, yOpen:=yOpenShO2, yClose:=yCloseShO2, MH:=MhShO2, aMH:=aMhShO2);
+Go_CloseShO2 := Shiber_O2.runToClose;
+Err16.3 := Shiber_O2.errLT;
+Err16.4 := Shiber_O2.errKonc;
+Err16.5 := Shiber_O2.errAZOut;
+DA_ShO2 := Shiber_O2.da;
+StMeh[39] := Shiber_O2.state;
+yOpenShO2 := Shiber_O2.yOpenOut;
+yCloseShO2 := Shiber_O2.yCloseOut;
+Go_OpenShO2 := Shiber_O2.runToOpen;
+
+// ---
+Shiber_O3(opened:=Opened_ShO3, closed:=Closed_ShO3, toOpen:=((LOpen_ShO3 AND UnBlockSilos.0) OR (LOpen_ShO3 AND UnBlockSilos.3)), toClose:=LClose_ShO3, maxTTO:=t#15s, errAZ:=ErrAz_ShO3, yOpen:=yOpenShO3, yClose:=yCloseShO3, MH:=MhShO3, aMH:=aMhShO3);
+Go_CloseShO3 := Shiber_O3.runToClose;
+Err16.6 := Shiber_O3.errLT;
+Err16.7 := Shiber_O3.errKonc;
+Err16.8 := Shiber_O3.errAZOut;
+DA_ShO3 := Shiber_O3.da;
+StMeh[40] := Shiber_O3.state;
+yOpenShO3 := Shiber_O3.yOpenOut;
+yCloseShO3 := Shiber_O3.yCloseOut;
+Go_OpenShO3 := Shiber_O3.runToOpen;
+
+// ---
+Shiber_O4(opened:=Opened_ShO4, closed:=Closed_ShO4, toOpen:=((LOpen_ShO4 AND UnBlockSilos.0) OR (LOpen_ShO4 AND UnBlockSilos.4)), toClose:=LClose_ShO4, maxTTO:=t#15s, errAZ:=ErrAz_ShO4, yOpen:=yOpenShO4, yClose:=yCloseShO4, MH:=MhShO4, aMH:=aMhShO4);
+Go_CloseShO4 := Shiber_O4.runToClose;
+Err16.9 := Shiber_O4.errLT;
+Err16.10 := Shiber_O4.errKonc;
+Err16.11 := Shiber_O4.errAZOut;
+DA_ShO4 := Shiber_O4.da;
+StMeh[41] := Shiber_O4.state;
+yOpenShO4 := Shiber_O4.yOpenOut;
+yCloseShO4 := Shiber_O4.yCloseOut;
+Go_OpenShO4 := Shiber_O4.runToOpen;
+
+// ---
+Shiber_O5(opened:=Opened_ShO5, closed:=Closed_ShO5, toOpen:=((LOpen_ShO5 AND UnBlockSilos.0) OR (LOpen_ShO5 AND UnBlockSilos.5)), toClose:=LClose_ShO5, maxTTO:=t#15s, errAZ:=ErrAz_ShO5, yOpen:=yOpenShO5, yClose:=yCloseShO5, MH:=MhShO5, aMH:=aMhShO5);
+Go_CloseShO5 := Shiber_O5.runToClose;
+Err16.12 := Shiber_O5.errLT;
+Err16.13 := Shiber_O5.errKonc;
+Err16.14 := Shiber_O5.errAZOut;
+DA_ShO5 := Shiber_O5.da;
+StMeh[42] := Shiber_O5.state;
+yOpenShO5 := Shiber_O5.yOpenOut;
+yCloseShO5 := Shiber_O5.yCloseOut;
+Go_OpenShO5 := Shiber_O5.runToOpen;
+
+// ---
+Shiber_O6(opened:=Opened_ShO6, closed:=Closed_ShO6, toOpen:=((LOpen_ShO6 AND UnBlockSilos.0) OR (LOpen_ShO6 AND UnBlockSilos.6)), toClose:=LClose_ShO6, maxTTO:=t#15s, errAZ:=ErrAz_ShO6, yOpen:=yOpenShO6, yClose:=yCloseShO6, MH:=MhShO6, aMH:=aMhShO6);
+Go_CloseShO6 := Shiber_O6.runToClose;
+Err17.0 := Shiber_O6.errLT;
+Err17.1 := Shiber_O6.errKonc;
+Err17.2 := Shiber_O6.errAZOut;
+DA_ShO6 := Shiber_O6.da;
+StMeh[43] := Shiber_O6.state;
+yOpenShO6 := Shiber_O6.yOpenOut;
+yCloseShO6 := Shiber_O6.yCloseOut;
+Go_OpenShO6 := Shiber_O6.runToOpen;
+
+// ---
+Shiber_O7(opened:=Opened_ShO7, closed:=Closed_ShO7, toOpen:=((LOpen_ShO7 AND UnBlockSilos.0) OR (LOpen_ShO7 AND UnBlockSilos.7)), toClose:=LClose_ShO7, maxTTO:=t#15s, errAZ:=ErrAz_ShO7, yOpen:=yOpenShO7, yClose:=yCloseShO7, MH:=MhShO7, aMH:=aMhShO7);
+Go_CloseShO7 := Shiber_O7.runToClose;
+Err17.3 := Shiber_O7.errLT;
+Err17.4 := Shiber_O7.errKonc;
+Err17.5 := Shiber_O7.errAZOut;
+DA_ShO7 := Shiber_O7.da;
+StMeh[44] := Shiber_O7.state;
+yOpenShO7 := Shiber_O7.yOpenOut;
+yCloseShO7 := Shiber_O7.yCloseOut;
+Go_OpenShO7 := Shiber_O7.runToOpen;
+
+// ---
+Shiber_O8(opened:=Opened_ShO8, closed:=Closed_ShO8, toOpen:=((LOpen_ShO8 AND UnBlockSilos.0) OR (LOpen_ShO8 AND UnBlockSilos.8)), toClose:=LClose_ShO8, maxTTO:=t#15s, errAZ:=ErrAz_ShO8, yOpen:=yOpenShO8, yClose:=yCloseShO8, MH:=MhShO8, aMH:=aMhShO8);
+Go_CloseShO8 := Shiber_O8.runToClose;
+Err17.6 := Shiber_O8.errLT;
+Err17.7 := Shiber_O8.errKonc;
+Err17.8 := Shiber_O8.errAZOut;
+DA_ShO8 := Shiber_O8.da;
+StMeh[45] := Shiber_O8.state;
+yOpenShO8 := Shiber_O8.yOpenOut;
+yCloseShO8 := Shiber_O8.yCloseOut;
+Go_OpenShO8 := Shiber_O8.runToOpen;
+
+// ---

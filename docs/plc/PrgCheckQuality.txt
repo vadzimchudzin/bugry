@@ -1,0 +1,143 @@
+program PrgCheckQuality
+VAR
+  local   ii : WORD
+  local   jj : WORD
+  local   couStep : WORD
+  local   tmp : WORD
+  local   tmpVes : REAL
+  local   SUBNum : WORD
+  local   NeedRecalc : BOOL
+  local   NewPorc : REAL
+  local   Delta : REAL
+  local   PredLim : REAL
+  local   fl : BOOL
+  local   RecalcJDos : BOOL
+  local   FTrigAutoPause : Standard.F_TRIG
+  local   RTrigStopDosing : Standard.R_TRIG
+  local   flsds : INT
+  local   EmerStopSilo : BOOL
+  local   EmerStopExit1 : BOOL
+  local   EmerStopExit2 : BOOL
+  local   NewErr0 : WORD
+  local   rrr : LREAL
+  local   rr1 : LREAL
+  local   rr2 : LREAL
+  local   AllInit : BOOL
+  local   arr : ARRAY[1..10] OF DWORD
+  local   minIdNum : WORD
+  local   minId : DWORD
+  input   nnnnn : WORD
+END_VAR
+
+(* ST *)
+IF CheckDefect1 THEN
+			CheckDefect1:=FALSE;
+			FOR ii:=1 TO LenOrd1 DO
+				Delta:=VesD[Order1[ii]]-VesZ[Order1[ii]];
+				IF (Delta>0) AND (LimMax1[Order1[ii]]>0) THEN
+					PredLim:=VesZ[Order1[ii]]*LimMax1[Order1[ii]]/100;
+					IF Delta>PredLim THEN Defect1:=TRUE; END_IF
+				END_IF 
+				IF (Delta<0) AND (LimMin1[Order1[ii]]>0) THEN
+					PredLim:=VesZ[Order1[ii]]*LimMin1[Order1[ii]]/100;
+					IF ABS(Delta)>PredLim THEN Defect1:=TRUE; END_IF
+				END_IF 
+			END_FOR
+		END_IF
+		//IF Defect1 AND SmsUpState.0 AND (idS1=idK) THEN
+		//	SmsUpState.15:=TRUE;
+		//	Defect1:=FALSE;
+		//END_IF
+		
+		IF CheckDefect2 THEN
+			CheckDefect2:=FALSE;
+			FOR ii:=1 TO LenOrd2 DO
+				Delta:=VesDD[Order2[ii]]-VesZD[Order2[ii]];
+				IF (Delta>0) AND (LimMax2[Order2[ii]]>0) THEN
+					PredLim:=VesZD[Order2[ii]]*LimMax2[Order2[ii]]/100;
+					IF Delta>PredLim THEN Defect2:=TRUE; END_IF
+				END_IF 
+				IF (Delta<0) AND (LimMin2[Order2[ii]]>0) THEN
+					PredLim:=VesZD[Order2[ii]]*LimMin2[Order2[ii]]/100;
+					IF ABS(Delta)>PredLim THEN Defect2:=TRUE; END_IF
+				END_IF 
+			END_FOR
+		END_IF
+		IF Defect2 AND SmsUpState.1 AND (idS1=idD) THEN
+			SmsUpState.15:=TRUE;
+			Defect2:=FALSE;
+		END_IF
+	
+		IF CheckDefect3 THEN
+			CheckDefect3:=FALSE;
+			FOR ii:=1 TO LenOrd3 DO
+				Delta:=VesDM[Order3[ii]]-VesZM[Order3[ii]];
+				IF (Delta>0) AND (LimMax3[Order3[ii]]>0) THEN
+					PredLim:=VesZM[Order3[ii]]*LimMax3[Order3[ii]]/100;
+					IF Delta>PredLim THEN Defect3:=TRUE; END_IF
+				END_IF 
+				IF (Delta<0) AND (LimMin3[Order3[ii]]>0) THEN
+					PredLim:=VesZM[Order3[ii]]*LimMin3[Order3[ii]]/100;
+					IF ABS(Delta)>PredLim THEN Defect3:=TRUE; END_IF
+				END_IF 
+			END_FOR
+		END_IF
+		IF Defect3 AND SmsUpState.9 AND (idS1=idM) THEN
+			SmsUpState.15:=TRUE;
+			Defect3:=FALSE;
+		END_IF
+	
+		IF CheckDefect4 THEN
+			CheckDefect4:=FALSE;
+			Delta:=VesDJ[1]-VesZJ[1]; 
+			IF (Delta>0) AND (LimMax4[1]>0) THEN
+				PredLim:=VesZJ[1]*LimMax4[1]/100;
+				IF Delta>PredLim THEN Defect4:=TRUE; END_IF
+			END_IF 
+			IF (Delta<0) AND (LimMin4[1]>0) THEN
+				PredLim:=VesZJ[1]*LimMin4[1]/100;
+				IF ABS(Delta)>PredLim THEN Defect4:=TRUE; END_IF
+			END_IF 
+		END_IF
+		IF Defect4 THEN
+			SmsMainState.15:=TRUE;
+			Defect4:=FALSE;
+		END_IF
+
+		IF CheckDefect5 THEN
+			CheckDefect5:=FALSE;
+			Delta:=VesDJ[2]-VesZJ[2]; 
+			IF (Delta>0) AND (LimMax4[2]>0) THEN
+				PredLim:=VesZJ[2]*LimMax4[2]/100;
+				IF Delta>PredLim THEN Defect4:=TRUE; END_IF
+			END_IF 
+			IF (Delta<0) AND (LimMin4[2]>0) THEN
+				PredLim:=VesZJ[2]*LimMin4[2]/100;
+				IF ABS(Delta)>PredLim THEN Defect5:=TRUE; END_IF
+			END_IF 
+		END_IF
+		IF Defect5 THEN
+			SmsMainState.15:=TRUE;
+			Defect5:=FALSE;
+		END_IF
+		
+		IF SmsMainState.15 AND NOT SmsMainState.9 AND SmsMainState.0 AND (NOT Answ.0) THEN
+			Answ.0:=TRUE;  // запрос оператору
+			Answ.1:=FALSE;	// ответы обнуляем
+			Answ.2:=FALSE;
+			//Block.7:=TRUE; // блокируем сброс из смесителя	
+		END_IF
+		IF Answ.0 AND Answ.1 THEN  //ответ - продолжить
+			SmsMainState.15:=FALSE;
+			Answ.0:=FALSE;
+			Answ.1:=FALSE;
+			//Block.7:=FALSE;
+		END_IF
+		
+		IF Answ.0 AND Answ.2 AND ((BunkForDefect>0) AND (BunkForDefect<=CBGP)) THEN  //ответ - выгрузить в бункер BunkForDefect
+			Answ.0:=FALSE;
+			Answ.1:=FALSE;	
+			Answ.2:=FALSE;	
+			SmsMainState.15:=FALSE;
+			SmsMainState.9:=TRUE;
+		END_IF

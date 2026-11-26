@@ -1,0 +1,218 @@
+program InFromModBuseAndEthernet
+VAR
+  local   i : INT
+END_VAR
+
+(* ST *)
+IF MEmul THEN
+	IF Every100ms THEN
+		IF Go_PCH_DozKomp AND (Go_Pusk_K1 OR Go_Pusk_K2 OR Go_Pusk_K3 OR Go_Pusk_K4 OR Go_Pusk_K5 OR Go_Pusk_K6) THEN
+			EmulVes1:=EmulVes1+WORD_TO_REAL(FreqDozK)*2.3/5000.0;
+		END_IF;
+		IF Go_TrKomp THEN
+			IF EmulVes1>6 THEN EmulVes1:=EmulVes1-5.4; ELSE Emulves1:=0; END_IF;
+		END_IF
+		IF (Go_PCH_DozDob AND (Go_Pusk_D1 OR Go_Pusk_D2 OR Go_Pusk_D3 OR Go_Pusk_D4 OR Go_Pusk_D5 OR Go_Pusk_D6 OR Go_Pusk_D7 OR Go_Pusk_D8)) THEN
+			EmulVes2:=EmulVes2+WORD_TO_REAL(FreqDozD)*0.7/5000.0;
+		END_IF;
+		IF (Go_PCH_DozDob) THEN
+			EmulVes2:=EmulVes2+WORD_TO_REAL(FreqDozD)*0.43/5000.0;
+		END_IF;
+		IF Go_TrDob THEN
+			IF EmulVes2>4 THEN EmulVes2:=EmulVes2-3.2; ELSE Emulves2:=0; END_IF;
+		END_IF
+	END_IF;
+	Ves1MB.RealValue:=EmulVes1;
+	Ves2MB.RealValue:=EmulVes2;
+	//Ves1cas:=EmulVes1;
+	//Ves2cas:=EmulVes2;
+	//Ves211cas:=EmulVes211;
+	//Ves212cas:=EmulVes212;
+	//Ves213cas:=EmulVes213;
+END_IF
+
+Ves1.RealValue:=(Ves1MB.RealValue*Ves01a)+Ves01b;
+Ves2.RealValue:=(Ves2MB.RealValue*Ves02a)+Ves02b;
+Ves3.RealValue:=(Ves3MB.RealValue*Ves03a)+Ves03b;
+Ves4.RealValue:=(Ves4MB.RealValue*Ves04a)+Ves04b;
+Ves5.RealValue:=(Ves5MB.RealValue*Ves05a)+Ves05b;
+IF RunDosing THEN
+	Ves1_int:=REAL_TO_INT((Ves1.RealValue-Ves01) * 10.0);
+	Ves2_int:=REAL_TO_INT((Ves2.RealValue-Ves02) * 10.0);
+	Ves3_int:=REAL_TO_INT((Ves3.RealValue-Ves03) * 100.0);
+	Ves4_int:=REAL_TO_INT((Ves4.RealValue) * 10.0);
+	Ves5_int:=REAL_TO_INT((Ves5.RealValue) * 10.0);
+ELSE
+	Ves1_int:=REAL_TO_INT((Ves1.RealValue) * 10.0);
+	Ves2_int:=REAL_TO_INT((Ves2.RealValue) * 10.0);
+	Ves3_int:=REAL_TO_INT((Ves3.RealValue) * 100.0);
+	Ves4_int:=REAL_TO_INT((Ves4.RealValue) * 10.0);
+	Ves5_int:=REAL_TO_INT((Ves5.RealValue) * 10.0);
+END_IF
+V1:=REAL_TO_INT(Ves1.RealValue);
+V2:=REAL_TO_INT(Ves2.RealValue);
+//Ves3_int:=REAL_TO_INT((Ves3.RealValue-Ves03) * 100.0);
+V4:=REAL_TO_INT(Ves4.RealValue);
+//Ves5_int:=REAL_TO_INT((Ves5.RealValue) * 10.0);
+
+X02_0:=XX_from2[0].0;
+X02_1:=XX_from2[0].1;
+X02_2:=XX_from2[0].2;
+X02_3:=XX_from2[0].3;
+X02_4:=XX_from2[0].4;
+X02_5:=XX_from2[0].5;
+X02_6:=XX_from2[0].6;
+X02_7:=XX_from2[0].7;
+X02_8:=XX_from2[0].8;
+X02_9:=XX_from2[0].9;
+X02_10:=XX_from2[0].10;
+X02_11:=XX_from2[0].11;
+X02_12:=XX_from2[0].12;
+X02_13:=XX_from2[0].13;
+X02_14:=XX_from2[0].14;
+X02_15:=XX_from2[0].15;
+X02_16:=XX_from2[1].00;
+X02_17:=XX_from2[1].01;
+X02_18:=XX_from2[1].02;
+X02_19:=XX_from2[1].03;
+X02_20:=XX_from2[1].04;
+X02_21:=XX_from2[1].05;
+X02_22:=XX_from2[1].06;
+X02_23:=XX_from2[1].07;
+
+X21_0:=XX_from2[2].0;
+X21_1:=XX_from2[2].1;
+X21_2:=XX_from2[2].2;
+X21_3:=XX_from2[2].3;
+X21_4:=XX_from2[2].4;
+X21_5:=XX_from2[2].5;
+X21_6:=XX_from2[2].6;
+X21_7:=XX_from2[2].7;
+X21_8:=XX_from2[2].8;
+X21_9:=XX_from2[2].9;
+X21_10:=XX_from2[2].10;
+X21_11:=XX_from2[2].11;
+X21_12:=XX_from2[2].12;
+X21_13:=XX_from2[2].13;
+X21_14:=XX_from2[2].14;
+X21_15:=XX_from2[2].15;
+X21_16:=XX_from2[3].00;
+X21_17:=XX_from2[3].01;
+X21_18:=XX_from2[3].02;
+X21_19:=XX_from2[3].03;
+X21_20:=XX_from2[3].04;
+X21_21:=XX_from2[3].05;
+X21_22:=XX_from2[3].06;
+X21_23:=XX_from2[3].07;
+X21_24:=XX_from2[3].08;
+X21_25:=XX_from2[3].09;
+X21_26:=XX_from2[3].10;
+X21_27:=XX_from2[3].11;
+X21_28:=XX_from2[3].12;
+X21_29:=XX_from2[3].13;
+X21_30:=XX_from2[3].14;
+X21_31:=XX_from2[3].15;
+
+X22_0:=XX_from2[4].0;
+X22_1:=XX_from2[4].1;
+X22_2:=XX_from2[4].2;
+X22_3:=XX_from2[4].3;
+X22_4:=XX_from2[4].4;
+X22_5:=XX_from2[4].5;
+X22_6:=XX_from2[4].6;
+X22_7:=XX_from2[4].7;
+X22_8:=XX_from2[4].8;
+X22_9:=XX_from2[4].9;
+X22_10:=XX_from2[4].10;
+X22_11:=XX_from2[4].11;
+X22_12:=XX_from2[4].12;
+X22_13:=XX_from2[4].13;
+X22_14:=XX_from2[4].14;
+X22_15:=XX_from2[4].15;
+X22_16:=XX_from2[5].00;
+X22_17:=XX_from2[5].01;
+X22_18:=XX_from2[5].02;
+X22_19:=XX_from2[5].03;
+X22_20:=XX_from2[5].04;
+X22_21:=XX_from2[5].05;
+X22_22:=XX_from2[5].06;
+X22_23:=XX_from2[5].07;
+X22_24:=XX_from2[5].08;
+X22_25:=XX_from2[5].09;
+X22_26:=XX_from2[5].10;
+X22_27:=XX_from2[5].11;
+X22_28:=XX_from2[5].12;
+X22_29:=XX_from2[5].13;
+X22_30:=XX_from2[5].14;
+X22_31:=XX_from2[5].15;
+
+X23_0:=XX_from2[6].0;
+X23_1:=XX_from2[6].1;
+X23_2:=XX_from2[6].2;
+X23_3:=XX_from2[6].3;
+X23_4:=XX_from2[6].4;
+X23_5:=XX_from2[6].5;
+X23_6:=XX_from2[6].6;
+X23_7:=XX_from2[6].7;
+X23_8:=XX_from2[6].8;
+X23_9:=XX_from2[6].9;
+X23_10:=XX_from2[6].10;
+X23_11:=XX_from2[6].11;
+X23_12:=XX_from2[6].12;
+X23_13:=XX_from2[6].13;
+X23_14:=XX_from2[6].14;
+X23_15:=XX_from2[6].15;
+X23_16:=XX_from2[7].00;
+X23_17:=XX_from2[7].01;
+X23_18:=XX_from2[7].02;
+X23_19:=XX_from2[7].03;
+X23_20:=XX_from2[7].04;
+X23_21:=XX_from2[7].05;
+X23_22:=XX_from2[7].06;
+X23_23:=XX_from2[7].07;
+X23_24:=XX_from2[7].08;
+X23_25:=XX_from2[7].09;
+X23_26:=XX_from2[7].10;
+X23_27:=XX_from2[7].11;
+X23_28:=XX_from2[7].12;
+X23_29:=XX_from2[7].13;
+X23_30:=XX_from2[7].14;
+X23_31:=XX_from2[7].15;
+
+X24_0:=XX_from2[8].0;
+X24_1:=XX_from2[8].1;
+X24_2:=XX_from2[8].2;
+X24_3:=XX_from2[8].3;
+X24_4:=XX_from2[8].4;
+X24_5:=XX_from2[8].5;
+X24_6:=XX_from2[8].6;
+X24_7:=XX_from2[8].7;
+X24_8:=XX_from2[8].8;
+X24_9:=XX_from2[8].9;
+X24_10:=XX_from2[8].10;
+X24_11:=XX_from2[8].11;
+X24_12:=XX_from2[8].12;
+X24_13:=XX_from2[8].13;
+X24_14:=XX_from2[8].14;
+X24_15:=XX_from2[8].15;
+X24_16:=XX_from2[9].00;
+X24_17:=XX_from2[9].01;
+X24_18:=XX_from2[9].02;
+X24_19:=XX_from2[9].03;
+X24_20:=XX_from2[9].04;
+X24_21:=XX_from2[9].05;
+X24_22:=XX_from2[9].06;
+X24_23:=XX_from2[9].07;
+X24_24:=XX_from2[9].08;
+X24_25:=XX_from2[9].09;
+X24_26:=XX_from2[9].10;
+X24_27:=XX_from2[9].11;
+X24_28:=XX_from2[9].12;
+X24_29:=XX_from2[9].13;
+X24_30:=XX_from2[9].14;
+X24_31:=XX_from2[9].15;
+
+TokCur1MB := XX_from2a[0];
+TokCur2MB := XX_from2a[1];
+//:= XX_from2a[2];
+//:= XX_from2a[3];

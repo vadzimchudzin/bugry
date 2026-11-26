@@ -1,0 +1,125 @@
+functionBlock PitGranPCH
+VAR
+  input   next : BOOL  // Следующий механизм (транспортер запустится через
+  input   prev : BOOL  // Предыдущий механизм
+  input   errPCH : BOOL := FALSE  // Ошибка ПЧ
+  input   workPch : BOOL := TRUE  // сигнал нормальной работы от частотника
+  input   DKS : BOOL
+  input   dksMustBlink : BOOL := TRUE
+  input   Dks_Off : BOOL
+  input   DksPerion : TIME
+  input   DP : BOOL := FALSE  // Датчик подпора
+  input   DP_off : BOOL  // Не учитывать ДП
+  input   HandMode : BOOL  // Работа в ручном режиме
+  input   canRunAuto : BOOL  // Условие для необходимости работы в автоматическом режиме
+  input   timeBeforeStart : TIME := TIME#5s0ms  // Пауза перед запуском в автоматическом режиме
+  input   timeToStop : TIME := TIME#20s0ms  // Время на выгрузку из нории при остановке автоматического режима
+  input   yRun : BOOL  // Пуск в ручном режиме
+  output  run : BOOL := FALSE  // Включение транспотера
+  output  OnPch : BOOL
+  output  da : BOOL := FALSE  // Авария механизма
+  output  err_Dks : BOOL
+  output  err_DP : BOOL := FALSE  // Авария ДП
+  output  errPCH_Save : BOOL
+  output  errWork : BOOL
+  output  yRunOut : BOOL
+  output  runAuto : BOOL
+  output  state : WORD := 0  // Состояние транспортера (0 выкл.без аварии, 1-включен, 2-авария)
+  output  reset_PCH : BOOL
+  local   rr : BOOL  // Готовность к работе
+  local   t_dks_on : TON
+  local   t_dks_off : TON
+  local   TON_START : TON
+  local   TON_STOP : TON
+  local   offState : WORD := 0
+  local   runState : WORD := 1
+  local   alarmState : WORD := 2
+  local   temp : BOOL
+  local   TON_Tr_PCH : TON
+  local   TOF_ResetPch : TOF
+  local   MHCalc_0 : MHCalc
+  local   TON_NotWorkPch : TON
+  inOut   FreqManual : WORD  // Частота в ручном режиме
+  inOut   FreqAuto : WORD  // частота в авто режиме
+  inOut   FreqPCH : WORD  // частота частотника * 100
+  inOut   MH : DWORD
+  inOut   aMH : DWORD
+END_VAR
+
+(* LD *)
+
+// --- Авария датчика подпора
+IF dp AND NOT DP_off THEN err_DP := TRUE; END_IF
+
+// ---
+IF errPCH THEN errPCH_Save := TRUE; END_IF
+
+// --- Таймера на аварию ДКС
+t_dks_on(IN:=run AND OnPch AND workPch AND NOT MEmul AND dks, PT:=DksPerion);
+t_dks_off(IN:=run AND OnPch AND workPch AND NOT MEmul AND NOT dks, PT:=DksPerion);
+
+// --- Авария ДКС
+IF ((((t_dks_on.Q OR t_dks_off.Q) AND dksMustBlink) OR (t_dks_off.Q AND NOT dksMustBlink)) AND run) AND NOT DKS_off THEN err_DKS := TRUE; END_IF
+
+// ---
+TON_NotWorkPch(IN:=OnPch AND run AND NOT WorkPch, PT:=t#5s);
+IF TON_NotWorkPch.Q THEN errWork := TRUE; END_IF
+
+// --- Сброс аварий
+IF ResetErrors THEN errWork := FALSE; END_IF
+IF ResetErrors THEN errPCH_Save := FALSE; END_IF
+IF ResetErrors THEN err_Dks := FALSE; END_IF
+IF ResetErrors THEN err_DP := FALSE; END_IF
+TOF_ResetPch(IN:=ResetErrors, PT:=t#200ms);
+reset_PCH := TOF_ResetPch.Q;
+
+// --- Готовность к работе
+rr := NOT err_Dks AND NOT err_DP AND NOT errPCH_Save AND NOT errWork AND NOT GEmer;
+da := NOT (NOT err_Dks AND NOT err_DP AND NOT errPCH_Save AND NOT errWork);
+
+// ---
+IF canRunAuto AND R_TRIG(HandMode) THEN yRun := run; END_IF
+IF run /*EN=canRunAuto AND R_TRIG(HandMode)*/ THEN FreqManual := FreqAuto; END_IF
+IF FreqAuto /*EN=run /*EN=canRunAuto AND R_TRIG(HandMode)*/*/ THEN runAuto := FALSE; END_IF
+IF canRunAuto AND F_TRIG(HandMode) THEN runAuto := yRun; END_IF
+IF yRun /*EN=canRunAuto AND F_TRIG(HandMode)*/ THEN FreqAuto := FreqManual; END_IF
+
+// --- Сброс yRun - ручного запуска из Скады в ручном режиме
+IF (NOT HandMode OR NOT rr OR (NOT MGod AND NOT next)) THEN yRun := FALSE; END_IF
+
+// --- Запуск автоматического режима
+TON_START(IN:=canRunAuto AND rr AND next, PT:=timeBeforeStart);
+IF TON_START.Q THEN runAuto := TRUE; END_IF
+
+// --- Остановка в автоматическом режиме
+TON_STOP(IN:=NOT prev AND NOT canRunAuto, PT:=timeToStop);
+
+// --- Сброс автоматического режима
+IF (TON_STOP.Q OR NOT rr OR NOT next) THEN runAuto := FALSE; END_IF
+
+// --- Включение пускателя
+run := ((runAuto AND NOT HandMode) OR yRun);
+
+// --- Включение ПЧ
+TON_Tr_PCH(IN:=NOT GEmer, PT:=t#150ms);
+OnPch := TON_Tr_PCH.Q;
+
+// ---
+IF (FreqManual < 200) /*EN=run AND OnPch AND yRun*/ THEN FreqManual := 200; END_IF
+IF run AND OnPch AND yRun THEN FreqPCH := FreqManual; END_IF
+IF run AND OnPch AND runAuto THEN FreqPCH := FreqAuto; END_IF
+IF run THEN FreqPCH := 0; END_IF
+
+// ---
+MHCalc_0(Run:=OnPch AND run, MH:=MH, aMH:=aMH);
+
+// ---
+yRunOut := yRun;
+
+// --- Статус транспортера (0-выключен без аварии, 1-работает, 2-авария)
+IF NOT da AND NOT run THEN state := offState; END_IF
+temp := offState /*EN=NOT da AND NOT run*/;
+IF NOT da AND run THEN state := runState; END_IF
+temp := runState /*EN=NOT da AND run*/;
+IF da THEN state := alarmState; END_IF
+temp := alarmState /*EN=da*/;

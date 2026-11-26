@@ -1,0 +1,217 @@
+program MainCycleUnload
+VAR
+  local   ii : WORD
+  local   jj : WORD
+  local   couStep : WORD
+  local   tmp : WORD
+  local   tmpVes : REAL
+  local   SelectLoadBunk : BOOL  // заполнить массив LoadBunkK
+  local   SelectLoadBunkD : BOOL  // Перезапуск загрузки добавок в другой бункер
+  local   SelectUnloadBunk : BOOL
+  local   SUBNum : WORD
+  local   NeedRecalc : BOOL
+  local   NewPorc : REAL
+  local   Delta : REAL
+  local   PredLim : REAL
+  local   fl : BOOL
+  local   RecalcJDos : BOOL
+  local   FTrigAutoPause : Standard.F_TRIG
+  local   RTrigStopDosing : Standard.R_TRIG
+  local   flsds : INT
+  local   RS_Unload : Standard.R_TRIG
+  local   EmerStopSilo : BOOL
+  local   EmerStopExit1 : BOOL
+  local   EmerStopExit2 : BOOL
+  local   NewErr0 : WORD
+  local   TON_GranIsEmpty : TON
+  local   TON_TokGranIsIdle : TON
+  local   TON_KonvPVHIsEmpty : TON
+  local   UnloadSt1 : WORD
+  local   wwwww : TIME
+  input   nnnnn : WORD
+END_VAR
+
+(* ST *)
+//выгрузка ГП
+	SelectUnloadBunk:=0;
+	RS_Unload(CLK:=UnloadSt.0);  
+	IF RS_Unload.Q OR 
+		((Closed_Sh50310 OR DA_Sh50310) AND (Closed_Sh50320 OR DA_Sh50320) AND (Closed_Sh50330 OR DA_Sh50330) AND 
+		 (Closed_Sh50410 OR DA_Sh50410) AND (Closed_Sh50420 OR DA_Sh50420) AND (Closed_Sh50430 OR DA_Sh50430))  THEN
+		CloseAllSh3:=0;
+	END_IF
+	
+	IF GranUnl309 THEN
+		AllUnloadGPStop := NOT (Go_Nor7);
+	ELSIF GranUnl310 THEN
+		AllUnloadGPStop := NOT (Go_Nor6 OR Go_Pros1 OR Go_Pros2);
+	ELSE
+		AllUnloadGPStop := NOT (Go_TrGP1 OR Go_TrGP2 OR Go_TrGP);
+	END_IF
+	UnloadSt.8:=UnloadSt.2 OR UnloadSt.3 OR UnloadSt.4 OR UnloadSt.5; 
+	IF (NOT AllUnloadGPStop) AND ((UnloadSt AND 3)>0) AND ((UnloadSt AND 3)<3) THEN
+		//есть или .0 или .1 но не оба
+		UnloadSt.8:=1;
+	END_IF
+	IF AllUnloadGPStop AND (NOT UnloadSt.0) AND (UnloadSt.1) THEN
+		UnloadSt:=0;
+		CloseAllSh3:=1;
+	END_IF
+	IF (NOT (UnloadSt.0)) (*OR UnloadSt.7*) THEN UnloadSt.2:=0; END_IF	//
+
+	//IF UnloadSt.0 AND NOT RunDosing THEN  	
+	//	//автовыгрузка когда не запущено производство
+	//	//при запущеном производстве выгрузка начнется когда     IF msgToScadaUnl=1 AND msgFromScadaUnl>0 THEN
+	//	IF UnloadSt.1=0 THEN  //выгрузка включена, но еще не началась
+	//		IF (UnloadList[1]>0) THEN
+	//			UnloadSt:=1+2+64;	//0,1,6  обычная выгрузка						
+	//			SelectUnloadBunk:=1;	//заполнить UnloadBunk
+	//			//ситуация UnloadList[1]=0 отсекается в скаде
+	//		END_IF
+	//	END_IF
+	//END_IF
+	
+	IF UnloadSt=1 OR UnloadSt=3 THEN  	
+		//автовыгрузка пытается начаться
+		IF (UnloadList[1]>0) THEN
+			IF RunDosing THEN
+				IF CurTaskSms3>0 THEN
+					UnloadSt:=1+2+64;	//0,1,6  обычная выгрузка
+				END_IF
+			ELSE						
+				UnloadSt:=1+2+64;	//0,1,6  обычная выгрузка
+			END_IF						
+			SelectUnloadBunk:=1;	//заполнить UnloadBunk
+			//ситуация UnloadList[1]=0 отсекается в скаде
+		END_IF
+	END_IF
+	
+	IF UnloadSt.8 THEN  //идет остановка (перестроение на другой бункер или полная остановка)
+		IF AllUnloadGPStop THEN
+			//все механизмы остановлены
+			IF UnloadSt.2 THEN
+				UnloadSt.2:=0;
+				IF UnloadSt.6 THEN
+					//если шла выгрузка качественного продукта - переходим к следующему бункеру
+					UnloadSt.4:=1;
+					UnloadSt.6:=0;
+				ELSIF UnloadSt.7 THEN
+					//если шла выгрузка брака - переходим к бункеру, первому в списке
+					UnloadSt.3:=1;
+					UnloadSt.7:=0;
+				END_IF
+			ELSE
+				IF NOT RunDosing THEN
+					UnloadSt:=0;
+					CloseAllSh3:=1;
+				END_IF
+			END_IF
+			IF UnloadSt.1 AND NOT UnloadSt.0 THEN
+				//остановка при выгрузке последней порции ПП
+				FOR ii:=1 TO CBGP DO
+					UnloadList[ii]:=0;
+				END_FOR
+				idS3:=0;
+				CurPortSms3:=0;	
+				UnloadSt:=1;	
+				IF NOT RunDosing THEN
+					UnloadSt:=0;
+					CloseAllSh3:=1;
+				END_IF
+			ELSIF UnloadSt.3 THEN	//обычная выгрузка восстановлена (после выгрузки брака)
+				UnloadSt:=1+2+64;	//0,1,6  обычная выгрузка	
+			ELSIF UnloadSt.4 THEN
+				//переходим на следующий бункер
+				couStep:=0;
+				FOR ii:=2 TO CBGP DO
+					IF UnloadList[ii]=0 THEN
+						EXIT;
+					ELSIF NOT DVU_Silo[UnloadList[ii]] THEN
+						couStep:=ii-1;
+						EXIT;
+					END_IF
+				END_FOR
+				IF couStep>0 THEN
+					//найден ближайший пустого бункера в очереди
+					FOR jj:=1 TO couStep DO
+						tmp:=UnloadList[1];
+						FOR ii:=1 TO CBGP DO
+							IF UnloadList[ii+1]>0 THEN
+								UnloadList[ii]:=UnloadList[ii+1];
+							ELSE
+								UnloadList[ii]:=tmp;
+								EXIT;
+							END_IF
+						END_FOR
+					END_FOR
+					UnloadSt:=1+2+64;
+					FOR ii:=1 TO CBGP DO
+					  UnloadBunk[ii]:=(UnloadList[1]=ii);
+					END_FOR
+					PolnSiloCur:=0;
+					Answ.12:=0;						
+					MsgToScada.5:=1;	//для скады
+				ELSIF Answ.12=0 THEN
+					//не найдено пустого бункера в очереди
+					Answ.12:=1;
+					MsgToScada.2:=1;	//для скады
+				END_IF
+			ELSIF UnloadSt.5 THEN
+				IF DNU_DownBunk THEN	//под смесителем уже лежит бракованная порция
+					UnloadSt:=1+2+128;	//выгружаем брак
+				END_IF
+			END_IF
+			SelectUnloadBunk:=1;					
+		END_IF 
+	END_IF
+	
+	IF Answ.12 AND NOT UnloadSt.4 THEN Answ.12:=0; END_IF
+	UnloadSt.9:=(UnloadSt.6 OR UnloadSt.7) AND NOT UnloadSt.2;
+	IF UnloadSt.9 THEN
+		IF UnloadSt.6 THEN
+			IF PolnSiloCur THEN
+				UnloadSt:=1+2+16;  //начинается перестройка на выгрузку в следующий по очереди бункер
+				IF (UnloadList[2]=0) AND Answ.10=0 THEN
+					Answ.10:=1;
+					Answ.11:=0;
+					MsgToScada.2:=1;	//для скады
+					//SelectUnloadBunk:=1;
+				END_IF
+			END_IF
+		END_IF
+		IF UnloadSt.7 THEN
+			IF PolnSiloCur AND NOT UnloadSt.10 THEN
+				Answ.10:=1;
+				Answ.11:=0;
+				MsgToScada.5:=1;	//для скады
+			END_IF
+		END_IF
+	END_IF
+	IF Answ.10 AND Answ.11 THEN
+		//оператор установил новое значение BunkForDefect
+ 		SelectUnloadBunk:=1;
+		Answ.10:=0;
+		Answ.11:=0;
+	END_IF
+  
+SelectUnloadBunk := TRUE;
+(*FOR ii:=1 TO CBGP DO
+	IF UnloadBunk[ii] THEN
+		SelectUnloadBunk:=FALSE;
+	END_IF
+END_FOR*)
+
+IF SelectUnloadBunk OR UnloadSt=0 THEN
+	IF UnloadSt=0 THEN
+		SUBNum:=0;
+	ELSIF UnloadSt.7 THEN
+	  SUBNum:=BunkForDefect;
+	ELSE
+	  SUBNum:=UnloadList[1];
+	END_IF
+	IF UnloadSt=0 THEN SUBNum:=0; END_IF
+	FOR ii:=1 TO CBGP DO
+	  UnloadBunk[ii]:=(SUBNum=ii);
+	END_FOR
+	SelectUnloadBunk:=0;
+END_IF

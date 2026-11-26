@@ -1,0 +1,46 @@
+functionBlock Produv
+VAR
+  input   RunAuto : BOOL := FALSE  // Условие для включения механизма
+  input   HandMode : BOOL  // ручной режим
+  input   yProduv : BOOL
+  output  Go_Produv : BOOL
+  output  Done : BOOL := FALSE  // дозирование закончено успешно
+  output  yProduvOut : BOOL
+  local   Run : BOOL
+  local   ProduvS1 : BOOL
+  local   ProduvS2 : BOOL
+  local   ProduvS3 : BOOL
+  local   TON_StopProduv1 : TON
+  local   TON_StopProduv2 : TON
+  local   TON_StopProduv3 : TON
+  inOut   DONE_Reset : BOOL  // сброс флага выполненного дозирования
+END_VAR
+
+(* LD *)
+
+// ---
+IF ((yProduv AND NOT HandMode) OR (yProduv AND GEmer)) THEN yProduv := FALSE; END_IF
+
+// ---
+IF ((R_TRIG(RunAuto) AND NOT HandMode) OR yProduv OR DONE_Reset) THEN Done := FALSE; END_IF
+
+// ---
+IF DONE_Reset THEN DONE_Reset := FALSE; END_IF
+
+// ---
+Run := ((RunAuto AND NOT HandMode) OR yProduv);
+
+// ---
+IF R_TRIG(Run) THEN ProduvS1 := TRUE; END_IF
+
+// ---
+TON_StopProduv1(IN:=ProduvS1, PT:=t#4s);
+IF TON_StopProduv1.Q THEN Done := TRUE; END_IF
+IF TON_StopProduv1.Q THEN yProduv := FALSE; END_IF
+IF TON_StopProduv1.Q THEN ProduvS1 := FALSE; END_IF
+
+// ---
+Go_Produv := ProduvS1;
+
+// ---
+yProduvOut := yProduv;

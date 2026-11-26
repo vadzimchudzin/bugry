@@ -1,0 +1,46 @@
+functionBlock GW
+VAR
+  input   opened : BOOL  // Открыт
+  input   closed : BOOL  // Закрыт
+  input   toOpen : BOOL  // Открыть в авто режиме
+  input   maxTTO : TIME := TIME#10s0ms  // максимальное время на переключение
+  input   notHand : BOOL
+  output  runToOpen : BOOL  // Открыть шибер
+  output  errLT : BOOL  // Авария "Долгое переключение"
+  output  errKonc : BOOL
+  output  da : BOOL  // Необходимость сигнализации об аварии
+  inOut   yOpen : BOOL  // Кнопка "Открыть" в ручном режиме со скады
+  local   TON_LT : TON  // Таймер на аварию долгого переключения
+  local   rr : BOOL  // Готовность к работе
+  local   TON_Konc : TON
+  local   TON_START : TON
+  local   CleanTON : BOOL
+END_VAR
+
+(* LD *)
+
+// --- Прервать счётчик долгого переключения
+CleanTON := ((R_TRIG(runToOpen)) OR (F_TRIG(runToOpen)));
+
+// --- Долгое переключение шибера
+TON_LT(IN:=(((runToOpen AND NOT opened) OR (NOT runToOpen AND NOT closed)) AND NOT CleanTON) AND NOT ResetErrors, PT:=maxTTO);
+IF TON_LT.Q THEN errLT := TRUE; END_IF
+
+// --- Авария концевиков
+TON_Konc(IN:=opened AND closed, PT:=t#1s);
+IF TON_Konc.Q THEN errKonc := TRUE; END_IF
+
+// --- Сброс Аварий
+IF ResetErrors THEN errLT := FALSE; END_IF
+IF ResetErrors THEN errKonc := FALSE; END_IF
+
+// --- Готовность к работе
+rr := NOT errLT AND NOT errKonc AND NOT GEmer;
+da := NOT (NOT errLT AND NOT errKonc);
+
+// --- Сброс yOpen, yClose
+IF (notHand OR NOT rr) THEN yOpen := FALSE; END_IF
+
+// --- Открытие
+TON_START(IN:=((rr AND yOpen) OR (rr AND MAuto AND toOpen)), PT:=t#500ms);
+runToOpen := TON_START.Q;

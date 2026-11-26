@@ -1,0 +1,17 @@
+functionBlock MHCalc
+VAR
+  input   Run : BOOL
+  local   MHStart : DWORD := 0
+  local   TON_MH : TON
+  inOut   MH : DWORD
+  inOut   aMH : DWORD
+END_VAR
+
+(* LD *)
+
+// ---
+TON_MH(IN:=Run AND NOT TON_MH.Q, PT:=t#100ms);
+IF TON_MH.Q THEN MHStart := (MHStart+1); END_IF
+IF (MHStart > 9) /*EN=(MHStart+1) /*EN=TON_MH.Q*/*/ THEN MHStart := 0; END_IF
+IF 0 /*EN=(MHStart > 9) /*EN=(MHStart+1) /*EN=TON_MH.Q*/*/*/ THEN MH := (MH+1); END_IF
+IF (MH+1) /*EN=0 /*EN=(MHStart > 9) /*EN=(MHStart+1) /*EN=TON_MH.Q*/*/*/*/ THEN aMH := (aMH+1); END_IF

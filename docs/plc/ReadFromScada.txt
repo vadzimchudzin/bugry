@@ -1,0 +1,130 @@
+program ReadFromScada
+VAR
+  local   ii : WORD
+END_VAR
+
+(* ST *)
+OffDP_NorHole 	:=OffSens1. 0;
+		OffDKS_NorHole	:=OffSens1. 1;
+		OffDSL1_NorHole	:=1;//OffSens1. 2;
+		OffDSL2_NorHole	:=1;//OffSens1. 3;
+		//OffDP_Nor1 		:=OffSens1. 4;
+		OffDKS_Nor1		:=OffSens1. 5;
+		OffDSL1_Nor1    :=1;//OffSens1. 6;
+		OffDSL2_Nor1    :=1;//OffSens1. 7;
+		//OffDP_Nor2      :=OffSens1. 8;
+		OffDKS_Nor2     :=OffSens1. 9;
+		OffDSL1_Nor2    :=1;//OffSens1.10;
+		OffDSL2_Nor2    :=1;//OffSens1.11;
+		//OffDP_NorHoleD  :=OffSens1.12;
+		//OffDKS_NorHoleD :=OffSens1.13;
+		//OffDSL1_NorHoleD:=OffSens1.14;
+		//OffDSL2_NorHoleD:=OffSens1.15;
+		//OffDP_Nor3      :=OffSens2. 0;
+		OffDKS_Nor3     :=OffSens2. 1;
+		OffDSL1_Nor3    :=1;//OffSens2. 2;
+		OffDSL2_Nor3    :=1;//OffSens2. 3;
+		//OffDP_Nor4      :=OffSens2. 4;
+		OffDKS_Nor4     :=OffSens2. 5;
+		OffDSL1_Nor4    :=1;//OffSens2. 6;
+		OffDSL2_Nor4    :=1;//OffSens2. 7;
+		//OffDP_Nor5      :=OffSens2. 8;
+		//OffDKS_Nor5     :=OffSens2. 9;
+		//OffDSL1_Nor5    :=OffSens2.10;
+		//OffDSL2_Nor5    :=OffSens2.11;
+		//OffDP_Nor6 		:=OffSens2.12;
+		//OffDKS_Nor6     :=OffSens2.13;
+		//OffDSL1_Nor6    :=OffSens2.14;
+		//OffDSL2_Nor6    :=OffSens2.15;
+		//OffDP_Nor7      :=OffSens3. 0;
+		//OffDKS_Nor7     :=OffSens3. 1;
+		//OffDSL1_Nor7    :=OffSens3. 2;
+		//OffDSL2_Nor7    :=OffSens3. 3;
+		//OffDP_Nor8      :=1;//OffSens3. 4;
+		//OffDKS_Nor8     :=OffSens3. 5;
+		//OffDSL1_Nor8    :=OffSens3. 6;
+		//OffDSL2_Nor8    :=OffSens3. 7;
+
+		OffDKS_TrHole 	:=1;//OffSens3. 8; 	//Не учитывать ДКС
+		OffDP_TrHole 	:=OffSens3. 9; 	//Не учитывать ДП
+		OffDKS_Tr1 		:=OffSens3.10;
+		OffDP1_Tr1 		:=OffSens3.11;
+		OffDP2_Tr1 		:=OffSens3.12;
+		OffDKS_Tr1L		:=OffSens3.13;
+		OffDP_Tr1L 		:=OffSens3.14;
+		OffDKS_Tr1R		:=OffSens4. 0;
+		OffDP_Tr1R 		:=OffSens4. 1;		
+		OffDKS_TrKomp	:=OffSens4. 2;
+		OffDP_TrKomp	:=OffSens4. 3; 
+		//OffDKS_Tr2      :=OffSens4. 4;
+		//OffDP_Tr2       :=OffSens4. 5;
+		OffDKS_TrDob    :=OffSens4. 6;
+		OffDP_TrDob     :=OffSens4. 7;
+		OffDKS_TrDrob   :=TRUE;//OffSens4. 8;
+		OffDP_TrDrob    :=OffSens4. 9;
+		//OffDKS_Tr3      :=OffSens4.10;
+		//OffDP_Tr3       :=OffSens4.11;
+		OffDKS_TrSms    :=OffSens4.12;
+		OffDP_TrSms     :=OffSens4.13;
+		//OffDKS_Tr7      :=OffSens4.14;
+		//OffDP_Tr7       :=OffSens4.15;
+		//OffDKS_TrPVH    :=TRUE;//OffSens5. 0;		
+		//OffDP_TrPVH     :=OffSens5. 1;
+		//OffDKS_Tr5      :=OffSens5. 2;
+		//OffDP_Tr5       :=OffSens5. 3;
+		//OffDKS_Tr6      :=OffSens5. 4;
+		//OffDP_Tr6       :=OffSens5. 5;
+		OffDKS_TrGP     :=OffSens5. 6;
+		OffDP_TrGP      :=OffSens5. 7;
+		OffDKS_TrGP1    :=OffSens5. 8;
+		OffDP_TrGP1    :=OffSens5. 9;
+		//OffDP2_TrGP1    :=OffSens5.10;
+		OffDKS_TrGP2    :=OffSens5.11;
+		OffDP_TrGP2    :=OffSens5.12;
+		//OffDP2_TrGP2	:=OffSens5.13;	
+		//OffDKS_TrGP3    :=OffSens5.14;
+		//OffDP1_TrGP3    :=OffSens5.15;
+		//OffDP2_TrGP3    :=OffSens3.15;	//все правильно
+		
+		OffDP_K1        :=OffSens6. 1;
+		OffDP_K2        :=OffSens6. 2;
+		OffDP_K3        :=OffSens6. 3;
+		OffDP_K4        :=OffSens6. 4;
+		OffDP_K5        :=OffSens6. 5;
+		OffDP_K6        :=OffSens6. 6;
+		//OffDP_K7        :=OffSens6. 7;
+		//OffDP_K8        :=OffSens6. 8;
+		//OffDP_K9        :=OffSens6. 9;
+		//OffDP_K10 		:=OffSens6.10;
+		OffDKS_K1       :=OffSens6.11;
+		OffDKS_K2       :=OffSens6.12;
+		OffDKS_K3       :=OffSens6.13;
+		OffDKS_K4       :=OffSens6.14;
+		OffDKS_K5       :=OffSens6.15;
+		OffDKS_K6       :=OffSens7. 0;
+		//OffDKS_K7       :=OffSens7. 1;
+		//OffDKS_K8       :=OffSens7. 2;
+		//OffDKS_K9       :=OffSens7. 3;
+		//OffDKS_K10      :=OffSens7. 4;
+		//OffDP_D1        :=OffSens7. 5;
+		//OffDP_D2        :=OffSens7. 6;
+		//OffDP_D3        :=OffSens7. 7;
+		//OffDP_D4        :=OffSens7. 8;
+
+		OffDKS_Gway1		:=OffSens7. 9;
+		//OffDks_ZatvTrDrob	:=OffSens7.10;
+		OffDoorUp			:=OffSens7.11;
+		OffDKSSms       	:=OffSens7.12;
+		OffDoorSms      	:=OffSens7.13;
+		OffDoorDown			:=OffSens7.14;
+		//OffDKSDrob     		:=OffSens8. 0;
+		OffDoor_Drob1     	:=OffSens8. 1;
+		OffDoor_Drob2     	:=OffSens8. 2;
+		
+		
+		
+	PauseDosingK:=MsgFromScada.1;
+	PauseDosingD:=MsgFromScada.2;
+	PauseDosingM:=MsgFromScada.3;
+	PauseDosingJ1:=MsgFromScada.4;
+	flTryDoliv:=Regim2.2;

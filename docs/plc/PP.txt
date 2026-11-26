@@ -1,0 +1,107 @@
+functionBlock PP
+VAR
+  input   curPos1 : BOOL := FALSE  // Установлено положение 1
+  input   curPos2 : BOOL := FALSE  // Установлено положение 2
+  input   toPos1 : BOOL  // Установить в положение 1
+  input   toPos2 : BOOL  // Установить в положение 2
+  input   maxTTO : TIME := TIME#25s0ms  // максимальное время на переключение
+  input   errAz : BOOL := FALSE  // Авария автомата защиты
+  input   HandMode : BOOL := FALSE
+  input   yRun1 : BOOL  // Кнопка переключения в положение 1 на скаде
+  input   yRun2 : BOOL  // Кнопка переключения в положение 2 на скаде
+  output  runToPos1 : BOOL := FALSE  // Движение двухпоточника в положение 1
+  output  runToPos2 : BOOL := FALSE  // Движение двухпоточника в положение 2
+  output  errLT : BOOL := FALSE  // Ошибка слишком долгого переключения
+  output  errKonc : BOOL  // Авария концевиков
+  output  errAZOut : BOOL
+  output  da : BOOL  // Авария
+  output  curPos1out : BOOL := FALSE  // Установлено положение 1
+  output  curPos2out : BOOL := FALSE  // Установлено положение 2
+  output  yRun1Out : BOOL  // Кнопка переключения в положение 1 на скаде
+  output  yRun2Out : BOOL  // Кнопка переключения в положение 2 на скаде
+  output  state : WORD  // Состояние ДВПТ (0-выключен, 1-ДВПТ в положение "1", 2-ДВПТ в положение "2", 3-Переключение, 4-Авария
+  inOut   MH : DWORD
+  inOut   aMH : DWORD
+  local   TON_ErrorLongTime : TON  // Таймер на аварию долгого переключения
+  local   TON_Konc : TON
+  local   rr : BOOL := TRUE  // Готовность к работе
+  local   Pos1State : WORD := 0  // Положение 1
+  local   Pos2State : WORD := 1  // Положение 2
+  local   SwitchState : WORD := 2  // Переключение
+  local   alarmState : WORD := 3  // Авария
+  local   temp : BOOL
+  local   MHCalc_1 : MHCalc
+  local   runToPos1t : BOOL
+  local   runToPos2t : BOOL
+  local   TOF_ToPos1 : TOF
+  local   TOF_ToPos2 : TOF
+  local   outPos : ton
+END_VAR
+
+(* LD *)
+
+// ---
+IF R_TRIG(MEmul) THEN curPos2 := TRUE; END_IF
+IF R_TRIG(MEmul) THEN curPos1 := FALSE; END_IF
+
+// --- Ошибка долгого переключения
+TON_ErrorLongTime(IN:=((runToPos1 AND NOT curPos1) OR (runToPos2 AND NOT curPos2)), PT:=maxTTO);
+IF TON_ErrorLongTime.Q THEN errLT := TRUE; END_IF
+
+// --- Авария концевиков
+TON_Konc(IN:=curPos1 AND curPos2, PT:=t#1s);
+IF TON_Konc.Q THEN errKonc := TRUE; END_IF
+
+// ---
+IF errAz THEN errAZOut := TRUE; END_IF
+
+// --- Сброс аварий
+IF (ResetErrors OR (R_TRIG(MEmul))) THEN errAZOut := FALSE; END_IF
+IF (ResetErrors OR (R_TRIG(MEmul))) THEN errKonc := FALSE; END_IF
+IF (ResetErrors OR (R_TRIG(MEmul))) THEN errLT := FALSE; END_IF
+
+// --- Готовность к работе
+rr := NOT errAZOut AND NOT errLT AND NOT errKonc AND NOT GEmer;
+da := NOT (NOT errAZOut AND NOT errLT AND NOT errKonc);
+
+// ---
+IF ((true AND curPos1) OR (true AND R_TRIG(yRun2))) THEN yRun1 := FALSE; END_IF
+IF ((true AND curPos2) OR (true AND R_TRIG(yRun1))) THEN yRun2 := FALSE; END_IF
+
+// ---
+IF (NOT HandMode OR NOT rr OR (yRun1 AND yRun2)) THEN yRun1 := FALSE; END_IF
+IF (NOT HandMode OR NOT rr OR (yRun1 AND yRun2)) THEN yRun2 := FALSE; END_IF
+
+// --- Запуск/остановка
+TOF_ToPos1(IN:=((rr AND NOT HandMode AND toPos1) OR (rr AND yRun1)) AND NOT curPos1, PT:=t#3s);
+runToPos1 := TOF_ToPos1.Q AND rr AND NOT runToPos2;
+TOF_ToPos2(IN:=((rr AND NOT HandMode AND toPos2) OR (rr AND yRun2)) AND NOT curPos2, PT:=t#3s);
+runToPos2 := TOF_ToPos2.Q AND rr AND NOT runToPos1;
+
+// ---
+IF MEmul AND R_TRIG(runToPos1) THEN curPos2 := FALSE; END_IF
+IF MEmul AND R_TRIG(runToPos2) THEN curPos1 := FALSE; END_IF
+outPos(IN:=((MEmul AND runToPos1) OR (MEmul AND runToPos2)), PT:=T#2S);
+IF outPos.Q AND runToPos1 THEN curPos1 := TRUE; END_IF
+IF outPos.Q AND runToPos2 THEN curPos2 := TRUE; END_IF
+
+// ---
+MHCalc_1(Run:=(runToPos1 OR runToPos2), MH:=MH, aMH:=aMH);
+
+// ---
+yRun1Out := yRun1;
+yRun2Out := yRun2;
+
+// ---
+curPos1Out := curPos1;
+curPos2Out := curPos2;
+
+// --- Статус ДВПТ (0-в положении 1, 1-в положении 2, 2-переключение, 3-авария)
+IF NOT da AND curPos1 THEN state := Pos1State; END_IF
+temp := Pos1State /*EN=NOT da AND curPos1*/;
+IF NOT da AND curPos2 THEN state := Pos2State; END_IF
+temp := Pos2State /*EN=NOT da AND curPos2*/;
+IF (((NOT da AND runToPos1) OR (NOT da AND runToPos2)) AND NOT curPos1) AND NOT curPos2 THEN state := SwitchState; END_IF
+temp := SwitchState /*EN=(((NOT da AND runToPos1) OR (NOT da AND runToPos2)) AND NOT curPos1) AND NOT curPos2*/;
+IF da THEN state := alarmState; END_IF
+temp := alarmState /*EN=da*/;

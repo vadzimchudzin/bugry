@@ -1,0 +1,154 @@
+functionBlock TAsp2
+VAR
+  input   Az : BOOL
+  input   AzGway1 : BOOL
+  input   AzGway2 : BOOL
+  input   dks1 : BOOL
+  input   dks2 : BOOL
+  input   offDks1 : BOOL
+  input   offDks2 : BOOL
+  input   prev : BOOL
+  input   HandMode : BOOL
+  input   conditionToWork : BOOL
+  input   TTS : TIME  // время остановки после снятия conditionToWork и prev
+  input   yRun : BOOL
+  input   yRunGw1 : BOOL
+  input   yRunGw2 : BOOL
+  output  runAsp : BOOL
+  output  runGway1 : BOOL
+  output  runGway2 : BOOL
+  output  rr : BOOL
+  output  DA : BOOL
+  output  DAGway1 : BOOL
+  output  DAGway2 : BOOL
+  output  errAz : BOOL
+  output  errDks1 : BOOL
+  output  errAzGway1 : BOOL
+  output  errDks2 : BOOL
+  output  errAzGway2 : BOOL
+  output  yRunOut : BOOL
+  output  yRunGw1Out : BOOL
+  output  yRunGw2Out : BOOL
+  output  State : WORD
+  local   start : BOOL
+  local   on2 : TON
+  local   off2 : TON
+  local   startt : TON
+  local   stop : TON
+  local   on1 : TON
+  local   off1 : TON
+  local   tonAsp : TON
+  local   temp : BOOL
+  local   MHCalc_asp : MHCalc
+  local   MHCalc_GW1 : MHCalc
+  local   MHCalc_GW2 : MHCalc
+  local   TOF_gw1 : TOF
+  local   TOF_gw2 : TOF
+  inOut   MHAsp : DWORD
+  inOut   aMHAsp : DWORD
+  inOut   MHGw1 : DWORD
+  inOut   aMHGw1 : DWORD
+  inOut   MHGw2 : DWORD
+  inOut   aMHGw2 : DWORD
+END_VAR
+
+(* LD *)
+
+// ---
+on1(IN:=runGway1 AND dks1, PT:=T#4s);
+off1(IN:=runGway1 AND NOT dks1, PT:=T#4s);
+
+// ---
+on2(IN:=runGway2 AND dks2, PT:=T#4s);
+off2(IN:=runGway2 AND NOT dks2, PT:=T#4s);
+
+// ---
+IF (on1.Q OR off1.Q) AND NOT offdks1 THEN errDks1 := TRUE; END_IF
+
+// ---
+IF (on2.Q OR off2.Q) AND NOT offdks2 THEN errDks2 := TRUE; END_IF
+
+// ---
+IF true AND Az THEN ErrAz := TRUE; END_IF
+IF true AND AzGway1 THEN errAzGway1 := TRUE; END_IF
+IF true AND AzGway2 THEN errAzGway2 := TRUE; END_IF
+
+// ---
+IF (ResetErrors OR MEmul) THEN ErrAz := FALSE; END_IF
+IF (ResetErrors OR MEmul) THEN errAzGway1 := FALSE; END_IF
+IF (ResetErrors OR MEmul) THEN errDks1 := FALSE; END_IF
+IF (ResetErrors OR MEmul) THEN errAzGway2 := FALSE; END_IF
+IF (ResetErrors OR MEmul) THEN errDks2 := FALSE; END_IF
+
+// ---
+DAGway1 := NOT (NOT errAzGway1 AND NOT errDks1);
+DAGway2 := NOT (NOT errAzGway2 AND NOT errDks2);
+DA := ErrAz;
+
+// ---
+rr := NOT DAGway1 AND NOT DAGway2 AND NOT ErrAz AND NOT GEmer;
+
+// ---
+IF conditionToWork AND R_TRIG(HandMode) THEN yRun := runAsp; END_IF
+IF runAsp /*EN=conditionToWork AND R_TRIG(HandMode)*/ THEN yRunGw1 := runGway1; END_IF
+IF runGway1 /*EN=runAsp /*EN=conditionToWork AND R_TRIG(HandMode)*/*/ THEN yRunGw2 := runGway2; END_IF
+IF conditionToWork AND F_TRIG(HandMode) THEN start := runAsp; END_IF
+
+// --- если аспирация уже была включена
+IF R_TRIG(conditionToWork) AND runAsp THEN start := TRUE; END_IF
+
+// ---
+startt(IN:=conditionToWork AND rr, PT:=T#4s);
+IF startt.Q THEN start := TRUE; END_IF
+
+// ---
+tonAsp(IN:=((((start OR yRun) AND runGway1) AND runGway2) OR ((start OR yRun) AND MGod)), PT:=t#2s);
+runAsp := tonAsp.Q;
+
+// ---
+TOF_gw1(IN:=start, PT:=t#30s);
+runGway1 := (TOF_gw1.Q OR (yRun AND NOT MGod) OR yRunGw1);
+
+// ---
+TOF_gw2(IN:=start, PT:=t#33s);
+runGway2 := (TOF_gw2.Q OR (yRun AND NOT MGod) OR yRunGw2);
+
+// ---
+stop(IN:=NOT conditionToWork AND NOT prev, PT:=TTS);
+
+// ---
+IF (stop.Q OR NOT rr OR NOT MAuto OR HandMode) THEN start := FALSE; END_IF
+
+// ---
+IF NOT HandMode AND conditionToWork THEN yRunGw2 := FALSE; END_IF
+IF NOT HandMode AND conditionToWork THEN yRunGw1 := FALSE; END_IF
+IF NOT HandMode AND conditionToWork THEN yRun := FALSE; END_IF
+
+// ---
+IF DAGway1 THEN yRunGw1 := FALSE; END_IF
+IF DAGway2 THEN yRunGw2 := FALSE; END_IF
+IF DA THEN yRun := FALSE; END_IF
+
+// ---
+MHCalc_asp(Run:=runAsp, MH:=MHAsp, aMH:=aMHAsp);
+
+// ---
+MHCalc_GW1(Run:=runGway1, MH:=MHGw1, aMH:=aMHGw1);
+
+// ---
+MHCalc_GW2(Run:=runGway2, MH:=MHGw2, aMH:=aMHGw2);
+
+// --- Статус (0-выключен без аварии, 1-работает, 2-авария)
+IF NOT da AND NOT runAsp THEN state := 0; END_IF
+temp := 0 /*EN=NOT da AND NOT runAsp*/;
+IF NOT da AND runAsp THEN state := 1; END_IF
+temp := 1 /*EN=NOT da AND runAsp*/;
+IF (da OR DAGway1 OR DAGway2) THEN state := 2; END_IF
+temp := 2 /*EN=(da OR DAGway1 OR DAGway2)*/;
+
+// ---
+yRunOut := yRun;
+yRunGw1Out := yRunGw1;
+yRunGw2Out := yRunGw2;
+
+// ---

@@ -1,0 +1,107 @@
+functionBlock MyPID
+VAR
+  input   Run : BOOL
+  input   TargetVal : REAL
+  input   MaxVal : REAL
+  input   CurVal : REAL
+  input   IdleVal : REAL
+  input   Idle : BOOL
+  input   kPidP : REAL := 2
+  input   kPidI : REAL := 0
+  input   kPidD : REAL := 0
+  input   Period : TIME  // период корректировки
+  input   FreqMax : WORD  // максимально допустимая частота
+  input   FreqIdle : WORD  // частота в ожидании
+  local   Delta : REAL
+  local   TON_Check : TON
+  local   TON_Max_Tok : TON
+  local   CheckNow : BOOL
+  local   CheckNowFl : BOOL
+  local   tmpCount1 : INT
+  local   tmpCount2 : INT
+  local   CurrR : REAL
+  local   Pk : REAL
+  local   Ik : REAL
+  local   Dk : REAL
+  local   PID : REAL
+  local   PredVal : REAL
+  local   UseMyPID : BOOL := TRUE
+  local   NewFreqPCH : REAL
+  local   PID_Drob : PID
+  local   TP_Max_Tok : TP
+  local   AbsDelta : REAL
+  inOut   FreqPCH : WORD  // частота частотника *100
+END_VAR
+
+(* LD *)
+
+// --- Стартовая частота в авто режиме
+IF R_TRIG(Run) THEN FreqPCH := 400; END_IF
+IF 400 /*EN=R_TRIG(Run)*/ THEN PredVal := CurVal; END_IF
+
+// --- Таймер на корректировку частоты
+TON_Check(IN:=Run AND NOT CheckNow, PT:=Period);
+CheckNow := TON_Check.Q;
+
+// ---
+IF (NOT Run OR ((CurVal < IdleVal) /*EN=true*/)) THEN Ik := 0; END_IF
+
+// ---
+IF R_TRIG(CheckNow) THEN CheckNowFl := TRUE; END_IF
+
+// --- просто для визуального контроля значений
+IF true THEN CurrR := CurVal; END_IF
+IF CurVal /*EN=true*/ THEN CurrR := PredVal; END_IF
+IF PredVal /*EN=CurVal /*EN=true*/*/ THEN CurrR := TargetVal; END_IF
+
+// ---
+IF CheckNowFl THEN Delta := (TargetVal-CurVal); END_IF
+
+// --- Расчет составляющих PID регулирования
+IF true THEN Pk := 0; END_IF
+
+// ---
+IF CheckNowFl THEN Pk := (Delta/2000*kPidP); END_IF
+IF CheckNowFl THEN Ik := (Delta/1000000*kPidI+Ik); END_IF
+IF CheckNowFl THEN Dk := ((PredVal-CurVal)/4700*kPidD); END_IF
+
+// ---
+IF CheckNowFl THEN AbsDelta := (ABS(Delta)); END_IF
+
+// ---
+IF (AbsDelta < (TargetVal*3/100)) /*EN=CheckNowFl*/ THEN Pk := (Pk/3); END_IF
+IF (Pk/3) /*EN=(AbsDelta < (TargetVal*3/100)) /*EN=CheckNowFl*/*/ THEN Ik := (Ik/2); END_IF
+IF (Ik/2) /*EN=(Pk/3) /*EN=(AbsDelta < (TargetVal*3/100)) /*EN=CheckNowFl*/*/*/ THEN Dk := 0; END_IF
+IF (AbsDelta < (TargetVal*20/100)) /*EN=(AbsDelta >= (TargetVal*3/100)) /*EN=CheckNowFl*/*/ THEN Pk := (Pk/2); END_IF
+IF (Pk/2) /*EN=(AbsDelta < (TargetVal*20/100)) /*EN=(AbsDelta >= (TargetVal*3/100)) /*EN=CheckNowFl*/*/*/ THEN Ik := (Ik/8); END_IF
+IF (Ik/8) /*EN=(Pk/2) /*EN=(AbsDelta < (TargetVal*20/100)) /*EN=(AbsDelta >= (TargetVal*3/100)) /*EN=CheckNowFl*/*/*/*/ THEN Dk := 0; END_IF
+
+// ---
+IF (((Pk*Ik) < 0) OR ((Delta<20) AND (Delta>0))) THEN Ik := 0; END_IF
+
+// ---
+IF CheckNowFl THEN PID := ((Pk+Ik+Dk)*100); END_IF
+IF (PID < 1) /*EN=(PID > 0.09) /*EN=((Pk+Ik+Dk)*100) /*EN=CheckNowFl*/*/*/ THEN PID := 1; END_IF
+IF (PID > (-1)) /*EN=(PID < (-0.09)) /*EN=((Pk+Ik+Dk)*100) /*EN=CheckNowFl*/*/*/ THEN PID := (-1); END_IF
+
+// ---
+IF CheckNowFl THEN NewFreqPCH := (word_to_real(FreqPCH)+PID); END_IF
+IF (word_to_real(FreqPCH)+PID) /*EN=CheckNowFl*/ THEN tmpCount1 := (tmpCount1+1); END_IF
+IF (NewFreqPCH <= 0) /*EN=(tmpCount1+1) /*EN=(word_to_real(FreqPCH)+PID) /*EN=CheckNowFl*/*/*/ THEN NewFreqPCH := FreqIdle; END_IF
+IF (NewFreqPCH > FreqMax) /*EN=(tmpCount1+1) /*EN=(word_to_real(FreqPCH)+PID) /*EN=CheckNowFl*/*/*/ THEN NewFreqPCH := FreqMax; END_IF
+
+// ---
+IF CheckNowFl THEN FreqPCH := (Real_to_word(NewFreqPCH)); END_IF
+IF (Real_to_word(NewFreqPCH)) /*EN=CheckNowFl*/ THEN PredVal := CurVal; END_IF
+
+// ---
+IF (FreqPCH > 5000) /*EN=true*/ THEN FreqPCH := 5000; END_IF
+IF (FreqPCH < 100) /*EN=true*/ THEN FreqPCH := 100; END_IF
+TON_Max_Tok(IN:=(CurVal >= MaxVal) /*EN=true*/, PT:=t#2s);
+TP_Max_Tok(IN:=TON_Max_Tok.Q, PT:=t#2s);
+IF TP_Max_Tok.Q THEN FreqPCH := 200; END_IF
+IF true AND Idle THEN FreqPCH := FreqIdle; END_IF
+IF true AND NOT run THEN FreqPCH := 0; END_IF
+
+// ---
+IF true THEN CheckNowFl := FALSE; END_IF

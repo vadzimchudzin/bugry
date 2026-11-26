@@ -1,0 +1,23 @@
+function CalcVesPS
+VAR
+  input   ps : pointer
+  local   i : WORD
+  local   c : WORD
+  local   pr : LREAL
+  local   ex : LREAL
+END_VAR
+
+(* ST *)
+CalcVesPS:=0;
+c:=0;
+pr:=1;
+FOR i:=1 TO LengthListVesPS DO
+	IF ps^[i]>0 THEN
+		pr:=pr*ps^[i];
+		c:=c+1;
+	END_IF
+END_FOR
+IF c>0 THEN
+	ex:=1.0/WORD_TO_REAL(c);
+	CalcVesPS:=EXPT(pr,ex);
+END_IF

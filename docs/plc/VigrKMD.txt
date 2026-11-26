@@ -1,0 +1,154 @@
+functionBlock VigrKMD
+VAR
+  input   Run : BOOL  // надо выгружать в автомате
+  input   Blocked : BOOL  // заблокировать выгрузку
+  input   HandMode : BOOL := FALSE
+  input   ZatvorUp : BOOL
+  input   ZatvorDown : BOOL
+  input   KlapOpened : BOOL
+  input   KlapClosed : BOOL
+  input   VesRequired : REAL  // вес, который надо достичь
+  input   Ves : REAL  // вес текущий
+  input   VesDelta : REAL  // вес, который можно оставить
+  input   timeVigr : TIME := TIME#5s0ms
+  input   yZatvor : BOOL
+  input   yKlap : BOOL
+  input   yVibr : BOOL
+  output  VigrOK : BOOL  // выгрузка завершена
+  output  GoZatvor : BOOL  // Открыть затвор
+  output  GoKlap : BOOL  // открыть нижний клапан
+  output  GoVibr : BOOL  // вкл. вибратор
+  output  ErrZatvUp : BOOL
+  output  ErrZatvDown : BOOL
+  output  ErrKlapOpen : BOOL
+  output  ErrKlapClose : BOOL
+  output  ErrCount : BOOL  // было 5 безуспешных попыток выгрузиться
+  output  yZatvorSet : BOOL
+  output  yZatvorReset : BOOL
+  output  yKlapSet : BOOL
+  output  yKlapReset : BOOL
+  output  yVibrSet : BOOL
+  output  yVibrReset : BOOL
+  local   yZatvorOnBegin : BOOL
+  local   yKlapOnBegin : BOOL
+  local   yVibrOnBegin : BOOL
+  local   num : WORD  // номер попытки
+  local   RunDo : BOOL  // все открылось - идет выгрузка
+  local   RunVes : BOOL
+  local   RunTimeOut : BOOL  // пауза между выгрузкой и замером веса
+  local   StopVigr : BOOL
+  local   TON_RunDo : TON
+  local   TON_ZatvUp : TON
+  local   TON_ZatvDown : TON
+  local   TON_TimeOut : TON
+  local   isBlocked : BOOL
+  local   VigrOKPr : BOOL
+  local   TON_VigrOK : TON
+  local   TON_KlapOpen : TON
+  local   TON_KlapClose : TON
+END_VAR
+
+(* LD *)
+
+// ---
+yZatvorOnBegin := yZatvor;
+yKlapOnBegin := yKlap;
+yVibrOnBegin := yVibr;
+
+// ---
+IF (NOT HandMode OR ErrKlapOpen) THEN yVibr := FALSE; END_IF
+IF (NOT HandMode OR ErrKlapOpen) THEN yKlap := FALSE; END_IF
+IF (NOT HandMode OR ErrKlapOpen) THEN yZatvor := FALSE; END_IF
+
+// ---
+IF Run AND R_TRIG(HandMode) THEN yZatvor := GoZatvor; END_IF
+IF GoZatvor /*EN=Run AND R_TRIG(HandMode)*/ THEN yKlap := GoKlap; END_IF
+IF GoKlap /*EN=GoZatvor /*EN=Run AND R_TRIG(HandMode)*/*/ THEN yVibr := GoVibr; END_IF
+
+// ---
+IF ErrZatvUp THEN yVibr := FALSE; END_IF
+IF ErrZatvUp THEN yZatvor := FALSE; END_IF
+
+// ---
+IF NOT Run THEN num := 0; END_IF
+IF 0 /*EN=NOT Run*/ THEN VigrOK := FALSE; END_IF
+IF 0 /*EN=NOT Run*/ THEN VigrOKPr := FALSE; END_IF
+IF 0 /*EN=NOT Run*/ THEN RunVes := FALSE; END_IF
+IF 0 /*EN=NOT Run*/ THEN RunTimeOut := FALSE; END_IF
+IF 0 /*EN=NOT Run*/ THEN StopVigr := FALSE; END_IF
+IF 0 /*EN=NOT Run*/ THEN RunDo := FALSE; END_IF
+
+// ---
+IF Blocked AND NOT Run THEN isBlocked := TRUE; END_IF
+IF (NOT Blocked OR NOT RunDosing) THEN isBlocked := FALSE; END_IF
+
+// ---
+TON_ZatvUp(IN:=GoZatvor AND NOT ZatvorUp, PT:=t#5s);
+IF TON_ZatvUp.Q THEN ErrZatvUp := TRUE; END_IF
+
+// ---
+TON_ZatvDown(IN:=NOT GoZatvor AND NOT ZatvorDown AND NOT ResetErrors, PT:=t#5s);
+IF TON_ZatvDown.Q THEN ErrZatvDown := TRUE; END_IF
+
+// ---
+TON_KlapOpen(IN:=GoKlap AND NOT KlapOpened, PT:=t#5s);
+IF TON_KlapOpen.Q THEN ErrKlapOpen := TRUE; END_IF
+
+// ---
+TON_KlapClose(IN:=NOT GoKlap AND NOT KlapClosed AND NOT ResetErrors, PT:=t#5s);
+IF TON_KlapClose.Q THEN ErrKlapClose := TRUE; END_IF
+
+// ---
+IF ResetErrors THEN ErrKlapOpen := FALSE; END_IF
+IF ResetErrors THEN ErrKlapClose := FALSE; END_IF
+IF ResetErrors THEN ErrZatvUp := FALSE; END_IF
+IF ResetErrors THEN ErrZatvDown := FALSE; END_IF
+
+// ---
+GoKlap := ((((Run AND NOT VigrOKPr) OR (Run AND NOT ZatvorDown)) AND NOT isBlocked) OR yKlap) AND NOT ErrKlapOpen;
+
+// ---
+GoZatvor := ((Run AND NOT VigrOKPr AND NOT isBlocked AND KlapOpened) OR yZatvor) AND NOT ErrZatvUp;
+
+// ---
+IF (num = 0) /*EN=Run AND NOT RunDo AND ZatvorUp AND KlapOpened*/ THEN RunDo := TRUE; END_IF
+
+// ---
+TON_RunDo(IN:=RunDo, PT:=timeVigr);
+IF TON_RunDo.Q THEN RunDo := FALSE; END_IF
+IF TON_RunDo.Q THEN RunTimeOut := TRUE; END_IF
+
+// ---
+GoVibr := ((((RunDo OR yVibr) AND ZatvorUp) AND KlapOpened) OR (yVibr AND MGod));
+
+// ---
+IF GoVibr THEN RunVes := FALSE; END_IF
+
+// ---
+TON_TimeOut(IN:=RunTimeOut, PT:=t#3s);
+IF TON_TimeOut.Q THEN RunTimeOut := FALSE; END_IF
+IF TON_TimeOut.Q THEN RunVes := TRUE; END_IF
+
+// ---
+IF (((Ves <= VesRequired) /*EN=RunVes AND true*/) OR (((Ves-VesDelta) <= VesRequired) /*EN=(num >= 2) /*EN=RunVes AND true*/*/)) THEN VigrOKPr := TRUE; END_IF
+IF (((Ves <= VesRequired) /*EN=RunVes AND true*/) OR (((Ves-VesDelta) <= VesRequired) /*EN=(num >= 2) /*EN=RunVes AND true*/*/)) THEN ErrCount := FALSE; END_IF
+IF ((Ves-VesDelta) > VesRequired) /*EN=(num >= 5) /*EN=RunVes*/*/ THEN ErrCount := TRUE; END_IF
+IF (num < 100) /*EN=RunVes*/ THEN num := (num+1); END_IF
+
+// ---
+IF RunVes AND NOT VigrOKPr THEN RunDo := TRUE; END_IF
+IF RunVes THEN RunVes := FALSE; END_IF
+
+// ---
+TON_VigrOK(IN:=VigrOKPr, PT:=t#1s);
+IF TON_VigrOK.Q THEN VigrOK := TRUE; END_IF
+
+// ---
+yZatvorSet := yZatvor AND NOT yZatvorOnBegin;
+yZatvorReset := NOT yZatvor AND yZatvorOnBegin;
+yKlapSet := yKlap AND NOT yKlapOnBegin;
+yKlapReset := NOT yKlap AND yKlapOnBegin;
+yVibrSet := yVibr AND NOT yVibrOnBegin;
+yVibrReset := NOT yVibr AND yVibrOnBegin;
+
+// ---

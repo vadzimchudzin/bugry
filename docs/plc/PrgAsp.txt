@@ -1,0 +1,53 @@
+program PrgAsp
+VAR
+  local   ASP_1 : asp
+  local   NoAutoHand : BOOL
+  local   Asp2 : TAsp2
+  local   NoAutoHand2 : BOOL
+END_VAR
+
+(* LD *)
+
+// ---
+ASP_1(Az:=ErrAz_Asp1, AzGway:=ErrAz_Gway1, dks:=DKS_Gway1, offDks:=OffDKS_Gway1, prev:=(Go_Tr1L OR Go_Tr1R OR RunDosing), HandMode:=((true AND NOT NoAutoHand AND NOT Load1St.1 AND NOT RunDosing AND HaveKomp) OR (true AND fHand1.0) OR (true AND MHand)), conditionToWork:=(Load1St.0 OR ((RunDosing OR Regim2.9) AND HaveKomp)), TTS:=t#1s*tcAsp, yRun:=yRunAsp, yRunGw:=yRunAspGw, MHAsp:=MhAsp1, aMHAsp:=aMhAsp1, MHGw:=MhAsp1Gw, aMHGw:=aMhAsp1Gw);
+Go_Gway1 := ASP_1.runGway;
+DA_Asp := ASP_1.DA;
+DA_AspGw1 := ASP_1.DAGway;
+Err1.4 := ASP_1.errAz;
+Err1.5 := ASP_1.errdks;
+Err1.6 := ASP_1.errAzGway;
+yRunAsp := ASP_1.yRunOut;
+yRunAspGw := ASP_1.yRunGwOut;
+Go_Asp1 := ASP_1.runAsp;
+
+// ---
+IF ((Go_Asp1 AND Load1St.0) OR (Go_Asp1 AND RunDosing AND HaveKomp)) THEN NoAutoHand := TRUE; END_IF
+
+// ---
+IF NOT fHand1.0 AND NOT Go_Asp1 THEN NoAutoHand := FALSE; END_IF
+
+// ---
+IF (((Go_Asp2 OR Go_Gway21 OR Go_Gway22) AND UnloadSt.0) OR ((Go_Asp2 OR Go_Gway21 OR Go_Gway22) AND RunDosing)) THEN NoAutoHand2 := TRUE; END_IF
+
+// ---
+IF NOT fHand2.13 AND NOT Go_Asp2 AND NOT Go_Gway21 AND NOT Go_Gway22 THEN NoAutoHand2 := FALSE; END_IF
+
+// ---
+Asp2(Az:=ErrAz_Asp2, AzGway1:=ErrAz_Gway21, AzGway2:=ErrAz_Gway22, dks1:=DKS_Gway21, dks2:=DKS_Gway22, offDks1:=OffDKS_Gway21, offDks2:=OffDKS_Gway22, prev:=(UnloadSt.0 OR UnloadSt.1 OR RunDosing), HandMode:=((NOT NoAutoHand2 AND (NOT (UnloadSt.0 OR RunDosing))) OR fHand2.13 OR MHand), conditionToWork:=((UnloadSt>0) OR RunDosing OR Regim2.9), TTS:=t#1s*tcAsp2, yRun:=yRunAsp2, yRunGw1:=yRunAsp2Gw1, yRunGw2:=yRunAsp2Gw2, MHAsp:=MhAsp2, aMHAsp:=aMhAsp2, MHGw1:=MhAsp2Gw1, aMHGw1:=aMhAsp2Gw1, MHGw2:=MhAsp2Gw2, aMHGw2:=aMhAsp2Gw2);
+Go_Gway21 := Asp2.runGway1;
+Go_Gway22 := Asp2.runGway2;
+DA_Asp2 := Asp2.DA;
+DA_AspGw21 := Asp2.DAGway1;
+DA_AspGw22 := Asp2.DAGway2;
+Err1.7 := Asp2.errAz;
+Err1.8 := Asp2.errDks1;
+Err1.9 := Asp2.errAzGway1;
+Err1.14 := Asp2.errDks2;
+Err1.15 := Asp2.errAzGway2;
+yRunAsp2 := Asp2.yRunOut;
+yRunAsp2Gw1 := Asp2.yRunGw1Out;
+yRunAsp2Gw2 := Asp2.yRunGw2Out;
+StMeh[27] := Asp2.State;
+Go_Asp2 := Asp2.runAsp;
+
+// ---

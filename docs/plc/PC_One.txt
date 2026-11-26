@@ -1,0 +1,81 @@
+functionBlock PC_One
+VAR
+  input   opened : BOOL  // Открыт
+  input   closed : BOOL  // Закрыт
+  input   toOpen : BOOL  // Открыть в авто режиме
+  input   noOpen : BOOL  // Ошибка, при которой открывать нельзя
+  input   maxTTO : TIME := TIME#10s0ms  // максимальное время на переключение
+  input   HandMode : BOOL
+  input   yOpen : BOOL  // Кнопка "Открыть" в ручном режиме со скады
+  output  runToOpen : BOOL  // Открыть шибер
+  output  errLTOpen : BOOL  // Авария "Долгое открытие"
+  output  errLTClose : BOOL  // Авария "Долгое закрытие"
+  output  errKonc : BOOL  // Авария концевиков
+  output  da : BOOL
+  output  openedOut : BOOL
+  output  closedOut : BOOL
+  output  yOpenOut : BOOL  // Кнопка "Открыть" в ручном режиме со скады
+  output  state : WORD  // Состояние: 0-Закрыт, 1-Открыт, 2-Переключение, 3-Авария, 4-Промежуточное положение
+  local   TON_LTOpen : TON
+  local   TON_LTClose : TON
+  local   rr : BOOL  // Готовность к работе
+  local   temp : BOOL
+  local   TON_Konc : TON
+  local   outOC : TON
+END_VAR
+
+(* LD *)
+
+// --- включился ручной режим
+IF R_TRIG(HandMode) THEN yOpen := runToOpen; END_IF
+
+// --- Долгое открытие шибера
+TON_LTOpen(IN:=runToOpen AND NOT opened AND NOT ResetErrors, PT:=maxTTO);
+IF TON_LTOpen.Q THEN errLTOpen := TRUE; END_IF
+
+// --- Долгое закрытие шибера
+TON_LTClose(IN:=NOT runToOpen AND NOT closed AND NOT ResetErrors, PT:=maxTTO);
+IF TON_LTClose.Q THEN errLTClose := TRUE; END_IF
+
+// --- Авария концевиков
+TON_Konc(IN:=opened AND closed AND NOT ResetErrors, PT:=t#1s);
+IF TON_Konc.Q THEN errKonc := TRUE; END_IF
+
+// --- Сброс Аварий
+IF (ResetErrors OR (R_TRIG(MEmul))) THEN errLTOpen := FALSE; END_IF
+IF (ResetErrors OR (R_TRIG(MEmul))) THEN errLTClose := FALSE; END_IF
+IF (ResetErrors OR (R_TRIG(MEmul))) THEN errKonc := FALSE; END_IF
+
+// --- Готовность к работе
+rr := NOT errLTOpen AND NOT errLTClose AND NOT errKonc AND NOT noOpen AND NOT GEmer;
+da := NOT (NOT errLTOpen AND NOT errLTClose AND NOT errKonc);
+
+// --- Сброс yOpen
+IF (NOT HandMode OR NOT rr) THEN yOpen := FALSE; END_IF
+
+// --- Открытие
+runToOpen := ((rr AND yOpen) OR (rr AND NOT HandMode AND toOpen));
+
+// ---
+IF MEmul AND runToOpen THEN closed := FALSE; END_IF
+IF MEmul AND NOT runToOpen THEN opened := FALSE; END_IF
+outOC(IN:=((MEmul AND runToOpen AND NOT opened) OR (MEmul AND NOT runToOpen AND NOT closed)), PT:=T#1S);
+IF outOC.Q AND runToOpen THEN opened := TRUE; END_IF
+IF outOC.Q AND NOT runToOpen THEN closed := TRUE; END_IF
+
+// ---
+yOpenOut := yOpen;
+
+// ---
+openedOut := opened;
+closedOut := closed;
+
+// --- Состояние: 0-Закрыт, 1-Открыт, 2-Переключение, 3-Переключение, 4-Авария
+IF NOT da AND closed THEN state := 0; END_IF
+temp := 0 /*EN=NOT da AND closed*/;
+IF NOT da AND opened THEN state := 1; END_IF
+temp := 1 /*EN=NOT da AND opened*/;
+IF NOT da AND NOT closed AND NOT opened THEN state := 3; END_IF
+temp := 3 /*EN=NOT da AND NOT closed AND NOT opened*/;
+IF da THEN state := 4; END_IF
+temp := 4 /*EN=da*/;

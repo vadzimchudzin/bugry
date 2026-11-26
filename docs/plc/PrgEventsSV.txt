@@ -1,0 +1,239 @@
+program PrgEventsSV
+VAR
+  local   ii : WORD
+  local   One_Perc : REAL
+  local   CalcLen : BOOL
+  local   iiii : BOOL
+  local   mustFS : WORD
+  local   VesLastPort : WORD
+  local   VesLastPort2 : WORD
+  local   RecalcDose : BOOL
+  local   FoundForDelete : BOOL
+  local   i2 : WORD
+  local   StartDos : BOOL
+  local   tttt : BOOL
+  local   alarm : BOOL
+  local   NewId : DWORD
+  local   TON_Msg8 : Standard.TON
+  local   StartMsg8 : BOOL
+  local   newMsgToScadaD : WORD
+  local   NotStopDosing : BOOL
+END_VAR
+
+(* ST *)
+IF (msgToScadaD=1) AND StopDosing AND (StopDosingID=0) THEN
+	//если надо остановиться, а не начинать новую ПП
+	//проверяем, не запущена ли новая ПП на других весах
+	IF NOT((idK>LastIdD) OR (idM>LastIdD)) THEN
+		MsgToScadaD:=0;
+	END_IF 
+END_IF
+
+//защита от медленного прихода VesP из OPC сервера. В msgFromScadaD лежит количество используемых бункеров
+IF (msgToScadaD=1) THEN
+	tttt:=0;
+	idD:=0;   
+	IF (msgFromScadaD>0) AND (CurTaskD>0) THEN   
+		//подсчет количества дошедших бункеров
+		IF msgFromScadaD=100 THEN msgFromScadaD:=0; END_IF	//если 100 - значит 0, 1..10 - количество компонентов рецепта
+		IF msgFromScadaD>0 THEN
+			mustFS:=0;
+			FOR ii:=1 TO CBD DO
+				IF VesPD[ii]>0 THEN
+					mustFS:=mustFS+1;
+				END_IF
+			END_FOR
+			IF (mustFS=msgFromScadaD) THEN
+				//все дошло
+				HaveDob:=1;
+				CalcLen := TRUE; //подсчет очереди дозирования
+				One_Perc := WORD_TO_REAL(PPVesPort[CurTaskD]) /100.0; //количество кг на 1% веса порции	(без сдвигов запятой)		
+				FOR ii:=1 TO (CBD) DO
+					IF (Order2[ii]>0) AND CalcLen THEN
+						LenOrd2:=ii;
+					ELSIF Order2[ii]=0 THEN
+						CalcLen:=FALSE;
+					END_IF
+					VesZD[ii]:=One_Perc*VesPD[ii];  //вес комп. на порцию в кг. (Real)
+					VesDD[ii]:=0;
+					VesCD[ii]:=0;
+					DeleteFromRecipeD[ii]:=FALSE;
+				END_FOR
+				CurVesPortD:=PPVesPort[CurTaskD];
+				CurPortD:=PPPortCompl[CurTaskD]+1;
+				msgFromScadaD:=0;
+				msgToScadaD:=2;
+			END_IF
+		ELSE
+			HaveDob:=0;
+			LenOrd2:=0;
+			FOR ii:=1 TO (CBD) DO
+				VesZD[ii]:=0;	VesDD[ii]:=0;	VesCD[ii]:=0;
+				DeleteFromRecipeD[ii]:=FALSE;
+			END_FOR
+			CurVesPortD:=0;
+			msgToScadaD:=64;
+			CurPortD:=0;
+		END_IF
+		IF StopDosing AND idD>StopDosingID THEN
+			MsgToScadaD:=0;
+			idD:=0;
+		END_IF
+	END_IF
+END_IF
+	
+IF msgToScadaD=2 AND (idD=0) AND (PPprmPP[CurTaskD].0) THEN
+	IF (CurTaskD=CurTaskK) AND (CurPortD=CurPortK) AND (CurPortK>0) AND (idK>0) THEN
+		idD:=idK;
+	ELSIF (CurTaskD=CurTaskPBD) AND (CurPortD=CurPortPBD) AND (CurPortPBD>0) AND (idPBD>0) THEN
+		idD:=idPBD;
+	ELSIF (CurTaskD=CurTaskSms1) AND (CurPortD=CurPortSms1) AND (CurPortSms1>0) AND (idS1>0) THEN
+		idD:=idS1;
+	END_IF	
+	IF idD>0 THEN msgFromScadaD:=1; END_IF
+	IF idD=0 AND StopDosingID>0 THEN msgToScadaD:=0; END_IF    
+END_IF  
+
+IF msgToScadaD=2 AND (idD>0) AND (MsgFromScadaD>0) AND (NOT BlockSWIn) THEN
+	tttt:=0;
+	StartDos:=TRUE;
+	DosingD_Done:=FALSE;
+	IF CurTaskK>0 THEN
+		IF (CurTaskD=NextTask(CurTaskK)) THEN
+			//если на БВ дозируется предыдущая ПП 
+			StartDos:=FALSE; 
+		END_IF	
+	END_IF 
+	//IF CurTaskM>0 THEN
+	//	IF (CurTaskD=NextTask(CurTaskM)) THEN
+	//		//если на МВ дозируется предыдущая ПП 
+	//		StartDos:=FALSE; 
+	//	END_IF	
+	//END_IF 
+	IF StartDos THEN
+		//дальше расчет последней или 2х последних порций, если партия делится на порции с остатком
+		CurVesPortD:=PPVesPort[CurTaskD];
+		IF PPVesPort[CurTaskD]*PPCouPort[CurTaskD]<>PPVesPart[CurTaskD] THEN
+			VesLastPort:=PPVesPart[CurTaskD]-PPVesPort[CurTaskD]*(PPCouPort[CurTaskD]-1);
+			VesLastPort2:=CurVesPortD;
+			IF VesLastPort<PPVesPort[CurTaskD]/2 THEN
+				VesLastPort2:=CurVesPortD+VesLastPort;
+				VesLastPort:=REAL_TO_WORD(VesLastPort2/ 2);
+				VesLastPort2:=VesLastPort2-VesLastPort;
+			END_IF
+			RecalcDose :=FALSE;
+			IF PPCouPort[CurTaskD]=CurPortD THEN
+				CurVesPortD:=VesLastPort;
+				RecalcDose:=TRUE;
+			ELSIF PPCouPort[CurTaskD]=CurPortD+1 THEN
+				CurVesPortD:=VesLastPort2;
+				RecalcDose:=TRUE;
+			END_IF
+			IF RecalcDose THEN
+				One_Perc := WORD_TO_REAL(CurVesPortD) / 100.0; //количество кг на 1% веса порции	(без сдвигов запятой)		
+				FOR ii:=1 TO (CBD) DO
+					VesZD[ii]:=One_Perc*VesPD[ii];  //вес комп. на порцию в кг. (Real)
+					VesDD[ii]:=0;
+					VesCD[ii]:=0;
+					DeleteFromRecipeD[ii]:=FALSE;
+				END_FOR
+			END_IF
+		END_IF
+		//старт дозировки	
+		PosOrd2:=0;
+		LastIdD:=idD;
+		msgFromScadaD:=0;
+		msgToScadaD:=4;
+		gPortSV:=gPortSV+1;
+	END_IF
+END_IF
+	
+IF msgToScadaD=4 AND msgFromScadaD>0 AND DosingD_Done THEN
+	// дозировка порции CurPortD завершена. 
+	//	Ждем сообщения от скады (msgFromSkadaD=1) сама порция записана в prod 
+	CouPosD:=0;
+	FOR ii:=1 TO CBD DO
+		IF VesZD[ii]>0 OR VesDD[ii]>0 THEN CouPosD:=CouPosD+1; END_IF
+	END_FOR
+	StartMsg8:=1;
+END_IF
+
+TON_Msg8(IN:=StartMsg8,PT:=T#1S);
+IF TON_Msg8.Q THEN
+	StartMsg8:=0;
+	msgFromScadaD:=0;
+	msgToScadaD:=8;	
+END_IF
+
+IF msgToScadaD=8 AND msgFromScadaD>0 AND idS1=idD AND idS1>0 AND (NOT (SmsUpState.1 or SmsUpState.4)) AND HaveDob AND (NOT BlockSWOut) THEN
+	// дозировка порции CurPortD завершено. 
+	//	Ждем сообщения от скады (msgFromSkadaD=1) что результаты записаны 
+	//		освобождения пути для выгрузки.
+	//		После этих двух условий начинаем выгружать
+	SmsUpState.1:=1;
+	VesSmsR[1]:=VesSmsR[1]+SumVesD2(0);
+	msgFromScadaD:=0;
+	msgToScadaD:=16;
+END_IF
+
+IF msgToScadaD=32 THEN
+	FOR ii:=1 TO (CBD) DO
+		VesDD[ii]:=0;
+		VesCD[ii]:=0;
+		IF DeleteFromRecipeD[ii] THEN
+			FoundForDelete:=FALSE;
+			FOR i2:=1 TO LenOrd2 DO
+				IF Order2[i2]=ii THEN FoundForDelete:=TRUE; END_IF
+				IF FoundForDelete THEN Order2[i2]:=Order2[i2+1]; END_IF
+				IF i2=LenOrd2 THEN Order2[i2]:=0; END_IF
+			END_FOR
+			IF FoundForDelete THEN 
+				VesPD[ii]:=0;
+				VesZD[ii]:=0;
+				LenOrd2:=LenOrd2-1;
+				IF LenOrd2=0 THEN HaveDob:=0; END_IF
+			END_IF			
+		END_IF		
+		DeleteFromRecipeD[ii]:=FALSE;
+	END_FOR
+	DosingD_Done:=FALSE;
+	msgFromScadaD:=0;
+	MsgToScadaD:=0;
+	newMsgToScadaD:=0;
+	NotStopDosing:=(StopDosingID=0 OR idD<StopDosingID);
+	idD:=0;
+	IF PPCouPort[CurTaskD]>CurPortD THEN
+		CurPortD:=CurPortD+1;
+		newMsgToScadaD:=2;	//2 - можно начинать дозировку новой порции
+	ELSE
+		CurPortD:=1;
+		CurTaskD:=NextTask(CurTaskD);
+		newMsgToScadaD:=1;	//ПП выполнена. Ждем следующую ПП
+		Alarm:=0;
+	END_IF
+	IF NotStopDosing THEN
+		MsgToScadaD:=newMsgToScadaD;
+	END_IF
+END_IF
+
+IF MsgToScadaD=64 THEN 
+	//в текущей ПП не участвует - ждет
+	NewId:=0;
+	StartDos:=FALSE;
+	IF (CurTaskK>0) AND (MsgToScadaK>1) AND (MsgToScadaK<64) THEN
+		IF ((CurTaskD=CurTaskK AND (CurPortK=PPCouPort[CurTaskK]))) or (NextTask(CurTaskD)=CurTaskK) THEN
+			//если на СВ дозируется последняя порция этой же ПП
+			NewId:=idK; 
+		END_IF	
+	END_IF 
+	(*IF (CurTaskM>0) AND (MsgToScadaM>1) AND (MsgToScadaM<64) THEN
+		IF (CurTaskM=CurTaskD AND (CurPortM=PPCouPort[CurTaskM])) THEN
+			//если на МВ дозируется последняя порция этой же ПП
+			NewId:=idM; 
+		END_IF	
+	END_IF*)
+	IF NewId>0 THEN
+		//старт дозировки	
+		msgToScadaD:=1;msgFromScadaD:=0;
+	END_IF
+END_IF

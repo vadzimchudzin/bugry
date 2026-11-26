@@ -1,0 +1,76 @@
+program StartDosing
+VAR
+  local   ii : WORD
+  local   AllOk : BOOL
+  local   sds : INT
+END_VAR
+
+(* ST *)
+//старт процесса автоматического дозирования
+	Answ:=0;
+	flBHDoorOpened:=0;
+	Regim2.15:=0;
+	//здесь надо устроить проверку на ошибки, и, если всё ОК, установить AllOk
+	AllOk:=TRUE;
+	IF AllOk THEN 
+		FOR ii:=1 TO 5 DO
+			PPidPP[ii]:=0;
+			PPCompleted[ii]:=0;
+			PPtime_suh[ii]:=0;
+			PPtime_mokr[ii]:=0;
+			PPspeedmel[ii]:=0;
+			PPVesPart[ii]:=0;
+			PPVesPort[ii]:=0;
+			PPCouPort[ii]:=0;
+			//PPLastSavePort[ii]:=0;
+			//PPidStart[ii]:=0;
+			PPprmPP[ii]:=0;
+			PPnpp[ii]:=0;
+		END_FOR
+		CurPortSms1:=0;		CurTaskSms1:=0; 	VesSmsR[1]:=0; 	idS1:=0;
+		CurPortSms2:=0;		CurTaskSms2:=0; 	VesSmsR[2]:=0; 	idS2:=0;
+		CurPortSms3:=0;		CurTaskSms3:=0; 	VesSmsR[3]:=0; 	idS3:=0;
+		FOR II:=1 TO CBGP DO
+			UnloadBunk[ii]:=0;
+			unloadList[ii]:=0;
+		END_FOR
+		msgToScadaUnl:=0;  //1
+		msgFromScadaUnl:=0;
+				
+		Regim2.10:=1;
+		StopDosingID:=0;
+		StopUnLoad:=FALSE;
+		
+		DosingK_Done:=FALSE;
+		DosingD_Done:=FALSE;
+		DosingM_Done:=FALSE; 
+		DosingJ1_Done:=FALSE;
+		DosingJ2_Done:=FALSE;
+		
+		Defect1 :=0;
+		Defect2 :=0;
+		Defect3 :=0;
+		Defect4 :=0;
+		Defect5 :=0;
+		DefectPBD:=0;
+		isVigr12:=0;
+		isVigr3S:=0;
+		isVigrM2:=0;
+		CheckDefect1 :=0;	
+		CheckDefect2 :=0;	
+		CheckDefect3 :=0;	
+		CheckDefect4 :=0;	
+		CheckDefect5 :=0;	
+		
+		MustVigr23	:=0;
+
+		msgFromScadaK:=0;		CurPortK:=0;	CurVesPortK:=0;		CurTaskK:=1;	idK:=0;	LastIdK :=0;		msgToScadaK:=1; 
+		msgFromScadaD:=0;		CurPortD:=0;	CurVesPortD:=0;		CurTaskD:=1;	idD:=0;	LastIdD :=0;		msgToScadaD:=1; 
+		msgFromScadaM:=0;		CurPortM:=0;	CurVesPortM:=0;		CurTaskM:=1;	idM:=0;	LastIdM :=0;		msgToScadaM:=1; 
+		msgFromScadaJ1:=0;						CurVesPortJ1:=0;	CurTaskJ1:=0;								msgToScadaJ1:=0; 
+		msgFromScadaJ2:=0;						CurVesPortJ2:=0;	CurTaskJ2:=0;								msgToScadaJ2:=0; 
+								CurPortPBD:=0;	VesPBD:=0;			CurTaskPBD:=0;	idPBD:=0;
+		
+		
+		
+	END_IF

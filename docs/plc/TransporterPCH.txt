@@ -1,0 +1,217 @@
+functionBlock TransporterPCH
+VAR
+  input   next : BOOL  // Следующий механизм (транспортер запустится через
+  input   prev : BOOL  // Предыдущий механизм
+  input   pause : BOOL  // Приостановка работы
+  input   Idle : BOOL  // может быть хх
+  input   errPCH : BOOL := FALSE  // Ошибка ПЧ
+  input   DP : BOOL := FALSE  // Датчик подпора
+  input   DP_off : BOOL  // Не учитывать ДП
+  input   HandMode : BOOL  // Работа в ручном режиме
+  input   canRunAuto : BOOL  // Условие для необходимости работы в автоматическом режиме
+  input   timeBeforeStart : TIME := TIME#5s0ms  // Пауза перед запуском в автоматическом режиме
+  input   timeToStop : TIME := TIME#20s0ms  // Время на выгрузку из нории при остановке автоматического режима
+  input   TokNom : WORD  // ток номинальный *10
+  input   TokMax : WORD  // ток максимальный *10
+  input   TokCur : WORD  // ток текущий *10
+  input   TokIdl : WORD  // ток ХХ *10
+  input   FreqManual : WORD  // Частота в ручном режиме
+  input   kPidP : REAL := 200  // 0.3; //0.4;
+  input   kPidI : REAL := 40  // 0.7; //0.3;
+  input   kPidD : REAL := 60  // 0.2; //0.5;
+  input   yRun : BOOL  // Пуск в ручном режиме
+  output  run : BOOL := FALSE  // Включение транспотера
+  output  run_PCH : BOOL
+  output  da : BOOL := FALSE  // Авария механизма
+  output  err_DP : BOOL := FALSE  // Авария ДП
+  output  errPCH_Save : BOOL
+  output  HandOut : BOOL
+  output  state : WORD := 0  // Состояние транспортера (0 выкл.без аварии, 1-включен, 2-авария)
+  output  reset_PCH : BOOL
+  local   rr : BOOL  // Готовность к работе
+  local   Delta : REAL
+  local   t_dks_on : TON
+  local   t_dks_off : TON
+  local   run_auto : BOOL
+  local   TON_START : TON
+  local   TON_STOP : TON
+  local   offState : WORD := 0
+  local   runState : WORD := 1
+  local   alarmState : WORD := 2
+  local   temp : BOOL
+  local   TON_Tr_PCH : TON
+  local   TON_pch : TON
+  local   CheckNowPlus : BOOL
+  local   TON_Check : TON
+  local   TON_Max_Tok : TON
+  local   TOF_ResetPch : TOF
+  local   CheckNow : BOOL
+  local   TON_CheckPlus : TON
+  local   CheckNowFl : BOOL
+  local   tmpCount1 : INT
+  local   tmpCount2 : INT
+  local   MinusGistMin : WORD
+  local   CurrR : WORD
+  local   TON_CheckMinus : TON
+  local   Pk : REAL
+  local   Ik : REAL
+  local   Dk : REAL
+  local   PID : REAL
+  local   TokPred : WORD
+  local   UseMyPID : BOOL := TRUE
+  local   PID_Drob : PID
+  local   TP_Max_Tok : TP
+  local   MHCalc_0 : MHCalc
+  local   NewFreqPCH : REAL
+  local   LastChange : REAL
+  inOut   FreqPCH : WORD  // частота частотника *100
+  inOut   MH : DWORD
+  inOut   aMH : DWORD
+END_VAR
+
+(* LD *)
+
+// --- Если не правильно задан ток ХХ
+IF (TokIdl < 50) /*EN=true*/ THEN TokIdl := (TokNom/4); END_IF
+
+// --- Авария датчика подпора
+IF dp AND NOT DP_off THEN err_DP := TRUE; END_IF
+
+// ---
+IF errPCH THEN errPCH_Save := TRUE; END_IF
+
+// --- Сброс аварий
+IF ResetErrors THEN errPCH_Save := FALSE; END_IF
+IF ResetErrors THEN err_DP := FALSE; END_IF
+TOF_ResetPch(IN:=ResetErrors, PT:=t#1s);
+reset_PCH := TOF_ResetPch.Q;
+
+// --- Готовность к работе
+rr := NOT err_DP AND NOT errPCH_Save AND NOT GEmer;
+da := NOT (NOT err_DP AND NOT errPCH_Save);
+
+// ---
+IF canRunAuto AND R_TRIG(HandMode) THEN yRun := run; END_IF
+IF canRunAuto AND F_TRIG(HandMode) THEN run_auto := yRun; END_IF
+
+// --- Запуск автоматического режима
+TON_START(IN:=canRunAuto AND rr AND next, PT:=timeBeforeStart);
+IF TON_START.Q THEN run_auto := TRUE; END_IF
+
+// --- Остановка в автоматическом режиме
+TON_STOP(IN:=NOT canRunAuto AND NOT prev, PT:=timeToStop);
+
+// --- Сброс автоматического режима
+IF (TON_STOP.Q OR NOT rr OR (NOT next AND NOT MGod)) THEN run_auto := FALSE; END_IF
+
+// --- Сброс yRun - ручного запуска из Скады в ручном режиме
+IF (NOT HandMode OR NOT rr OR (NOT MGod AND NOT next)) THEN yRun := FALSE; END_IF
+
+// --- Включение пускателя
+run := ((run_auto AND NOT HandMode AND NOT pause) OR yRun) AND NOT TON_Max_Tok.Q;
+
+// --- Включение ПЧ
+TON_Tr_PCH(IN:=run, PT:=t#150ms);
+run_PCH := TON_Tr_PCH.Q;
+
+// --- Стартовая частота в авто режиме
+IF R_TRIG(run_PCH) AND canRunAuto THEN FreqPCH := 400; END_IF
+IF 400 /*EN=R_TRIG(run_PCH) AND canRunAuto*/ THEN TokPred := TokCur; END_IF
+
+// --- Если использовать стандартный ПИД а не мой
+IF NOT UseMyPID THEN GOTO StandartPID; END_IF
+
+// --- Таймер на корректировку частоты
+TON_Check(IN:=run_PCH AND rr AND NOT CheckNow, PT:=t#500ms);
+CheckNow := TON_Check.Q;
+
+// ---
+IF (NOT run_PCH OR ((TokCur < TokIdl) /*EN=true*/)) THEN Ik := 0; END_IF
+
+// ---
+IF R_TRIG(CheckNow) THEN CheckNowFl := TRUE; END_IF
+
+// --- просто для визуального контроля токов
+IF true THEN CurrR := TokCur; END_IF
+IF TokCur /*EN=true*/ THEN CurrR := TokPred; END_IF
+IF TokPred /*EN=TokCur /*EN=true*/*/ THEN CurrR := TokNom; END_IF
+
+// ---
+IF CheckNowFl THEN Delta := (word_to_real(TokNom)-word_to_real(TokCur)); END_IF
+IF (word_to_real(TokNom)-word_to_real(TokCur)) /*EN=CheckNowFl*/ THEN LastChange := (word_to_real(TokPred)-word_to_real(TokCur)); END_IF
+
+// --- Расчет составляющих PID регулирования
+IF true THEN Pk := 0; END_IF
+
+// ---
+IF CheckNowFl THEN Pk := (Delta/6700*kPidP); END_IF
+IF CheckNowFl THEN Ik := (Delta/1000000*kPidI+Ik); END_IF
+IF CheckNowFl THEN Dk := (LastChange/4700*kPidD); END_IF
+
+// --- Ток номинальный больше текущего
+IF (Delta < (word_to_real(TokNom)*10/100)) /*EN=(Delta > 0) /*EN=CheckNowFl*/*/ THEN Pk := (Pk/4); END_IF
+IF (Pk/4) /*EN=(Delta < (word_to_real(TokNom)*10/100)) /*EN=(Delta > 0) /*EN=CheckNowFl*/*/*/ THEN Ik := 0; END_IF
+IF 0 /*EN=(Pk/4) /*EN=(Delta < (word_to_real(TokNom)*10/100)) /*EN=(Delta > 0) /*EN=CheckNowFl*/*/*/*/ THEN Dk := (Dk/2); END_IF
+IF (LastChange < (TokNom/200)) /*EN=(Dk/2) /*EN=0 /*EN=(Pk/4) /*EN=(Delta < (word_to_real(TokNom)*10/100)) /*EN=(Delta > 0) /*EN=CheckNowFl*/*/*/*/*/*/ THEN Dk := 0; END_IF
+IF (Delta < (word_to_real(TokNom)*20/100)) /*EN=(Delta >= (word_to_real(TokNom)*10/100)) /*EN=(Delta > 0) /*EN=CheckNowFl*/*/*/ THEN Pk := (Pk/2); END_IF
+IF (Pk/2) /*EN=(Delta < (word_to_real(TokNom)*20/100)) /*EN=(Delta >= (word_to_real(TokNom)*10/100)) /*EN=(Delta > 0) /*EN=CheckNowFl*/*/*/*/ THEN Ik := (Ik*0.8); END_IF
+
+// ---
+IF ((Pk*Ik) < 0) THEN Ik := 0; END_IF
+IF (Dk > 0) /*EN=(Delta < 0)*/ THEN Dk := (Dk/4); END_IF
+IF (Delta < 0) THEN Pk := (Pk*1.1); END_IF
+
+// ---
+IF CheckNowFl THEN PID := ((Pk+Ik+Dk)*100); END_IF
+IF (PID > 0) /*EN=(Delta < 0) /*EN=((Pk+Ik+Dk)*100) /*EN=CheckNowFl*/*/*/ THEN PID := 0; END_IF
+
+// ---
+IF CheckNowFl THEN NewFreqPCH := (word_to_real(FreqPCH)+PID); END_IF
+IF (word_to_real(FreqPCH)+PID) /*EN=CheckNowFl*/ THEN tmpCount1 := (tmpCount1+1); END_IF
+IF (NewFreqPCH <= 0) /*EN=(tmpCount1+1) /*EN=(word_to_real(FreqPCH)+PID) /*EN=CheckNowFl*/*/*/ THEN NewFreqPCH := 5; END_IF
+
+// ---
+IF CheckNowFl THEN FreqPCH := (Real_to_word(NewFreqPCH)); END_IF
+IF (Real_to_word(NewFreqPCH)) /*EN=CheckNowFl*/ THEN TokPred := TokCur; END_IF
+
+// ---
+StandartPID:
+IF UseMyPID THEN GOTO AfterPID; END_IF
+
+// ---
+
+// ---
+PID_Drob(ACTUAL:=word_to_real(TokCur), SET_POINT:=word_to_real(TokNom), KP:=5, TN:=7, TV:=0, Y_MANUAL:=, Y_OFFSET:=0, Y_MIN:=0, Y_MAX:=5000, MANUAL:=false, RESET:=(Idle OR NOT run));
+
+// ---
+IF run THEN FreqPCH := REAL_TO_WORD(In2:=PID_Drob.Y); END_IF
+
+// ---
+AfterPid:
+IF (FreqPCH > 5000) /*EN=true*/ THEN FreqPCH := 5000; END_IF
+IF (FreqPCH < 100) /*EN=true*/ THEN FreqPCH := 100; END_IF
+TON_Max_Tok(IN:=(TokCur >= TokMax) /*EN=true*/, PT:=t#2s);
+TP_Max_Tok(IN:=TON_Max_Tok.Q, PT:=t#2s);
+IF TP_Max_Tok.Q THEN FreqPCH := 200; END_IF
+IF true AND NOT mgod AND Idle THEN FreqPCH := 300; END_IF
+IF true AND NOT run THEN FreqPCH := 0; END_IF
+
+// ---
+IF true THEN CheckNowFl := FALSE; END_IF
+
+// ---
+IF (FreqPCH > FreqManual) /*EN=yRun*/ THEN FreqPCH := FreqManual; END_IF
+
+// ---
+MHCalc_0(Run:=run_PCH AND run, MH:=MH, aMH:=aMH);
+
+// ---
+HandOut := yRun;
+
+// --- Статус транспортера (0-выключен без аварии, 1-работает, 2-авария)
+IF NOT da AND NOT run THEN state := offState; END_IF
+temp := offState /*EN=NOT da AND NOT run*/;
+IF NOT da AND run THEN state := runState; END_IF
+temp := runState /*EN=NOT da AND run*/;
+IF da THEN state := alarmState; END_IF
+temp := alarmState /*EN=da*/;

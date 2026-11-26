@@ -1,0 +1,70 @@
+functionBlock Mehanizm
+VAR
+  input   next : BOOL  // Следующий механизм. После его запуска будет запущена нория в автоматическом режиме через время timeBeforeStart
+  input   prev : BOOL  // Предыдущий механизм. После его остановки будет остановлена нория в автоматическом режиме через время timeToStop
+  input   AZ : BOOL  // Авария от автомата защиты
+  input   HandMode : BOOL
+  input   SlowHand : BOOL := FALSE  // можно плавно переходить из автоматического в ручной
+  input   canRunAuto : BOOL  // Условие для необходимости работы в автоматическом режиме
+  input   timeBeforeStart : TIME := TIME#2s0ms  // Пауза перед запуском в автоматическом режиме
+  input   timeToStop : TIME := TIME#20s0ms  // Время на выгрузку из нории при остановке автоматического режима
+  output  run : BOOL  // Запуск нории
+  output  da : BOOL  // Авария, о которой нужно сигнализировать
+  output  errAZ : BOOL  // Авария от автомата защиты
+  output  State : WORD  // Состояние объекта
+  inOut   yRun : BOOL  // "Пуск" со скады в ручном режиме
+  inOut   MH : DWORD
+  inOut   aMH : DWORD
+  local   rr : BOOL
+  local   TON_AutoOn : TON
+  local   run_auto : BOOL := FALSE
+  local   TON_AutoOff : TON
+  local   temp : BOOL
+  local   offState : WORD := 0
+  local   runState : WORD := 1
+  local   alarmState : WORD := 2
+  local   MHCalc_f : MHCalc
+END_VAR
+
+(* LD *)
+
+// --- Авария от автомата защиты
+IF AZ THEN errAZ := TRUE; END_IF
+
+// --- Сброс аварий
+IF (ResetErrors OR MEmul) THEN errAZ := FALSE; END_IF
+
+// --- Готовность к работе
+rr := NOT errAZ AND NOT GEmer;
+da := NOT NOT errAZ;
+
+// ---
+IF canRunAuto AND SlowHand AND R_TRIG(HandMode) THEN yRun := run; END_IF
+IF canRunAuto AND SlowHand AND F_TRIG(HandMode) THEN run_auto := yRun; END_IF
+
+// --- Запуск в автоматическом режиме работы
+TON_AutoOn(IN:=canRunAuto AND rr AND next, PT:=timeBeforeStart);
+IF TON_AutoOn.Q THEN run_auto := TRUE; END_IF
+
+// --- Таймер на остановку работы в автоматическом режиме работы (при остановке режима)
+TON_AutoOff(IN:=NOT canRunAuto AND NOT prev, PT:=timeToStop);
+
+// --- Остановка работы в автоматическом режиме
+IF (TON_AutoOff.Q OR NOT rr OR NOT next) THEN run_auto := FALSE; END_IF
+
+// --- Сброс yRun - ручного запуска из Скады в ручном режиме
+IF ((NOT next AND NOT MGod) OR NOT rr OR NOT HandMode) THEN yRun := FALSE; END_IF
+
+// --- Включение
+run := ((NOT HandMode AND run_auto) OR yRun);
+
+// ---
+MHCalc_f(Run:=run, MH:=MH, aMH:=aMH);
+
+// --- Статус (0-выключен без аварии, 1-работает, 2-авария)
+IF NOT da AND NOT run THEN state := offState; END_IF
+temp := offState /*EN=NOT da AND NOT run*/;
+IF NOT da AND run THEN state := runState; END_IF
+temp := runState /*EN=NOT da AND run*/;
+IF da THEN state := alarmState; END_IF
+temp := alarmState /*EN=da*/;

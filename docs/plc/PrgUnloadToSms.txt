@@ -1,0 +1,324 @@
+program PrgUnloadToSms
+VAR
+  local   TON_UnloadD : TON
+  local   TON_UnloadK : TON
+  local   NoChangeWeightK : WeightControl
+  local   NoChangeWeightD : WeightControl
+  local   TON_Go_KompTr : TON
+  local   TON_Out_from_30500 : TON
+  local   TON_ChangeErrorK : TON
+  local   TON_ChangeErrorD : TON
+  local   TON_UPP_HH : TON
+  local   TON_Nor20300 : TON
+  local   TON_PustBunk30101 : TON
+  local   TON_pust_30320 : TON
+  local   TON_Out_from_30400 : TON
+  local   TON_OutD_from_30400 : TON
+  local   TON_OutD_from_30500 : TON
+  local   Filter_30400 : Filter
+  local   Konv30400 : Transporter
+  local   Konv21500 : Transporter
+  local   VentDrob : Filter  // Konv30330: Transporter;
+  local   Noria3 : Noria
+  local   TrDob : Transporter
+  local   TrDrob : Transporter
+  local   TrKomp : Transporter
+  local   Noria2 : Noria
+  local   PrevNor2 : BOOL
+  local   Drobilka1 : Drobilka
+  local   Drobilka2 : Drobilka
+  local   CTU_1 : CTU
+  local   isBlocketKomp : BOOL
+  local   isBlocketDob : BOOL
+  local   TON_DrobRun : TON
+  local   NextDrob : BOOL
+  local   PredPitat : BOOL
+  local   TOF_StopPit : TOF
+  local   TOn_StopPit : TON
+  local   NextVentDrob : BOOL
+  local   qq : BOOL
+  local   NoChangeWeightK_Next : WeightControl
+  local   TOn_IdlePit : TON
+  local   MustVigrKMD1 : BOOL
+  local   GWDob : GW
+  local   ResetAutoDrob : BOOL
+  local   CanResetKomp : BOOL
+  local   Zatvor30350 : Zatvor
+  local   TON_OutM_from_30400 : TON
+  local   TON_OutM_from_30500 : TON
+  local   TOF_UnlockDrob : TOF
+  local   LockDoorDrob : BOOL
+  local   TON_PustBunkDrob : TON
+  local   TON_NotPustBunkDrob : TON
+  local   FILTER_CURR_DROB1 : FILTER_analog_signal
+  local   FILTER_CURR_DROB2 : FILTER_analog_signal
+  local   TP_MS_AutoOpen : TP
+  local   Go_Drob000 : BOOL
+  local   Go_LDrob000 : BOOL
+  local   Go_RDrob000 : BOOL
+  local   TOF_RunKomp : TOF
+  local   TOF_RunDob : TOF
+  local   yRunZatvTrDrob3 : BOOL
+  local   TON_DrobIsFree : TON
+  local   DrobIsFree : BOOL
+  local   BlockInDrob : BOOL
+  local   TON_ClearNextVent : TON
+  local   MyTimer_StopDrob : MyTimer
+  local   ResetTimerStopDrob : BOOL
+  local   GWDrob : PC_One
+  local   TrPBD : Transporter
+  local   Pit1 : TransporterPCH
+  local   Pit2 : TransporterPCH
+  local   TON_DrobRun1 : TON
+  local   TON_DrobRun2 : TON
+  local   TOn_IdleDrob1 : TON
+  local   TOn_IdleDrob2 : TON
+  local   TOn_IdlePit2 : TON
+  local   TOn_IdlePit1 : TON
+  local   TON_Out_from_Nor3 : TON
+  local   TON_Drob1_HH : TON
+  local   TON_Drob2_HH : TON
+  local   TON_PustPBD : TON
+  local   TON_TrPBD : TON
+  local   DopOstKr : REAL
+  local   DopOstDr : REAL
+END_VAR
+
+(* LD *)
+
+// ---
+DopOstKr := (word_to_real(DopOstK)/10);
+IF (word_to_real(DopOstK)/10) THEN DopOstDr := (word_to_real(DopOstD)/10); END_IF
+
+// --- Компоненты все выехали
+NoChangeWeightK(RunWatch:=PBDState.0 AND NOT PBDState.1 AND Go_TrKomp AND DosingK_Done, Ves:=Ves1.RealValue, ToInc:=false, timeDedLine:=t#20s, range:=1, timeOutWatch:=t#5s);
+IF (Ves1.RealValue <= (Ves01+DopOstKr)) /*EN=NoChangeWeightK.notChange*/ THEN msgToScadaK := 32; END_IF
+IF 32 /*EN=(Ves1.RealValue <= (Ves01+DopOstKr)) /*EN=NoChangeWeightK.notChange*/*/ THEN PBDState.1 := TRUE; END_IF
+Err1.12 //выгрузка застряла := (Ves1.RealValue > (Ves01+DopOstKr)) /*EN=NoChangeWeightK.notChange*/;
+
+// --- Добавки все выехали
+NoChangeWeightD(RunWatch:=SmsUpState.1 AND Go_TrDob AND DosingD_Done AND NOT SmsUpState.2, Ves:=Ves2.RealValue, ToInc:=false, timeDedLine:=t#20s, range:=1, timeOutWatch:=t#2s);
+IF (Ves2.RealValue <= (Ves02+DopOstD)) /*EN=NoChangeWeightD.notChange*/ THEN msgToScadaD := 32; END_IF
+IF 32 /*EN=(Ves2.RealValue <= (Ves02+DopOstD)) /*EN=NoChangeWeightD.notChange*/*/ THEN SmsUpState.2 := TRUE; END_IF
+Err1.13 := (Ves2.RealValue > (Ves02+DopOstD)) /*EN=NoChangeWeightD.notChange*/;
+
+// --- timeout прохода нории 2
+TON_Nor20300(IN:=PBDState.1 AND Go_Nor2, PT:=t#1s*tcNor2);
+IF TON_Nor20300.Q THEN PBDState.3 := TRUE; END_IF
+
+// --- timeout прохода конвейера над предбункером дробилки
+TON_TrPBD(IN:=PBDState.3 AND Go_TrPBD, PT:=t#1s*tcTrPBD);
+IF TON_TrPBD.Q THEN PBDState.4 := TRUE; END_IF
+
+// --- прошли предбункер дробилки
+TON_PustPBD(IN:=((PBDState.4 AND NOT DNU_PBD AND Go_Pit1) OR (PBDState.4 AND NOT DNU_PBD AND Go_Pit2)) AND NOT SmsUpState.5, PT:=t#4s);
+IF TON_PustPBD.Q THEN idPBD := 0; END_IF
+IF 0 /*EN=TON_PustPBD.Q*/ THEN PBDState := 0; END_IF
+IF 0 /*EN=0 /*EN=TON_PustPBD.Q*/*/ THEN SmsUpState.5 := TRUE; END_IF
+IF TON_PustPBD.Q THEN CurPortPBD := 0; END_IF
+IF 0 /*EN=TON_PustPBD.Q*/ THEN CurTaskPBD := 0; END_IF
+
+// --- Дробилка 1 на ХХ
+TON_Drob1_HH(IN:=(TokCur1 <= TokIdl1) /*EN=Go_Drob1*/, PT:=t#5s);
+Drob1_HH := TON_Drob1_HH.Q;
+
+// --- Дробилка 2 на ХХ
+TON_Drob2_HH(IN:=(TokCur2 <= TokIdl2) /*EN=Go_Drob2*/, PT:=t#5s);
+Drob2_HH := TON_Drob2_HH.Q;
+
+// --- компоненты вышли из бункера под дробилкой
+TON_pust_30320(IN:=((((((SmsUpState.5 AND Go_Drob1) OR (SmsUpState.5 AND Go_Drob2)) AND Drob1_HH) OR (((SmsUpState.5 AND Go_Drob1) OR (SmsUpState.5 AND Go_Drob2)) AND NOT UsedDrob.0) OR (((SmsUpState.5 AND Go_Drob1) OR (SmsUpState.5 AND Go_Drob2)) AND Drobilka1.da) OR (((SmsUpState.5 AND Go_Drob1) OR (SmsUpState.5 AND Go_Drob2)) AND NOT Go_Drob1)) AND Drob2_HH) OR (((((SmsUpState.5 AND Go_Drob1) OR (SmsUpState.5 AND Go_Drob2)) AND Drob1_HH) OR (((SmsUpState.5 AND Go_Drob1) OR (SmsUpState.5 AND Go_Drob2)) AND NOT UsedDrob.0) OR (((SmsUpState.5 AND Go_Drob1) OR (SmsUpState.5 AND Go_Drob2)) AND Drobilka1.da) OR (((SmsUpState.5 AND Go_Drob1) OR (SmsUpState.5 AND Go_Drob2)) AND NOT Go_Drob1)) AND NOT UsedDrob.1) OR (((((SmsUpState.5 AND Go_Drob1) OR (SmsUpState.5 AND Go_Drob2)) AND Drob1_HH) OR (((SmsUpState.5 AND Go_Drob1) OR (SmsUpState.5 AND Go_Drob2)) AND NOT UsedDrob.0) OR (((SmsUpState.5 AND Go_Drob1) OR (SmsUpState.5 AND Go_Drob2)) AND Drobilka1.da) OR (((SmsUpState.5 AND Go_Drob1) OR (SmsUpState.5 AND Go_Drob2)) AND NOT Go_Drob1)) AND Drobilka2.da) OR (((((SmsUpState.5 AND Go_Drob1) OR (SmsUpState.5 AND Go_Drob2)) AND Drob1_HH) OR (((SmsUpState.5 AND Go_Drob1) OR (SmsUpState.5 AND Go_Drob2)) AND NOT UsedDrob.0) OR (((SmsUpState.5 AND Go_Drob1) OR (SmsUpState.5 AND Go_Drob2)) AND Drobilka1.da) OR (((SmsUpState.5 AND Go_Drob1) OR (SmsUpState.5 AND Go_Drob2)) AND NOT Go_Drob1)) AND NOT Go_Drob2)) AND Go_TrDrob, PT:=t#1s*tcTrDrob);
+IF TON_pust_30320.Q THEN CurPortDr := 0; END_IF
+IF 0 /*EN=TON_pust_30320.Q*/ THEN SmsUpState.6 := TRUE; END_IF
+
+// --- компоненты в смесителе
+TON_Out_from_Nor3(IN:=SmsUpState.6 AND Go_Nor3, PT:=t#1s*tcNor3);
+IF TON_Out_from_Nor3.Q THEN SmsUpState.0 := FALSE; END_IF
+IF TON_Out_from_Nor3.Q THEN SmsUpState.8 := TRUE; END_IF
+
+// --- TimeOut , чтобы добавки добрались до смесителя
+TON_OutD_from_30500(IN:=SmsUpState.2 AND Go_Nor3, PT:=t#1s*tcNor3);
+IF TON_OutD_from_30500.Q THEN SmsUpState.1 := FALSE; END_IF
+IF TON_OutD_from_30500.Q THEN SmsUpState.4 := TRUE; END_IF
+
+// --- сыпучие материалы в смесителе. Оставлено для совместимости
+IF SmsUpState.8 AND SmsUpState.4 THEN SmsUpState.10 := TRUE; END_IF
+
+// ---
+TOF_RunKomp(IN:=((RunDosing AND (msgToScadaK>1) AND (msgToScadaK<>64)) OR (RunDosing AND (PBDState>0))), PT:=t#5s);
+CanRunAutoK := TOF_RunKomp.Q;
+
+// ---
+IF Go_Asp2 AND CanRunAutoK THEN RunKomp := TRUE; END_IF
+IF Go_Asp2 AND CanRunAutoK THEN RunDrob := TRUE; END_IF
+IF NOT CanRunAutoK THEN RunKomp := FALSE; END_IF
+
+// ---
+IF (((SmsUpState = 0) /*EN=((((NOT CanRunAutoK AND NOT DNU_PBD AND NOT Go_Pit1 AND NOT Go_Pit2 AND Drob1_HH) OR (NOT CanRunAutoK AND NOT DNU_PBD AND NOT Go_Pit1 AND NOT Go_Pit2 AND NOT UsedDrob.0) OR (NOT CanRunAutoK AND NOT DNU_PBD AND NOT Go_Pit1 AND NOT Go_Pit2 AND NOT Go_Drob1)) AND Drob2_HH) OR (((NOT CanRunAutoK AND NOT DNU_PBD AND NOT Go_Pit1 AND NOT Go_Pit2 AND Drob1_HH) OR (NOT CanRunAutoK AND NOT DNU_PBD AND NOT Go_Pit1 AND NOT Go_Pit2 AND NOT UsedDrob.0) OR (NOT CanRunAutoK AND NOT DNU_PBD AND NOT Go_Pit1 AND NOT Go_Pit2 AND NOT Go_Drob1)) AND NOT UsedDrob.1) OR (((NOT CanRunAutoK AND NOT DNU_PBD AND NOT Go_Pit1 AND NOT Go_Pit2 AND Drob1_HH) OR (NOT CanRunAutoK AND NOT DNU_PBD AND NOT Go_Pit1 AND NOT Go_Pit2 AND NOT UsedDrob.0) OR (NOT CanRunAutoK AND NOT DNU_PBD AND NOT Go_Pit1 AND NOT Go_Pit2 AND NOT Go_Drob1)) AND NOT Go_Drob2))*/) OR (((((NOT CanRunAutoK AND NOT DNU_PBD AND NOT Go_Pit1 AND NOT Go_Pit2 AND Drob1_HH) OR (NOT CanRunAutoK AND NOT DNU_PBD AND NOT Go_Pit1 AND NOT Go_Pit2 AND NOT UsedDrob.0) OR (NOT CanRunAutoK AND NOT DNU_PBD AND NOT Go_Pit1 AND NOT Go_Pit2 AND NOT Go_Drob1)) AND Drob2_HH) OR (((NOT CanRunAutoK AND NOT DNU_PBD AND NOT Go_Pit1 AND NOT Go_Pit2 AND Drob1_HH) OR (NOT CanRunAutoK AND NOT DNU_PBD AND NOT Go_Pit1 AND NOT Go_Pit2 AND NOT UsedDrob.0) OR (NOT CanRunAutoK AND NOT DNU_PBD AND NOT Go_Pit1 AND NOT Go_Pit2 AND NOT Go_Drob1)) AND NOT UsedDrob.1) OR (((NOT CanRunAutoK AND NOT DNU_PBD AND NOT Go_Pit1 AND NOT Go_Pit2 AND Drob1_HH) OR (NOT CanRunAutoK AND NOT DNU_PBD AND NOT Go_Pit1 AND NOT Go_Pit2 AND NOT UsedDrob.0) OR (NOT CanRunAutoK AND NOT DNU_PBD AND NOT Go_Pit1 AND NOT Go_Pit2 AND NOT Go_Drob1)) AND NOT Go_Drob2)) AND SmsUpState.6)) THEN RunDrob := FALSE; END_IF
+
+// ---
+IF RunDrob AND UsedDrob.0 THEN RunDrob1 := TRUE; END_IF
+IF RunDrob AND UsedDrob.1 THEN RunDrob2 := TRUE; END_IF
+
+// ---
+IF NOT RunDrob THEN RunDrob1 := FALSE; END_IF
+IF NOT RunDrob THEN RunDrob2 := FALSE; END_IF
+
+// ---
+TOn_IdleDrob1(IN:=NOT UsedDrob.0 AND RunDrob1 AND (TokCur1<=TokIdl1), PT:=t#4s);
+IF TOn_IdleDrob1.Q THEN RunDrob1 := FALSE; END_IF
+
+// ---
+TOn_IdleDrob2(IN:=NOT UsedDrob.1 AND RunDrob2 AND (TokCur2<=TokIdl2), PT:=t#4s);
+IF TOn_IdleDrob2.Q THEN RunDrob2 := FALSE; END_IF
+
+// ---
+TOF_RunDob(IN:=(msgToScadaD <> 64) /*EN=(msgToScadaD > 1) /*EN=RunDosing*/*/, PT:=t#5s);
+CanRunAutoD := TOF_RunDob.Q;
+
+// ---
+IF Go_Asp2 AND CanRunAutoD THEN RunDob := TRUE; END_IF
+IF NOT CanRunAutoD THEN RunDob := FALSE; END_IF
+
+// ---
+Noria3(localPusk:=LPusk_Nor3 AND Local_Nor3, localStop:=(LStopD_Nor3 OR LStopU_Nor3), next:=true, prev:=Go_TrDrob, dp:=false, off_dp:=true, dks:=DKS_Nor3, off_dks:=OffDKS_Nor3, dsl1:=DSL1_Nor3, dsl2:=DSL2_Nor3, off_dsl1:=OffDSL1_Nor3, off_dsl2:=OffDSL2_Nor3, AZ:=ErrAz_Nor3, HandMode:=(MHand OR NOT RunDosing OR fHand2.6), SlowHand:=RunDosing, canRunAuto:=(RunDrob OR RunDob), timeBeforeStart:=t#5s, timeToStop:=t#1s*tcNor3, yRun:=yRunNor3, MH:=MhNor3, aMH:=aMhNor3);
+DA_Nor3 := Noria3.da;
+Err10.0 := Noria3.errAZ;
+Err10.1 := Noria3.errDKS;
+Err10.2 := Noria3.errDP;
+Err10.3 := Noria3.errDSL1;
+Err10.4 := Noria3.errDSL2;
+yRunNor3 := Noria3.yRunOut;
+StMeh[48] := Noria3.state;
+Go_Nor3 := Noria3.run;
+
+// ---
+TrDob(localStop:=LStop_TrDob, localPusk:=LPusk_TrDob AND Local_TrDob, next:=Go_Nor3, prev:=SmsUpState.1 AND NOT SmsUpState.2, errAZ:=ErrPCH_TrDob, dks:=true //DKS_TrDob, dksMustBlink:=false, DKS_off:=true //OffDKS_TrDob, DP:=DP_TrDob, DP_off:=OffDP_TrDob, HandMode:=(MHand OR NOT RunDosing OR fHand1.14), SlowHand:=RunDosing, canRunAuto:=DosingD_Done AND SmsUpState.1 AND NOT SmsUpState.2 AND msgToScadaD.4 AND RunDob AND NOT isBlocketDob, timeBeforeStart:=t#1s, timeToStop:=t#1s, yHand:=yRunTrDob, MH:=MhTrDob, aMH:=aMhTrDob);
+DA_TrDob := TrDob.da;
+Err7.6 := TrDob.err_AZ;
+Err7.7 := TrDob.err_DKS;
+Err7.8 := TrDob.err_DP;
+yRunTrDob := TrDob.HandOut;
+StMeh[50] := TrDob.state;
+Go_TrDob := TrDob.run;
+
+// ---
+TrDrob(localStop:=(LStop1_TrDrob OR LStop2_TrDrob), localPusk:=LPusk_TrDrob AND Local_TrDrob, next:=Go_Nor3, prev:=(Go_Drob1 OR Go_Drob2), errAZ:=ErrAz_TrDrob, dks:=DKS_TrDrob, dksMustBlink:=false, DKS_off:=OffDKS_TrDrob, DP:=DP_TrDrob, DP_off:=OffDP_TrDrob, HandMode:=(MHand OR NOT RunDosing OR fHand2.5), SlowHand:=RunDosing, canRunAuto:=RunDrob, timeBeforeStart:=t#3s, timeToStop:=t#1s*tcTrDrob, yHand:=yRunTrDrob, MH:=MhTrDrob, aMH:=aMhTrDrob);
+DA_TrDrob := TrDrob.da;
+Err7.3 := TrDrob.err_AZ;
+Err7.4 := TrDrob.err_DKS;
+Err7.5 := TrDrob.err_DP;
+yRunTrDrob := TrDrob.HandOut;
+StMeh[51] := TrDrob.state;
+Go_TrDrob := TrDrob.run;
+
+// ---
+Drobilka1(AZ:=ErrAz_Drob1, OpenDoor:=OpenDoor_Drob1, OffOpenDor:=OffDoor_Drob1, HandMode:=(MHand OR NOT RunDosing OR fHand2.3), SlowHand:=RunDosing, next:=true, prev:=Go_Pit1, canRunAuto:=RunDrob1, timeBeforeStart:=t#2s, timeToStop:=t#10s, yHand:=yRunDrob1, MH:=MhDrob1, aMH:=aMhDrob1);
+DA_Drob1 := Drobilka1.da;
+Err18.0 := Drobilka1.ErrAz;
+Err18.1 := Drobilka1.ErrOpenDoor;
+yRunDrob1 := Drobilka1.yHandOut;
+StMeh[35] := Drobilka1.state;
+Go_Drob1 := Drobilka1.Run;
+
+// ---
+Drobilka2(AZ:=ErrAz_Drob2, OpenDoor:=OpenDoor_Drob2, OffOpenDor:=OffDoor_Drob2, HandMode:=(MHand OR NOT RunDosing OR fHand2.4), SlowHand:=RunDosing, next:=true, prev:=Go_Pit2, canRunAuto:=RunDrob2, timeBeforeStart:=t#12s, timeToStop:=t#10s, yHand:=yRunDrob2, MH:=MhDrob2, aMH:=aMhDrob2);
+DA_Drob2 := Drobilka2.da;
+Err18.2 := Drobilka2.ErrAz;
+Err18.3 := Drobilka2.ErrOpenDoor;
+yRunDrob2 := Drobilka2.yHandOut;
+StMeh[36] := Drobilka2.state;
+Go_Drob2 := Drobilka2.Run;
+
+// ---
+TON_DrobRun1(IN:=Go_Drob1 AND (TokCur1<TokIdl1), PT:=t#5s);
+IF TON_DrobRun1.Q THEN DrobIsRun1 := TRUE; END_IF
+IF NOT Go_Drob1 THEN DrobIsRun1 := FALSE; END_IF
+
+// ---
+TON_DrobRun2(IN:=Go_Drob2 AND (TokCur2<TokIdl2), PT:=t#5s);
+IF TON_DrobRun2.Q THEN DrobIsRun2 := TRUE; END_IF
+IF NOT Go_Drob2 THEN DrobIsRun2 := FALSE; END_IF
+
+// ---
+TOn_IdlePit1(IN:=NOT DNU_PBD AND (TokCur1<=TokIdl1), PT:=t#4s);
+TOn_IdlePit2(IN:=NOT DNU_PBD AND (TokCur2<=TokIdl2), PT:=t#4s);
+
+// ---
+IF SmsUpState.0 AND NOT SmsUpState.5 AND NOT WorkPit THEN CurPortDr := CurPortPBD; END_IF
+IF CurPortPBD /*EN=SmsUpState.0 AND NOT SmsUpState.5 AND NOT WorkPit*/ THEN WorkPit := TRUE; END_IF
+IF ((((((WorkPit AND SmsUpState.5) OR (WorkPit AND (PBDState=0))) AND TOn_IdlePit1.Q) OR (((WorkPit AND SmsUpState.5) OR (WorkPit AND (PBDState=0))) AND NOT UsedDrob.0)) AND TOn_IdlePit2.Q) OR (((((WorkPit AND SmsUpState.5) OR (WorkPit AND (PBDState=0))) AND TOn_IdlePit1.Q) OR (((WorkPit AND SmsUpState.5) OR (WorkPit AND (PBDState=0))) AND NOT UsedDrob.0)) AND NOT UsedDrob.1)) THEN WorkPit := FALSE; END_IF
+
+// --- Фильтр тока дробилки
+FILTER_CURR_DROB1(START:=true, VALUE:=TokCur1MB, LEN:=t#200ms);
+
+// --- Фильтр тока дробилки
+FILTER_CURR_DROB2(START:=true, VALUE:=TokCur2MB, LEN:=t#200ms);
+
+// ---
+TokCur1 := (int_to_word(FILTER_CURR_DROB1.F_VALUE));
+IF (int_to_word(FILTER_CURR_DROB1.F_VALUE)) THEN TokCur2 := (int_to_word(FILTER_CURR_DROB2.F_VALUE)); END_IF
+
+// ---
+Pit1(next:=(((DrobIsRun1 AND NOT BlockDrob1 AND WorkPit) OR (DrobIsRun1 AND NOT BlockDrob1 AND NOT RunDosing)) AND UsedDrob.0) AND Go_TrDrob, prev:=false, pause:=BlockDrob1, Idle:=TOn_IdlePit1.Q, errPCH:=ErrPCH_Pit1, DP:=false, DP_off:=true, HandMode:=(((MHand OR NOT RunDosing OR fHand2.1) AND Go_Drob1) OR ((MHand OR NOT RunDosing OR fHand2.1) AND MGod)), canRunAuto:=WorkPit AND RunDrob AND DrobIsRun1 AND Go_TrDrob, timeBeforeStart:=t#2s, timeToStop:=t#2s, TokNom:=TokNom1, TokMax:=TokMax1, TokCur:=TokCur1, TokIdl:=TokIdl1, FreqManual:=FreqManualPit1, kPidP:=kPidP1, kPidI:=kPidI1, kPidD:=kPidD1, yRun:=yRunPit1, FreqPCH:=FreqPit1, MH:=MhPit1, aMH:=aMhPit1);
+DA_Pit1 := Pit1.da;
+Err6.15 := Pit1.errPCH_Save;
+yRunPit1 := Pit1.HandOut;
+StMeh[37] := Pit1.state;
+RstErrPCH_Pit1 := Pit1.reset_PCH;
+Go_Pit1 := Pit1.run;
+
+// ---
+Pit2(next:=(((DrobIsRun2 AND NOT BlockDrob2 AND WorkPit) OR (DrobIsRun2 AND NOT BlockDrob2 AND NOT RunDosing)) AND UsedDrob.1) AND Go_TrDrob, prev:=false, pause:=BlockDrob2, Idle:=TOn_IdlePit2.Q, errPCH:=ErrPCH_Pit2, DP:=false, DP_off:=true, HandMode:=(((MHand OR NOT RunDosing OR fHand2.2) AND Go_Drob2) OR ((MHand OR NOT RunDosing OR fHand2.2) AND MGod)), canRunAuto:=WorkPit AND RunDrob AND DrobIsRun2 AND Go_TrDrob, timeBeforeStart:=t#2s, timeToStop:=t#2s, TokNom:=TokNom2, TokMax:=TokMax2, TokCur:=TokCur2, TokIdl:=TokIdl2, FreqManual:=FreqManualPit2, kPidP:=kPidP2, kPidI:=kPidI2, kPidD:=kPidD2, yRun:=yRunPit2, FreqPCH:=FreqPit2, MH:=MhPit2, aMH:=aMhPit2);
+DA_Pit2 := Pit2.da;
+Err7.15 := Pit2.errPCH_Save;
+yRunPit2 := Pit2.HandOut;
+StMeh[38] := Pit2.state;
+RstErrPCH_Pit2 := Pit2.reset_PCH;
+Go_Pit2 := Pit2.run;
+
+// --- ограничение максимальной частоты питателей (maxFreqPit1 и maxFreqPit2 не больше 500)
+IF (FreqPit1 > maxFreqPit1) /*EN=(maxFreqPit1>0)*/ THEN FreqPit1 := maxFreqPit1; END_IF
+IF (FreqPit2 > maxFreqPit2) /*EN=(maxFreqPit2>0)*/ THEN FreqPit2 := maxFreqPit2; END_IF
+
+// ---
+FreqPit1toPCH := (FreqPit1*2);
+FreqPit2toPCH := (FreqPit2*2);
+
+// ---
+TrPBD(localStop:=LStop_TrPBD, localPusk:=LPusk_TrPBD AND Local_TrPBD, next:=true, prev:=Go_Nor2, errAZ:=ErrAz_TrPBD, dks:=DKS_TrPBD, dksMustBlink:=true, DKS_off:=OffDKS_TrPBD, DP:=DP_TrPBD, DP_off:=OffDP_TrPBD, HandMode:=(MHand OR NOT RunDosing OR fHand2.0), SlowHand:=RunDosing, canRunAuto:=RunKomp, timeBeforeStart:=t#1s, timeToStop:=t#1s*tcTrPBD, yHand:=yRunTrPBD, MH:=MhTrPBD, aMH:=aMhTrPBD);
+DA_TrPBD := TrPBD.da;
+Err6.12 := TrPBD.err_AZ;
+Err6.13 := TrPBD.err_DKS;
+Err6.14 := TrPBD.err_DP;
+yRunTrPBD := TrPBD.HandOut;
+StMeh[51] := TrPBD.state;
+Go_TrPBD := TrPBD.run;
+
+// ---
+Noria2(localPusk:=LPusk_Nor2 AND Local_Nor2, localStop:=(LStopD_Nor2 OR LStopU_Nor2), next:=true, prev:=Go_TrKomp, dp:=false, off_dp:=true, dks:=DKS_Nor2, off_dks:=OffDKS_Nor2, dsl1:=DSL1_Nor2, dsl2:=DSL2_Nor2, off_dsl1:=OffDSL1_Nor2, off_dsl2:=OffDSL2_Nor2, AZ:=ErrAz_Nor2, HandMode:=(MHand OR NOT RunDosing OR fHand1.15), SlowHand:=RunDosing, canRunAuto:=CanRunAutoK, timeBeforeStart:=t#1s, timeToStop:=t#1s*tcNor2, yRun:=yRunNor2, MH:=MhNor2, aMH:=aMhNor2);
+DA_Nor2 := Noria2.da;
+Err10.5 := Noria2.errAZ;
+Err10.6 := Noria2.errDKS;
+Err10.7 := Noria2.errDP;
+Err10.8 := Noria2.errDSL1;
+Err10.9 := Noria2.errDSL2;
+yRunNor2 := Noria2.yRunOut;
+StMeh[54] := Noria2.state;
+Go_Nor2 := Noria2.run;
+
+// ---
+IF NOT Go_TrKomp AND Block.0 THEN isBlocketKomp := TRUE; END_IF
+IF NOT Block.0 THEN isBlocketKomp := FALSE; END_IF
+IF Block.1 AND NOT Go_TrDob THEN isBlocketDob := TRUE; END_IF
+IF NOT Block.1 THEN isBlocketDob := FALSE; END_IF
+
+// ---
+TrKomp(localStop:=LStop_TrKomp, localPusk:=LPusk_TrKomp AND Local_TrKomp, next:=Go_Nor2 AND NOT DVU_PBD, prev:=false, errAZ:=ErrAz_TrKomp, dks:=DKS_TrKomp, dksMustBlink:=false, DKS_off:=OffDKS_TrKomp, DP:=DP_TrKomp, DP_off:=OffDP_TrKomp, HandMode:=(MHand OR NOT RunDosing OR fHand1.13), SlowHand:=RunDosing, canRunAuto:=PBDState.0 AND NOT PBDState.1 AND msgToScadaK.4 AND NOT isBlocketKomp, timeBeforeStart:=t#4s, timeToStop:=t#1s, yHand:=yRunTrKomp, MH:=MhTrKomp, aMH:=aMhTrKomp);
+DA_TrKomp := TrKomp.da;
+Err7.0 := TrKomp.err_AZ;
+Err7.1 := TrKomp.err_DKS;
+Err7.2 := TrKomp.err_DP;
+yRunTrKomp := TrKomp.HandOut;
+StMeh[55] := TrKomp.state;
+Go_TrKomp := TrKomp.run;

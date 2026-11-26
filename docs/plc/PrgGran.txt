@@ -1,0 +1,381 @@
+program PrgGran
+VAR
+  local   flOil : BOOL
+  local   flOilOff : BOOL
+  local   OilMustWork : BOOL
+  local   tonPauseDozOil : TON
+  local   tonDozOil : TON
+  local   KondGr : Transporter
+  local   ssss : BOOL
+  local   EnginGr : Transporter
+  local   TON_GranRstErr : TON
+  local   TON_SetWorkPchGran : TON
+  local   TON_SetWorkPchPitGr : TON
+  local   TON_ErrShtift : TON
+  local   PitGran : PitGranPCH
+  local   R_TRIG_StartGran : R_TRIG
+  local   F_TRIG_StartGran : F_TRIG
+  local   TON_GranWork10sec : TON
+  local   TON_GranOverload1 : TON
+  local   TON_GranOverload2 : TON
+  local   TON_OpenBaypass : TON
+  local   TON_CloseBaypass : TON
+  local   PchGrMustRun : BOOL
+  local   TON_GranLowerNom : TON
+  local   TON_GranHH : TON
+  local   TON_Gran1sec : TON
+  local   TON_0 : Ton
+  local   tonCorrPar : ton
+  local   tpStopDrobPar : ton
+  local   ErrOpenDoorGr : BOOL
+  local   ddd : WORD
+  local   ppPwCurrent1 : INT
+  local   aaa : WORD
+  local   TON_ClearPitGr : TON
+  local   TON_ClearKondGr : TON
+  local   TON_GranHHEnd : TON
+  local   TON_ClearOhl : TON
+  local   TON_ClearKonusOhl : TON
+  local   noResetErr : BOOL
+END_VAR
+
+(* ST *)
+//проверка явно не правильных параметров
+IF ppInterval<10 THEN ppInterval:=15; END_IF;
+IF ppMaxTemp<10 OR ppMaxTemp>800 THEN ppMaxTemp:=600; END_IF;
+IF TokIdlGran<100 THEN TokIdlGran:=100; END_IF;
+IF TokNomGran<500 THEN ToknomGran:=500; END_IF;
+IF TokMaxGran<500 THEN TokMaxGran:=500; END_IF;
+IF ppPlotn<100 THEN ppPlotn:=800; END_IF;
+IF ppPwStart<100 THEN ppPwStart:=100; END_IF;
+IF ppPwStart>2000 THEN ppPwStart:=500; END_IF;
+IF ppPwDelta<50 THEN ppPwDelta:=500; END_IF;
+IF ppPwTarg<500 THEN ppPwTarg:=5000; END_IF;
+IF ppPlotn<100 OR ppPlotn>3000 THEN ppPlotn:=800; END_IF;
+IF ppKPar<1 OR ppKPar>50 THEN ppKPar:=21; END_IF;
+
+GrButton:=(UseGran OR GrStart);
+ 
+R_TRIG_StartGran(CLK:=GrStart);
+IF R_TRIG_StartGran.Q THEN
+	//	включился режим гранулирования	
+		GrStopLoad:=FALSE;
+		GrHotStopLoad:=FALSE;
+		Err27.0:=ppPwStart<200 OR ppPwStart>2000;
+		Err27.1:=ppPwTarg<1000;
+		Err27.2:=ppPwDelta<50;
+		Err27.3:=ppInterval<15;
+		Err27.4:=ppPlotn<100 OR ppPlotn>3000;
+		Err27.5:=ppKPar<1 OR ppKPar>50;
+		IF (Err27 AND 2#1111111) > 0 THEN
+			(* Отменяем автоматический режим работы *)
+			GrStart:=FALSE;
+		else
+			(* Открываем байпас *)
+			yOpenBypass:=TRUE; 
+		END_IF;
+END_IF
+
+GoBypass := (CloseBypass OR fHand5.7) AND NOT yOpenBypass;
+IF MEmul THEN
+	BypassClosed:=GoBypass;
+	Bypassopened:=not GoBypass;
+END_IF
+//  типа PID :) для питателя гранулятора
+IF 	NOT Go_PchGr OR	
+	NOT isWorkPCHGr OR 
+	NOT Go_GwOhlGr OR 
+	MHand THEN
+		PID_Active:=false;
+		ppPwCurrent:=0;
+		FreqAutoPitGr:=0;
+END_IF;
+
+	//IF GrStart AND NOT (GrStopLoad OR GrHotStopLoad) AND ppPwCurrent=0 AND GoBypass AND Go_GwOhlGr THEN
+	IF GrStart AND NOT (GrStopLoad OR GrHotStopLoad) AND ppPwCurrent=0 AND BypassClosed AND Go_GwOhlGr THEN
+		ppPwCurrent:=ppPwStart-ppPwDelta;
+		DoMain:=TRUE;
+		PID_Active:=TRUE;
+	end_if;
+	IF GranWork10sec AND Go_GwOhlGr THEN
+		if not PID_Active then
+			CounterM:=0;
+			CounterM2:=0;
+			CounterOv:=0;
+			WasOverload:=false;
+			ppPwCurrent:=ppPwStart-ppPwDelta;
+			DoMain:=true;
+			DoMinus:=false;
+			Overload:=false;
+			LastPwPlus:=0;
+		end_if;
+		PID_Active:=true;
+	end_if;
+
+	IF Gran1Sec THEN
+		IF BypassOpened OR GrStopLoad OR GrHotStopLoad THEN
+			CounterM:=0;
+			ppSecToInc:=0;			
+			ppPwCurrent:=ppPwStart;
+		END_IF
+		IF BypassClosed THEN
+			CounterM:=CounterM+1;
+			IF mustCorrectPar AND GrAutoPar THEN
+				CounterM2:=CounterM2+1;
+			end_if;
+			IF scTokGran>WORD_TO_INT(TokNomGran) THEN 
+				CounterOv:=CounterOv+1; 
+				CountNotOv:=0;
+				IF NOT (Overload OR WasOverload) THEN
+					Overload:=TRUE;
+				END_IF;
+
+			end_if; (* если идет перегрузка*)
+
+			IF scTokGran<WORD_TO_INT(TokNomGran) THEN
+				if CountNotOv>1 then
+					CounterOv:=0;
+					CountNotOv:=0;
+					Overload:=false;
+					WasOverload:=false;
+				else
+					CountNotOv:=CountNotOv+1;
+				end_if;
+			end_if;
+
+			IF CounterM >= ppInterval AND NOT (Overload OR WasOverload) THEN
+				CounterM:=0;
+				CounterOv:=0;
+				DoMain:=true;
+			end_if;
+
+			(*Для скады - сколько осталось секунд до изменения производительности*)
+			IF CounterM>=ppInterval THEN ppSecToInc:=0;	ELSE ppSecToInc:=ppInterval-CounterM; END_IF;
+			
+			IF CounterOv>=10 THEN
+				CounterOv:=0;
+				if Overload then
+					Overload:=false;
+					WasOverload:=true;
+					ppPwCurrent:=ppPwCurrent-LastPwPlus/2;
+					LastPwPlus:=0;
+				else
+					if WasOverload then
+						ppPwCurrent:=ppPwCurrent-ppPwDelta/2;
+						IF ppPwCurrent<WORD_TO_INT(pw1Percent)*2 THEN
+							ppPwCurrent:=WORD_TO_INT(pw1Percent);
+						end_if;
+					end_if;
+				end_if;
+				DoMinus:=true;
+			end_if;
+		end_if;
+		if DoMain then 
+			IF ppPwCurrent<ppPwTarg THEN	(* увеличиваем текущую производительность *)
+				LastPwPlus:=ppPwTarg-ppPwCurrent;
+				IF LastPwPlus>ppPwDelta THEN
+					LastPwPlus:=ppPwDelta;
+				end_if;
+				ppPwCurrent:=ppPwCurrent+LastPwPlus;
+			end_if;
+		end_if;
+		IF ppPwCurrent>ppPwTarg THEN	(* уменьшаем текущую производительность *)
+			ppPwCurrent:=ppPwTarg;
+			DoMinus:=true;
+		end_if;
+		if DoMain or DoMinus then
+			DoMain:=FALSE;
+			DoMinus:=false;
+			MustCorrectPar:=true;
+		end_if;
+	FreqAutoPitGr:=REAL_TO_WORD(INT_TO_REAL(ppPwCurrent)/WORD_TO_REAL(ppPlotn)*1000.0/WORD_TO_REAL(Pw1Percent)*50.0);
+	aaa := FreqAutoPitGr;
+end_if;
+
+IF GrAutoPar AND PID_Active THEN
+	IF ppMaxTemp=0 THEN ppMaxTemp:=550; END_IF;  (* максимальная температура не должна быть нулём *)
+
+	TON_0(IN:=(NOT DNU_PBGran) OR (NOT (Go_PchPitGr AND OnPchPitGr)), PT:=T#10S);
+	IF TON_0.Q THEN
+		(* нельзя подавать пар *)
+		scParOut:=0;
+		SetPointParDistPred:=0;
+	else
+		SetPointParDist:=WORD_TO_INT(TempKond)-WORD_TO_INT(ppMaxTemp);
+		if SetPointParDist>-1 then
+			MustCorrectPar:=true;
+		end_if;
+		tonCorrPar(IN:=not(tonCorrPar.q), PT:=T#5s);
+		if (CounterM2>4) or tonCorrPar.Q then
+			MustCorrectPar:=false;
+			CounterM2:=0;
+			IF SetPointParDist>400 THEN
+				scParOut:=scParOut-30;
+			ELSIF SetPointParDist>300 THEN
+				scParOut:=scParOut-20;
+			ELSIF SetPointParDist>200 THEN
+				scParOut:=scParOut-10;
+			elsif SetPointParDist>0 then
+				scParOut:=scParOut-2;
+			ELSIF SetPointParDist>-100 THEN
+				scParOut:=scParOut-1;
+		 	ELSIF SetPointParDist>-200 THEN
+				scParOut:=scParOut+1;
+		 	ELSIF SetPointParDist>-500 THEN
+				scParOut:=scParOut+2;
+		 	ELSIF SetPointParDist<=-500 THEN
+				scParOut:=REAL_TO_WORD(WORD_TO_REAL(ppKpar)*FreqPitGr/1000);
+			end_if;
+			IF scParOut<REAL_TO_WORD(WORD_TO_REAL(ppKpar)*FreqPitGr/2000.0) THEN
+				scParOut:=REAL_TO_WORD(WORD_TO_REAL(ppKpar)*FreqPitGr/2000);
+			end_if;
+			SetPointParDistPred:=SetPointParDist;
+		end_if;
+		tpStopDrobPar(IN:=(ppCorrectTemp<0) AND (TempKond<ppMaxTemp), PT:=T#10S);
+		if tpStopDrobPar.q then
+			ppCorrectTemp:=0;
+		end_if;
+		IF ppCorrectTemp<0 THEN 
+			IF ABS(ppCorrectTemp)>WORD_TO_INT(scParOut)-100 THEN
+				ppCorrectTemp:=-(WORD_TO_INT(scParOut)-100);
+			end_if;
+		end_if;
+		scParOut:=scParOut+INT_TO_WORD(ppCorrectTemp);
+	END_IF;
+end_if;
+	
+ddd:=REAL_TO_WORD(INT_TO_REAL(ppPwCurrent1)/WORD_TO_REAL(ppPlotn)*1000.0/WORD_TO_REAL(Pw1Percent)*50.0);
+
+(* LD *)
+
+// ---
+ST_CODE();
+
+// ---
+IF GrRstErrors AND NOT ResetErrors THEN ResetErrors := TRUE; END_IF
+IF GrRstErrors AND NOT ResetErrors THEN noResetErr := TRUE; END_IF
+
+// ---
+PitGran(next:=Go_KondGr AND GranIsWork AND Go_GwOhlGr AND NOT GrStopLoad AND NOT GrHotStopLoad, prev:=DNU_PBGran, errPCH:=ErrPchPitGr, workPch:=isWorkPchPitGr, DKS:=DKS_PitGr, dksMustBlink:=TRUE, Dks_Off:=OffDKS_PitGr, DksPerion:=t#5s, DP:=DP_PitGr, DP_off:=OffDP_PitGr, HandMode:=(mHand OR fHand5.6 OR (NOT GrStart AND NOT PitGran.runAuto)), canRunAuto:=GrStart AND NOT GrStopLoad AND NOT GranIsEmpty, timeBeforeStart:=t#2s, timeToStop:=t#1s*tcPitGr, yRun:=yRunPitGr, FreqManual:=HandFreqPitGr, FreqAuto:=FreqAutoPitGr, FreqPCH:=FreqPitGr, MH:=MhPitGr, aMH:=aMhPitGr);
+OnPchPitGr := PitGran.OnPch;
+DA_PitGr := PitGran.da;
+Err30.2 := PitGran.err_Dks;
+Err30.3 := PitGran.err_DP;
+Err30.4 := PitGran.errPCH_Save;
+Err30.5 := PitGran.errWork;
+yRunPitGr := PitGran.yRunOut;
+RstPchPitGr := PitGran.reset_PCH;
+Go_PchPitGr := PitGran.run;
+
+// --- Кондиционер
+KondGr(localStop:=FALSE, localPusk:=FALSE, next:=GranIsWork AND Go_GwOhlGr AND NOT GrHotStopLoad, prev:=Go_PchPitGr, errAZ:=ErrAz_KondGr, dks:=DKS_KondGr, dksMustBlink:=TRUE, DKS_off:=OffDKS_KondGr, DP:=Door_KondGr, DP_off:=OffDoor_KondGr, HandMode:=(MHand OR fHand5.4), SlowHand:=GrStart, canRunAuto:=GrStart AND NOT GrStopLoad AND NOT GranIsEmpty, timeBeforeStart:=t#3s, timeToStop:=t#1s*tcKond, yHand:=yRunKond, MH:=MhKondGr, aMH:=aMhKondGr);
+DA_KondGr := KondGr.da;
+Err28.12 := KondGr.err_AZ;
+Err28.13 := KondGr.err_DKS;
+Err28.14 := KondGr.err_DP;
+yRunKond := KondGr.HandOut;
+Go_KondGr := KondGr.run;
+
+// ---
+TON_ClearPitGr(IN:=(isVigr3Wait=2) AND NOT DNU_PBGran AND Go_PchPitGr, PT:=t#1s*tcPitGr);
+TON_ClearKondGr(IN:=(isVigr3Wait=2) AND NOT DNU_PBGran AND TON_ClearPitGr.Q AND Go_KondGr, PT:=t#1s*tcKond);
+TON_GranHHEnd(IN:=(scTokGran <= (word_to_int(TokIdlGran))) /*EN=(isVigr3Wait=2) AND NOT DNU_PBGran AND TON_ClearKondGr.Q*/, PT:=t#30s);
+IF TON_GranHHEnd.Q THEN GranMustEmpty := TRUE; END_IF
+TON_ClearOhl(IN:=(isVigr3Wait=2) AND NOT DNU_PBGran AND GranIsEmpty AND NOT DNU_OhlGr AND GranUnlRun, PT:=t#10s);
+TON_ClearKonusOhl(IN:=TON_ClearOhl.Q AND Go_PchTr40700, PT:=t#1s*tcOhl);
+IF TON_ClearKonusOhl.Q THEN OhlMustEmpty := TRUE; END_IF
+
+// --- Смазка ==============================================================================
+IF ((NOT MHand AND NOT fHand5.3 AND NOT MGod) OR GEmer) THEN yRunOil := FALSE; END_IF
+
+// ---
+flOil := ((Go_PchGr AND OnPchGr) OR (yRunOil AND NOT MGod));
+
+// ---
+IF ((R_TRIG(flOil)) OR tonPauseDozOil.Q) THEN flOilOff := FALSE; END_IF
+IF ((R_TRIG(flOil)) OR tonPauseDozOil.Q) THEN OilMustWork := TRUE; END_IF
+IF NOT flOil THEN OilMustWork := FALSE; END_IF
+tonPauseDozOil(IN:=flOil AND NOT OilMustWork, PT:=t#1s*TimePauseOil);
+tonDozOil(IN:=flOil AND OilMustWork, PT:=t#1s*TimeWorkOil);
+IF tonDozOil.Q THEN OilMustWork := FALSE; END_IF
+
+// ---
+Go_Smazka := (flOil OR (yRunOil AND MGod));
+
+// --- Гранулятор включение частотников и сброс ошибок
+OnPchGr := NOT GEmer;
+OnPchPitGr := NOT GEmer;
+onPchTr40700 := NOT GEmer;
+IF (ResetErrors OR GrRstErrors) THEN Err18.10 := FALSE; END_IF
+IF (ResetErrors OR GrRstErrors) THEN Err18.13 := FALSE; END_IF
+IF (ResetErrors OR GrRstErrors) THEN Err18.14 := FALSE; END_IF
+IF (ResetErrors OR GrRstErrors) THEN Err30.8 := FALSE; END_IF
+IF (ResetErrors OR GrRstErrors) THEN Err30.6 := FALSE; END_IF
+IF (ResetErrors OR GrRstErrors) THEN Err30.7 := FALSE; END_IF
+RstPchGr := (ResetErrors OR GrRstErrors);
+RstPchPitGr := (ResetErrors OR GrRstErrors);
+RstPchTr40700 := (ResetErrors OR GrRstErrors);
+TON_GranRstErr(IN:=GrRstErrors, PT:=t#1s);
+IF TON_GranRstErr.Q THEN GrRstErrors := FALSE; END_IF
+
+// --- Гранулятор - сигналы на включение и запус частотника есть
+PchGrMustRun := OnPchGr AND Go_PchGr;
+
+// --- Гранулятор - сигнал о нормальной работе не пришёл
+TON_SetWorkPchGran(IN:=PchGrMustRun AND NOT isWorkPCHGr, PT:=t#10s);
+IF TON_SetWorkPchGran.Q THEN Err18.10 := TRUE; END_IF
+
+// --- Гранулятор - работает уже 10 сек
+TON_GranWork10sec(IN:=PchGrMustRun AND isWorkPCHGr, PT:=t#10s);
+GranWork10sec := TON_GranWork10sec.Q;
+
+// --- Гранулятор - открытие клапана в автоматическом режиме, аварийная остановка гранулятора
+TON_GranOverload1(IN:=(scTokGran > (word_to_int(TokMaxGran))) /*EN=GranWork10sec*/, PT:=t#5s);
+IF TON_GranOverload1.Q THEN CloseBypass := FALSE; END_IF
+TON_GranOverload2(IN:=(scTokGran > (word_to_int(TokMaxGran))) /*EN=GranWork10sec*/ AND NOT BypassClosed, PT:=t#10s);
+IF TON_GranOverload2.Q THEN GrStart := FALSE; END_IF
+IF TON_GranOverload2.Q THEN Err30.8 := TRUE; END_IF
+TON_GranLowerNom(IN:=(scTokGran < (word_to_int(TokNomGran))) /*EN=GranWork10sec AND NOT CloseBypass*/, PT:=t#3s);
+IF TON_GranLowerNom.Q THEN CloseBypass := TRUE; END_IF
+TON_GranHH(IN:=(scTokGran <= (word_to_int(TokIdlGran))) /*EN=GranWork10sec*/, PT:=t#3s);
+GranHH := TON_GranHH.Q;
+TON_Gran1sec(IN:=GranWork10sec AND PID_Active AND NOT TON_Gran1sec.Q, PT:=t#1s);
+Gran1Sec := TON_Gran1sec.Q;
+
+// --- Гранулятор - авария по штифту
+TON_ErrShtift(IN:=Shtift AND NOT gemer, PT:=t#1s);
+IF TON_ErrShtift.Q THEN Err18.14 := TRUE; END_IF
+
+// --- не переключился байпасс
+TON_OpenBaypass(IN:=NOT GoBypass AND NOT BypassOpened, PT:=t#3s);
+IF TON_OpenBaypass.Q THEN Err30.6 := TRUE; END_IF
+TON_CloseBaypass(IN:=GoBypass AND NOT GEmer AND NOT BypassClosed, PT:=t#3s);
+IF TON_CloseBaypass.Q THEN Err30.7 := TRUE; END_IF
+
+// ---
+IF OpenDoorGr AND NOT OffDoorGr THEN ErrOpenDoorGr := TRUE; END_IF
+IF ResetErrors THEN ErrOpenDoorGr := FALSE; END_IF
+
+// --- Гранулятор
+EnginGr(localStop:=Gran_LStop, localPusk:=FALSE, next:=OnPchGr AND Go_GwOhlGr AND NOT Err30.8, prev:=Go_KondGr, errAZ:=ErrPCHGr, dks:=DKS_Gran, dksMustBlink:=TRUE, timedks:=4, DKS_off:=(OffDKSGr OR NOT GranWork10sec), DP:=FALSE, DP_off:=TRUE, HandMode:=(MHand OR fHand5.5 OR NOT GrStart), SlowHand:=GrStart, canRunAuto:=GrStart, timeBeforeStart:=t#5s, timeToStop:=t#20s, yHand:=yRunGran, MH:=MhGran, aMH:=aMhGran);
+DA_Gran := EnginGr.da;
+Err18.4 := EnginGr.err_AZ;
+Err18.5 := EnginGr.err_DKS;
+yRunGran := EnginGr.HandOut;
+Go_PchGr := EnginGr.run AND NOT Err18.14 AND NOT ErrOpenDoorGr;
+
+// ---
+GranIsWork := isWorkPCHGr AND Go_PchGr AND NOT ErrPCHGr AND GranWork10sec;
+
+// ---
+IF GrRstErrors AND noResetErr THEN ResetErrors := FALSE; END_IF
+IF TRUE THEN GrRstErrors := FALSE; END_IF
+IF TRUE THEN noResetErr := FALSE; END_IF
+
+// ---
+
+// ---
+
+// ---
+
+// ---

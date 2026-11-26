@@ -1,0 +1,117 @@
+program MainCycleLoad
+VAR
+  local   ii : WORD
+  local   jj : WORD
+  local   couStep : WORD
+  local   tmp : WORD
+  local   tmpVes : REAL
+  local   SelectLoadBunk : BOOL  // заполнить массив LoadBunkK
+  local   SelectLoadBunkD : BOOL  // Перезапуск загрузки добавок в другой бункер
+  local   SelectUnloadBunk : BOOL
+  local   SUBNum : WORD
+  local   NeedRecalc : BOOL
+  local   NewPorc : REAL
+  local   Delta : REAL
+  local   PredLim : REAL
+  local   fl : BOOL
+  local   RecalcJDos : BOOL
+  local   FTrigAutoPause : Standard.F_TRIG
+  local   RTrigStopDosing : Standard.R_TRIG
+  local   flsds : INT
+  local   EmerStopSilo : BOOL
+  local   EmerStopExit1 : BOOL
+  local   EmerStopExit2 : BOOL
+  local   NewErr0 : WORD
+  local   RS_Load : Standard.R_TRIG
+  input   nnnnn : WORD
+END_VAR
+
+(* ST *)
+SelectLoadBunk:=0;
+  //Загрузка больших бункеров
+	IF Load1St.2 AND (LoadList1[2]=0) THEN
+		//на скаде установили 2й бит для перехода к следующему бункеру, но следующего в списке нет или смена уже идет
+		Load1St.2:=0;		
+	END_IF
+  
+  RS_Load(CLK:=Load1St.0);  
+  IF RS_Load.Q OR ((Closed_ShL1 OR DA_ShL1) AND (Closed_ShL2 OR DA_ShL2) AND 
+				   (Closed_ShR1 OR DA_ShR1) AND (Closed_ShR2 OR DA_ShR2)) THEN
+  	CloseAllSh1:=0;
+  END_IF
+  IF Load1St.0 THEN
+	  IF Load1St.1=0 THEN  //загрузка только началась
+		  CloseAllSh1:=0;
+		  ChangeLoadBunk:=0;
+  		  Load1St.2:=0;	
+		  IF LoadList1[1]=0 THEN
+			  //не задано, куда грузить
+			  Load1St.0:=0;
+		  ELSE
+		    SelectLoadBunk:=1;  //заполнить массив LoadBunkK
+			IF flStartLoad1 THEN
+			Load1St.1:=1; //подтверждаем старт загрузки  
+			END_IF
+		  END_IF
+	  ELSE	// режим загрузки работает
+		IF ChangeLoadBunk OR Load1St.2 THEN
+			IF NOT (Go_Tr1L OR Go_Tr1R) THEN
+				couStep:=0;
+				FOR ii:=2 TO CBK DO
+					IF LoadList1[ii]=0 THEN
+						EXIT;
+					END_IF
+					IF NOT DVU_BunkK[LoadList1[ii]] THEN
+						couStep:=ii-1;
+						EXIT;
+					END_IF
+				END_FOR
+				IF couStep>0 THEN
+					//найден ближайший пустого бункера в очереди
+					FOR jj:=1 TO couStep DO
+						tmp:=LoadList1[1];
+						FOR ii:=1 TO CBK DO
+							IF LoadList1[ii+1]>0 THEN
+								LoadList1[ii]:=LoadList1[ii+1];
+							ELSE
+								LoadList1[ii]:=tmp;
+								EXIT;
+							END_IF
+						END_FOR
+					END_FOR
+					MsgToScada.3:=1;	//для скады - произошла смена бункера
+				ELSE
+					//не найдено пустого бункера в очереди
+					Load1St:=0;
+					MsgToScada.0:=1;	//для скады
+				END_IF
+				ChangeLoadBunk:=0;
+ 			    Load1St.2:=0;	
+				SelectLoadBunk:=1;
+			END_IF 
+	  	ELSIF PolnBunkCur THEN
+			IF (LoadList1[2]>0) THEN
+				ChangeLoadBunk:=1;  //Перезапуск загрузки компонентов в другой бункер
+			ELSE
+				Load1St:=2;
+				MsgToScada.0:=1;	//для скады
+			END_IF
+		END_IF
+	  END_IF
+  ELSE
+	  ChangeLoadBunk:=0;
+	  Load1St.2:=0;	
+	  IF (Load1St>0) AND (NOT (Go_Tr1L OR Go_Tr1R)) THEN
+		  //загрузка полностью остановилась
+		  Load1St:=0;
+		  Regim2.7:=0;
+		  CloseAllSh1:=1;
+		  SelectLoadBunk:=TRUE;
+	  END_IF
+  END_IF
+  IF SelectLoadBunk THEN
+	  FOR ii:=1 TO CBK DO
+		  LoadBunkK[ii]:=(LoadList1[1]=ii) AND (Load1St.1);
+	  END_FOR		
+	  SelectLoadBunk:=FALSE;  
+  END_IF

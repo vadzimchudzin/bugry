@@ -1,0 +1,156 @@
+functionBlock Noria
+VAR
+  input   localPusk : BOOL  // Местный пуск в ручном режиме
+  input   localStop : BOOL := FALSE  // Местный стоп в ручном режике
+  input   next : BOOL  // Следующий механизм. После его запуска будет запущена нория в автоматическом режиме через время timeBeforeStart
+  input   prev : BOOL  // Предыдущий механизм. После его остановки будет остановлена нория в автоматическом режиме через время timeToStop
+  input   dp : BOOL  // Датчик подпора
+  input   off_dp : BOOL  // Не учитывать ДП
+  input   dks : BOOL  // ДКС
+  input   off_dks : BOOL  // Не учитывать ДКС
+  input   dsl1 : BOOL  // Датчик 1 сбега ленты
+  input   dsl2 : BOOL := FALSE  // Датчик 2 сбега ленты (его может не быть)
+  input   off_dsl1 : BOOL := FALSE  // Не учитывать ДСЛ
+  input   off_dsl2 : BOOL := FALSE  // Не учитывать ДСЛ
+  input   AZ : BOOL  // Авария от автомата защиты
+  input   HandMode : BOOL := FALSE
+  input   SlowHand : BOOL := FALSE  // можно плавно переходить из автоматического в ручной
+  input   canRunAuto : BOOL  // Условие для необходимости работы в автоматическом режиме
+  input   timeBeforeStart : TIME := TIME#5s0ms  // Пауза перед запуском в автоматическом режиме
+  input   timeToStop : TIME := TIME#20s0ms  // Время на выгрузку из нории при остановке автоматического режима
+  input   yRun : BOOL  // "Пуск" со скады в ручном режиме
+  output  run : BOOL  // Запуск нории
+  output  da : BOOL  // Авария, о которой нужно сигнализировать
+  output  errAZ : BOOL  // Авария от автомата защиты
+  output  errDKS : BOOL  // Авария ДКС
+  output  errDP : BOOL  // Авария датчика подпора
+  output  errDSL1 : BOOL  // Авария датчика сбега ленты
+  output  errDSL2 : BOOL  // Авария датчика сбега ленты
+  output  yRunOut : BOOL
+  output  state : WORD  // Состояние 0-выключена, 1-запущена, 2-Авария
+  inOut   MH : DWORD
+  inOut   aMH : DWORD
+  local   TON_DKS_ON : TON
+  local   TON_DKS_OFF : TON
+  local   TON_DSL1 : TON
+  local   TON_dsl2 : TON
+  local   rr : BOOL
+  local   run_auto : BOOL
+  local   TON_AutoNorOn : TON
+  local   TON_AutoNorOff : TON
+  local   temp : BOOL
+  local   offState : WORD := 0
+  local   runState : WORD := 1
+  local   alarmState : WORD := 2
+  local   MHCalc_0 : MHCalc
+  local   TOF_DSL1 : TOF
+  local   CountPDSL1 : WORD
+  local   CountPDSL2 : WORD
+  local   BLINK_ClrCounter : BLINK
+  local   R_TRIG_Counter : R_TRIG
+  local   MaxDSL1 : WORD
+  local   MaxDSL2 : WORD
+  local   CouPusk : WORD := 0
+  local   TON_localPusk : TON
+  local   ElocalPusk : BOOL
+  local   ElocalStop : BOOL
+END_VAR
+
+(* ST *)
+IF MEmul THEN
+	off_dp := TRUE;
+	off_dks:= TRUE;
+	off_dsl1:=TRUE;
+	off_dsl2:=TRUE;
+	localPusk := ElocalPusk;
+	localStop := ElocalStop;
+
+END_IF
+
+(* LD *)
+
+// ---
+Emul();
+
+// --- Авария ДКС таймеры
+TON_DKS_ON(IN:=run AND dks, PT:=t#3s);
+TON_DKS_OFF(IN:=run AND NOT dks, PT:=t#3s);
+
+// --- Авария от автомата защиты
+IF AZ THEN errAZ := TRUE; END_IF
+
+// --- Авария ДКС установка
+IF (TON_DKS_ON.Q OR TON_DKS_OFF.Q) AND NOT off_dks THEN errDKS := TRUE; END_IF
+
+// --- Авария ДП
+IF dp AND NOT off_dp THEN errDP := TRUE; END_IF
+
+// --- Авария ДСЛ, если сигнал постоянный
+TON_DSL1(IN:=run AND NOT off_dsl1 AND dsl1, PT:=t#4s);
+IF TON_DSL1.Q THEN errDSL1 := TRUE; END_IF
+TON_dsl2(IN:=run AND NOT off_dsl2 AND dsl2, PT:=t#4s);
+IF TON_dsl2.Q THEN errDSL2 := TRUE; END_IF
+
+// --- Авария ДСЛ, если сигнал моргает
+BLINK_ClrCounter(ENABLE:=run, TIMELOW:=t#4s, TIMEHIGH:=t#1ms);
+R_TRIG_Counter(CLK:=BLINK_ClrCounter.OUT);
+IF R_TRIG_Counter.Q THEN CountPDSL1 := 0; END_IF
+IF 0 /*EN=R_TRIG_Counter.Q*/ THEN CountPDSL2 := 0; END_IF
+IF run AND (CountPDSL1>MaxDSL1)  //это для контроля THEN MaxDSL1 := CountPDSL1; END_IF
+IF run AND (CountPDSL2>MaxDSL2) THEN MaxDSL2 := CountPDSL2; END_IF
+IF run AND NOT off_dsl1 AND R_TRIG(dsl1) THEN CountPDSL1 := (CountPDSL1+1); END_IF
+IF (CountPDSL1 > 40) /*EN=(CountPDSL1+1) /*EN=run AND NOT off_dsl1 AND R_TRIG(dsl1)*/*/ THEN errDSL1 := TRUE; END_IF
+IF run AND NOT off_dsl2 AND R_TRIG(dsl2) THEN CountPDSL2 := (CountPDSL2+1); END_IF
+IF (CountPDSL2 > 40) /*EN=(CountPDSL2+1) /*EN=run AND NOT off_dsl2 AND R_TRIG(dsl2)*/*/ THEN errDSL2 := TRUE; END_IF
+
+// --- Сброс аварий
+IF (ResetErrors OR MEmul) THEN errDKS := FALSE; END_IF
+IF (ResetErrors OR MEmul) THEN errDP := FALSE; END_IF
+IF (ResetErrors OR MEmul) THEN errDSL1 := FALSE; END_IF
+IF (ResetErrors OR MEmul) THEN errDSL2 := FALSE; END_IF
+IF (ResetErrors OR MEmul) THEN errAZ := FALSE; END_IF
+
+// --- Готовность к работе
+rr := NOT errAZ AND NOT errDKS AND NOT errDSL1 AND NOT errDSL2 AND NOT errDP AND NOT GEmer AND NOT localStop;
+da := NOT (NOT errAZ AND NOT errDKS AND NOT errDSL1 AND NOT errDSL2 AND NOT errDP);
+
+// ---
+IF canRunAuto AND SlowHand AND R_TRIG(HandMode) THEN yRun := run; END_IF
+IF canRunAuto AND SlowHand AND F_TRIG(HandMode) THEN run_auto := yRun; END_IF
+
+// --- Запуск в автоматическом режиме работы
+TON_AutoNorOn(IN:=canRunAuto AND rr AND next, PT:=timeBeforeStart);
+IF TON_AutoNorOn.Q THEN run_auto := TRUE; END_IF
+
+// --- Таймер на остановку работы в автоматическом режиме работы (при остановке режима)
+TON_AutoNorOff(IN:=NOT canRunAuto AND NOT prev, PT:=timeToStop);
+
+// --- Остановка работы в автоматическом режиме
+IF (TON_AutoNorOff.Q OR NOT rr OR NOT next) THEN run_auto := FALSE; END_IF
+
+// --- Сброс yRun - ручного запуска из Скады в ручном режиме
+IF ((NOT next AND NOT MGod) OR NOT rr OR localStop OR NOT HandMode) THEN yRun := FALSE; END_IF
+
+// --- включение ручного пуска после 3х кратного нажатия локального пуска с интервалом не более 5сек
+IF R_TRIG(localPusk) AND HandMode AND MGod THEN CouPusk := (CouPusk+1); END_IF
+IF (CouPusk >= 2) /*EN=(CouPusk+1) /*EN=R_TRIG(localPusk) AND HandMode AND MGod*/*/ THEN CouPusk := 0; END_IF
+IF 0 /*EN=(CouPusk >= 2) /*EN=(CouPusk+1) /*EN=R_TRIG(localPusk) AND HandMode AND MGod*/*/*/ THEN yRun := TRUE; END_IF
+TON_localPusk(IN:=NOT localPusk, PT:=t#2s);
+IF (localStop OR NOT HandMode OR TON_localPusk.Q) THEN CouPusk := 0; END_IF
+
+// --- Включение нории
+run := (((NOT HandMode AND run_auto) OR (HandMode AND localPusk) OR yRun) AND NOT localStop) AND rr;
+
+// ---
+MHCalc_0(Run:=run, MH:=MH, aMH:=aMH);
+
+// ---
+yRunOut := yRun;
+
+// --- Статус нории (0-выключен без аварии, 1-работает, 2-авария)
+IF NOT da AND NOT run THEN state := offState; END_IF
+temp := offState /*EN=NOT da AND NOT run*/;
+IF NOT da AND run THEN state := runState; END_IF
+temp := runState /*EN=NOT da AND run*/;
+IF da THEN state := alarmState; END_IF
+temp := alarmState /*EN=da*/;

@@ -1,0 +1,122 @@
+functionBlock Transporter
+VAR
+  input   localStop : BOOL  // Местный стоп
+  input   localPusk : BOOL  // Местный старт
+  input   next : BOOL  // Следующий механизм (транспортер запустится через
+  input   prev : BOOL  // Предыдущий механизм
+  input   errAZ : BOOL := FALSE  // Авария от автомата защиты
+  input   dks : BOOL  // Датчик контроля скорости
+  input   dksMustBlink : BOOL := TRUE  // 1-ДКС в норм.ситуации должен моргать, 0- dks=1-Ok, dks=0-Error
+  input   timedks : WORD := 4
+  input   DKS_off : BOOL  // Не использовать ДКС
+  input   DP : BOOL := FALSE  // Датчик подпора
+  input   DP_off : BOOL  // Не учитывать ДП
+  input   HandMode : BOOL := FALSE
+  input   SlowHand : BOOL := FALSE  // можно плавно переходить из автоматического в ручной
+  input   canRunAuto : BOOL  // Условие для необходимости работы в автоматическом режиме
+  input   timeBeforeStart : TIME := TIME#5s0ms  // Пауза перед запуском в автоматическом режиме
+  input   timeToStop : TIME := TIME#20s0ms  // Время на выгрузку из нории при остановке автоматического режима
+  input   yHand : BOOL  // Пуск в ручном режиме
+  output  run : BOOL := FALSE  // Включение транспотера
+  output  da : BOOL := FALSE  // Авария механизма
+  output  err_AZ : BOOL := FALSE  // Авария от автомата защиты
+  output  err_DKS : BOOL := FALSE  // Авария от ДКС
+  output  err_DP : BOOL := FALSE  // Авария ДП
+  output  isEmpty : BOOL := FALSE  // Последняя остановка была по таймеру очистки
+  output  HandOut : BOOL
+  output  state : WORD := 0  // Состояние транспортера (0 выкл.без аварии, 1-включен, 2-авария)
+  local   rr : BOOL  // Готовность к работе
+  local   t_dks_on : TON
+  local   t_dks_off : TON
+  local   run_auto : BOOL := FALSE
+  local   TON_START : TON
+  local   TON_STOP : TON
+  local   offState : WORD := 0
+  local   runState : WORD := 1
+  local   alarmState : WORD := 2
+  local   temp : BOOL
+  local   MHCalc_1 : MHCalc
+  local   CouPusk : WORD
+  local   TON_localPusk : TON
+  local   TOF_0 : TOF
+  local   MaxDks : TIME := TIME#0ms
+  local   delayDks : ton
+  inOut   MH : DWORD
+  inOut   aMH : DWORD
+END_VAR
+
+(* LD *)
+
+// --- Таймера на аварию ДКС
+delayDks(IN:=run, PT:=T#1s*timedks);
+t_dks_on(IN:=delayDks.Q AND NOT MEmul AND dks, PT:=T#1s*timedks);
+t_dks_off(IN:=delayDks.Q AND NOT MEmul AND NOT dks, PT:=T#1s*timedks);
+
+// ---
+IF (t_dks_on.ET>MaxDks) THEN MaxDks := t_dks_on.ET; END_IF
+IF (t_dks_off.ET>MaxDks) THEN MaxDks := t_dks_off.ET; END_IF
+
+// --- Авария от автомата защиты
+IF errAZ THEN err_AZ := TRUE; END_IF
+
+// --- Авария ДКС
+IF ((((t_dks_on.Q OR t_dks_off.Q) AND dksMustBlink) OR (t_dks_off.Q AND NOT dksMustBlink)) AND run) AND NOT DKS_off THEN err_DKS := TRUE; END_IF
+
+// --- Авария датчика подпора
+TOF_0(IN:=dp, PT:=t#2s);
+err_DP := TOF_0.Q AND NOT DP_off;
+
+// --- Сброс аварий
+IF (ResetErrors OR MEmul) THEN err_AZ := FALSE; END_IF
+IF (ResetErrors OR MEmul) THEN err_DP := FALSE; END_IF
+IF (ResetErrors OR MEmul) THEN err_DKS := FALSE; END_IF
+
+// --- Готовность к работе
+rr := NOT err_DKS AND NOT err_DP AND NOT err_AZ AND NOT GEmer AND NOT localStop;
+da := NOT (NOT err_DKS AND NOT err_DP AND NOT err_AZ);
+
+// ---
+IF SlowHand AND R_TRIG(HandMode) THEN yHand := run; END_IF
+IF SlowHand AND F_TRIG(HandMode) THEN run_auto := yHand; END_IF
+
+// --- включение ручного пуска после 3х кратного нажатия локального пуска с интервалом не более 5сек
+IF R_TRIG(localPusk) AND HandMode AND MGod THEN CouPusk := (CouPusk+1); END_IF
+IF (CouPusk >= 2) /*EN=(CouPusk+1) /*EN=R_TRIG(localPusk) AND HandMode AND MGod*/*/ THEN CouPusk := 0; END_IF
+IF 0 /*EN=(CouPusk >= 2) /*EN=(CouPusk+1) /*EN=R_TRIG(localPusk) AND HandMode AND MGod*/*/*/ THEN yHand := TRUE; END_IF
+TON_localPusk(IN:=NOT localPusk, PT:=t#2s);
+IF (localStop OR NOT HandMode OR TON_localPusk.Q) THEN CouPusk := 0; END_IF
+
+// --- Запуск автоматического режима
+TON_START(IN:=canRunAuto AND rr AND next, PT:=timeBeforeStart);
+IF TON_START.Q THEN isEmpty := FALSE; END_IF
+IF TON_START.Q THEN run_auto := TRUE; END_IF
+
+// --- Остановка в автоматическом режиме
+TON_STOP(IN:=NOT canRunAuto AND NOT prev, PT:=timeToStop);
+IF TON_STOP.Q THEN isEmpty := TRUE; END_IF
+
+// --- Сброс автоматического режима
+IF (isEmpty OR NOT rr OR NOT next) THEN run_auto := FALSE; END_IF
+
+// --- Сброс yHand - ручного запуска из Скады в ручном режиме
+IF ((NOT next AND NOT MGod) OR NOT rr OR localStop OR NOT HandMode) THEN yHand := FALSE; END_IF
+
+// --- Включение транспортера
+run := (((NOT HandMode AND run_auto) OR (HandMode AND localPusk) OR yHand) AND NOT localStop) AND rr;
+IF (((NOT HandMode AND run_auto) OR (HandMode AND localPusk) OR yHand) AND NOT localStop) AND rr THEN isEmpty := FALSE; END_IF
+
+// ---
+MHCalc_1(Run:=run, MH:=MH, aMH:=aMH);
+
+// ---
+HandOut := yHand;
+
+// --- Статус транспортера (0-выключен без аварии, 1-работает, 2-авария)
+IF NOT da AND NOT run THEN state := offState; END_IF
+temp := offState /*EN=NOT da AND NOT run*/;
+IF NOT da AND run THEN state := runState; END_IF
+temp := runState /*EN=NOT da AND run*/;
+IF da THEN state := alarmState; END_IF
+temp := alarmState /*EN=da*/;
+
+// ---

@@ -1,0 +1,28 @@
+functionBlock ChangeJDob
+VAR
+  input   Run : BOOL  // старт работы по замене
+  input   tpChange : WORD  // тип замены (2(1бит)-замена, 4(2бит)-пропуск один раз), 8(3бит)-выкинуть из рецепта
+  input   idx : WORD  // 1-Масло, 2-Жир
+  output  Done : BOOL  // флаг, что выполнено
+  local   ii : WORD
+  local   i0 : WORD
+END_VAR
+
+(* ST *)
+IF run THEN
+	IF tpChange.1 THEN //продолжить
+		Done:=TRUE;
+	ELSIF tpChange.2 THEN //пропустить один раз
+		VesCJ[idx]:=VesZJ[idx];
+		Done:=TRUE;
+	ELSIF tpChange.3 THEN  //удаляем из рецепта
+		VesCJ[idx]:=VesZJ[idx];
+		DeleteFromRecipeJ[idx]:=TRUE;
+		Done:=TRUE;
+	ELSIF tpChange.4 THEN  //попытаться долить и продолжить дозирование
+		flTryDoliv:=TRUE;
+		Done:=false; //не снимать паузу
+	END_IF
+ELSE
+	Done:=FALSE;
+END_IF

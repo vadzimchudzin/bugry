@@ -1,0 +1,29 @@
+functionBlock MyTimer
+VAR
+  input   run : BOOL
+  input   pause : BOOL
+  inOut   reset : BOOL
+  output  seconds : WORD := 0
+  local   tm : BLINK
+  local   tmp : WORD := 0
+  local   tm_out : BOOL
+END_VAR
+
+(* LD *)
+
+// ---
+IF reset THEN tmp := 0; END_IF
+IF 0 /*EN=reset*/ THEN reset := FALSE; END_IF
+
+// ---
+tm(ENABLE:=run AND NOT pause, TIMELOW:=t#500ms, TIMEHIGH:=t#500ms);
+tm_out := tm.OUT;
+
+// ---
+IF R_TRIG(tm_out) AND NOT pause THEN tmp := (tmp+1); END_IF
+
+// ---
+IF (tmp < 2) /*EN=true*/ THEN seconds := 0; END_IF
+
+// ---
+IF (tmp > 1) /*EN=true*/ THEN seconds := (tmp-1); END_IF

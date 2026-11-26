@@ -1,0 +1,8 @@
+{
+  "name": "bugry-simulator",
+  "private": true,
+  "description": "Учебный эмулятор пульта и ПЛК комбикормового завода «Бугры»",
+  "scripts": {
+    "test": "node tests/run.js"
+  }
+}

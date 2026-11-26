@@ -577,6 +577,7 @@
     void t;
   }
   function drawScrew(n) {
+    if (n.chain) return drawChain(n, n.x1, n.cy, n.x2, n.cy, Math.max(36, n.h));
     const m = M[n.id], e = EL[n.id], f = faulty(n.id), t = T(), run = m ? m.spin : 0;
     const small = n.small, h = small ? 22 : n.h, cy = n.cy, x = n.x, w = n.w;
     m._ph = (m._ph || 0) + run * 0.22 * (n.reverse ? (V.GoR_Tr1 ? 1 : -1) : n.dir);
@@ -605,7 +606,114 @@
     if (f) faultFrame(x, cy - h / 2, w, h);
     led(n.dir > 0 ? x + w - 12 : x + 12, cy + h / 2 + 9, n.id, small ? 4 : 6);
   }
+  /* ---------- цепной скребковый транспортёр (ТСЦ): секционный короб с крышкой и фланцами,
+     смотровые окна по секциям (цепь из пластин, скребки, продукт перед скребком, холостая ветвь),
+     натяжная секция с винтами, приводная головка со звёздочкой и выпуском, опоры. */
+  const CHAIN_SUP = { Tr51100: "trestle", Tr51200: "hang", Tr40700: "feet" };
+  function sprocket(cx, cy, r, ang) {
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang);
+    ctx.beginPath(); ctx.arc(0, 0, r + 4, 0, TAU); ctx.fillStyle = "#0f1418"; ctx.fill();
+    const nT = 10; ctx.beginPath();
+    for (let k = 0; k < nT * 2; k++) { const a = (k / (nT * 2)) * TAU, rr = k % 2 ? r * 0.8 : r; ctx.lineTo(Math.cos(a - 0.08) * rr, Math.sin(a - 0.08) * rr); ctx.lineTo(Math.cos(a + 0.08) * rr, Math.sin(a + 0.08) * rr); }
+    ctx.closePath(); const g = ctx.createRadialGradient(-r * 0.3, -r * 0.3, 1, 0, 0, r); g.addColorStop(0, "#b4bec4"); g.addColorStop(1, "#4b555c");
+    ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = "#1b2227"; ctx.stroke();
+    for (let k = 0; k < 4; k++) { const a = k * TAU / 4; ctx.beginPath(); ctx.arc(Math.cos(a) * r * 0.48, Math.sin(a) * r * 0.48, r * 0.14, 0, TAU); ctx.fillStyle = "#20282d"; ctx.fill(); }
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.24, 0, TAU); ctx.fillStyle = "#d4dadd"; ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#2a3238"; ctx.fillRect(-r * 0.05, -r * 0.24, r * 0.1, r * 0.12);
+    ctx.restore();
+  }
+  function chainLinks(x0, x1, y, step, off) {
+    for (let X = x0 - step * 2 + off, i = Math.floor((x0 - step * 2 + off) / step); X < x1 + step; X += step, i++) {
+      if (i % 2 === 0) { K.rr(X - 1.5, y - 3.6, step + 3, 7.2, 3.6); ctx.fillStyle = "#4a545a"; ctx.fill(); ctx.lineWidth = 0.8; ctx.strokeStyle = "#151b1f"; ctx.stroke(); ctx.fillStyle = "rgba(255,255,255,.22)"; ctx.fillRect(X + 1, y - 2.6, step - 2, 1.2); }
+      else { K.rr(X, y - 2.6, step, 5.2, 2.6); ctx.fillStyle = "#8a949a"; ctx.fill(); ctx.lineWidth = 0.7; ctx.strokeStyle = "#20282d"; ctx.stroke(); }
+      ctx.beginPath(); ctx.arc(X, y, 1.7, 0, TAU); ctx.fillStyle = "#d6dcdf"; ctx.fill();
+    }
+  }
+  function drawChain(n, x1, y1, x2, y2, h) {
+    const m = M[n.id], e = EL[n.id], f = faulty(n.id), t = T(), run = m ? m.spin : 0;
+    const ang = Math.atan2(y2 - y1, x2 - x1), len = Math.hypot(x2 - x1, y2 - y1), ux = Math.cos(ang), uy = Math.sin(ang);
+    const flip = ux < -1e-6, nx = flip ? uy : -uy, ny = flip ? -ux : ux;   // мировая «нижняя» нормаль
+    m._ph = (m._ph || 0) + run * 0.22;
+    const pitch = 30, mov = m._ph * pitch, TL = 48, HL = 66, Lm = Math.max(40, len - TL - HL);
+    const nSec = Math.max(1, Math.round(Lm / 150)), secL = Lm / nSec;
+    const W = (X, Y) => [x1 + ux * X + nx * Y, y1 + uy * X + ny * Y];
+    const prod = (X) => (e ? [Math.min(1, cellAt(e, X / len) / (e.cap || 1)), e.kinds[Math.max(0, Math.min(e.N - 1, Math.floor(X / len * e.N)))], e.prod] : [0, "grain"]);
+    // ---- опоры (за корпусом)
+    const sup = CHAIN_SUP[n.id];
+    const flX = []; for (let k = 0; k <= nSec; k++) flX.push(TL + k * secL);
+    if (sup === "trestle") {
+      const floor = Math.max(y1, y2) + 34, cols = [0.2, 0.5, 0.78].map((q) => W(len * q, h / 2 + 4));
+      ctx.lineWidth = 2; ctx.strokeStyle = "#6b767d";
+      for (let k = 0; k + 1 < cols.length; k++) { const a = cols[k], b = cols[k + 1]; ctx.beginPath(); ctx.moveTo(a[0], a[1] + 30); ctx.lineTo(b[0], floor - 8); ctx.moveTo(b[0], b[1] + 30); ctx.lineTo(a[0], floor - 8); ctx.stroke(); }
+      cols.forEach(([cx, cy]) => {
+        ctx.fillStyle = "#56626a"; ctx.fillRect(cx - 5, cy, 10, floor - cy); ctx.fillStyle = "#8c979e"; ctx.fillRect(cx - 1.5, cy, 3, floor - cy);
+        ctx.strokeStyle = "#1f282d"; ctx.lineWidth = 1; ctx.strokeRect(cx - 5, cy, 10, floor - cy);
+        ctx.fillStyle = "#3f4a51"; ctx.fillRect(cx - 15, floor - 4, 30, 6); ctx.fillRect(cx - 10, cy - 3, 20, 5); K.bolts(cx - 10, floor - 1, cx + 10, floor - 1, 2, 1.3);
+      });
+    } else if (sup === "hang") {
+      flX.forEach((X) => { const [hx, hy] = W(X, -h / 2 - 6), top = hy - 52;
+        ctx.strokeStyle = "#7a858c"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(hx - 7, hy); ctx.lineTo(hx - 7, top); ctx.moveTo(hx + 7, hy); ctx.lineTo(hx + 7, top); ctx.stroke();
+        ctx.fillStyle = "#4c565d"; ctx.fillRect(hx - 11, hy - 30, 22, 7); ctx.fillRect(hx - 16, top - 5, 32, 6);
+        ctx.strokeStyle = "#1f282d"; ctx.lineWidth = 1; ctx.strokeRect(hx - 16, top - 5, 32, 6); K.bolts(hx - 9, top - 2, hx + 9, top - 2, 2, 1.3); });
+    } else if (sup === "feet") {
+      flX.forEach((X) => { const [fx, fy] = W(X, h / 2 + 4), fl = fy + 26; ctx.fillStyle = "#56626a"; ctx.fillRect(fx - 4, fy, 8, fl - fy); ctx.fillStyle = "#3f4a51"; ctx.fillRect(fx - 12, fl - 3, 24, 5); });
+    }
+    // ---- корпус в локальной системе: X вдоль хода цепи, +Y — днище
+    ctx.save(); ctx.translate(x1, y1); ctx.rotate(ang); if (flip) ctx.scale(1, -1);
+    K.rr(TL - 2, -h / 2, Lm + 4, h, 2); K.skin("galv", K.shadeCyl(0, -h / 2, 0, h / 2, 0.6), "#26323a", 1.8);
+    K.rr(TL - 4, -h / 2 - 6, Lm + 8, 7, 1.5); K.skin("galv", null, "#26323a", 1.2);
+    ctx.fillStyle = "rgba(255,255,255,.35)"; ctx.fillRect(TL, -h / 2 - 5, Lm, 1.5);
+    ctx.fillStyle = "#3d474e"; ctx.fillRect(TL - 2, h / 2 - 3, Lm + 4, 3);
+    const yC = h / 2 - h * 0.34, yR = -h / 2 + h * 0.24, floorY = h / 2 - 5;
+    for (let k = 0; k < nSec; k++) {
+      const wx = TL + k * secL + 11, ww = secL - 22, wy = -h / 2 + 5, wh = h - 9;
+      if (ww < 16) continue;
+      ctx.save(); ctx.beginPath(); ctx.rect(wx, wy, ww, wh); ctx.clip(); cavity(wx, wy, ww, wh);
+      ctx.fillStyle = "#59636a"; ctx.fillRect(wx, floorY, ww, 4);
+      const p0 = ((mov % pitch) + pitch) % pitch;
+      for (let X = wx - pitch + p0; X < wx + ww + pitch; X += pitch) {   // продукт перед скребками
+        const [q, kd, pr] = prod(X + pitch / 2); if (q < 0.01) continue;
+        const hh = (floorY - yC + h * 0.16) * Math.min(1, 0.25 + q * 1.1), xb = X + pitch * 0.96;
+        ctx.beginPath(); ctx.moveTo(X + 2, floorY); ctx.lineTo(X + 2, floorY - hh); ctx.quadraticCurveTo(X + pitch * 0.45, floorY - hh * 1.04, xb, floorY - hh * 0.3); ctx.lineTo(xb, floorY); ctx.closePath();
+        ctx.save(); ctx.translate(mov, 0); ctx.fillStyle = matPat(kd, pr); ctx.fill(); ctx.restore();
+        ctx.fillStyle = "rgba(20,12,2,.25)"; ctx.fill();
+      }
+      { const [q0, kd0, pr0] = prod(wx + ww / 2); if (q0 > 0.01) { ctx.save(); ctx.translate(mov, 0); ctx.fillStyle = matPat(kd0, pr0); ctx.fillRect(wx - mov, floorY - 3 - 3 * Math.min(1, q0), ww, 3 + 3 * Math.min(1, q0)); ctx.restore(); } }
+      chainLinks(wx, wx + ww, yC, pitch / 2, p0);
+      for (let X = wx - pitch + p0; X < wx + ww + pitch; X += pitch) {   // скребки рабочей ветви
+        const g = ctx.createLinearGradient(X - 3, 0, X + 3, 0); g.addColorStop(0, "#e2e7ea"); g.addColorStop(1, "#7f898f");
+        ctx.fillStyle = g; ctx.fillRect(X - 2.5, yC - 6, 5, floorY - yC + 5); ctx.strokeStyle = "#1b2227"; ctx.lineWidth = 0.8; ctx.strokeRect(X - 2.5, yC - 6, 5, floorY - yC + 5);
+      }
+      const r0 = (((-mov) % pitch) + pitch) % pitch;   // холостая ветвь идёт обратно
+      ctx.fillStyle = "#4e585e"; ctx.fillRect(wx, yR + 4.5, ww, 2.5);
+      for (let X = wx - pitch + r0; X < wx + ww + pitch; X += pitch) { ctx.fillStyle = "#a9b3b8"; ctx.fillRect(X - 2.5, yR - 9, 5, 12); ctx.strokeStyle = "#1b2227"; ctx.lineWidth = 0.8; ctx.strokeRect(X - 2.5, yR - 9, 5, 12); }
+      chainLinks(wx, wx + ww, yR, pitch / 2, r0);
+      const gl = ctx.createLinearGradient(wx, wy, wx + ww * 0.6, wy + wh); gl.addColorStop(0, "rgba(255,255,255,.12)"); gl.addColorStop(0.35, "rgba(255,255,255,0)"); ctx.fillStyle = gl; ctx.fillRect(wx, wy, ww, wh);
+      ctx.restore(); cutFrame(wx, wy, ww, wh, 2);
+    }
+    flX.forEach((X) => { ctx.fillStyle = "#7d8a93"; ctx.fillRect(X - 3.5, -h / 2 - 8, 7, h + 11); ctx.strokeStyle = "#1f292f"; ctx.lineWidth = 1; ctx.strokeRect(X - 3.5, -h / 2 - 8, 7, h + 11); K.bolts(X, -h / 2 - 3, X, h / 2 - 3, 4, 1.3); });
+    // натяжная секция: винты натяжения, загрузочный патрубок, звёздочка
+    [-h * 0.27, h * 0.27].forEach((Y) => { ctx.fillStyle = "#a3adb3"; ctx.fillRect(-24, Y - 2, 28, 4); ctx.fillStyle = "rgba(0,0,0,.35)"; for (let X = -22; X < 2; X += 3) ctx.fillRect(X, Y - 2, 1, 4); ctx.fillStyle = "#5d686f"; ctx.fillRect(-21, Y - 5, 6, 10); ctx.strokeStyle = "#1b2227"; ctx.lineWidth = 0.8; ctx.strokeRect(-21, Y - 5, 6, 10); });
+    K.rr(-2, -h / 2 - 9, TL + 2, h + 18, 3); K.skin("galv", K.shadeFlat(-2, -h / 2 - 9, TL + 2, h + 18), "#26323a", 1.8);
+    K.rr(6, -h / 2 - 17, TL - 14, 9, 1); K.skin("galv", null, "#26323a", 1.2); K.bolts(9, -h / 2 - 12.5, TL - 11, -h / 2 - 12.5, 3, 1.2);
+    const rs = h * 0.34; sprocket(TL / 2, 0, rs, mov / rs);
+    // приводная головка: звёздочка, подшипниковый узел, выпускной патрубок
+    const hx = len - HL; K.rr(hx, -h / 2 - 11, HL + 4, h + 22, 4); K.skin("galv", K.shadeFlat(hx, -h / 2 - 11, HL + 4, h + 22), "#26323a", 2);
+    K.bolts(hx + 6, -h / 2 - 6, hx + HL - 2, -h / 2 - 6, 4, 1.4); K.bolts(hx + 6, h / 2 + 6, hx + HL - 2, h / 2 + 6, 4, 1.4);
+    K.rr(hx + 12, h / 2 + 10, HL - 22, 12, 1); K.skin("galv", K.shadeCyl(hx + 12, 0, hx + HL - 10, 0), "#26323a", 1.3);
+    ctx.fillStyle = "#7d8a93"; ctx.fillRect(hx + 8, h / 2 + 20, HL - 14, 4); ctx.strokeStyle = "#1f292f"; ctx.lineWidth = 1; ctx.strokeRect(hx + 8, h / 2 + 20, HL - 14, 4);
+    const rh = h * 0.42; sprocket(hx + HL / 2 + 2, 0, rh, mov / rh);
+    if (run < 0.99) { K.rr(-2, -h / 2 - 11, len + 6, h + 22, 4); ctx.fillStyle = `rgba(6,12,18,${0.32 * (1 - run)})`; ctx.fill(); }
+    ctx.restore();
+    // мотор-редуктор на консоли над приводной головкой
+    const [mx, my] = W(len - HL / 2 + 2, -h / 2 - 24), [bx, by] = W(len - HL / 2 + 2, -h / 2 - 11);
+    ctx.strokeStyle = "#4c565d"; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(mx, my + 6); ctx.stroke();
+    K.gearMotor(mx, my, 0.6, { dir: ux >= 0 ? -1 : 1, run, t });
+    if (f) faultFrame(Math.min(x1, x2), Math.min(y1, y2) - h / 2, Math.abs(x2 - x1), Math.abs(y2 - y1) + h);
+    const [lx, ly] = W(len - HL / 2, h / 2 + 30); led(lx, ly, n.id, 6);
+  }
   function drawScraper(n) {
+    if (!n.screwType) return drawChain(n, n.x1, n.y1, n.x2, n.y2, 40);
     const m = M[n.id], e = EL[n.id], f = faulty(n.id), t = T(), run = m ? m.spin : 0;
     const { x1, y1, x2, y2 } = n, ang = Math.atan2(y2 - y1, x2 - x1), len = Math.hypot(x2 - x1, y2 - y1), h = 40;
     m._ph = (m._ph || 0) + run * 0.22;

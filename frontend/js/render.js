@@ -217,10 +217,9 @@
     L([1545, 1033], [1545, 1050], () => (M.ZatvK.pos > 0.3 && CT.scale1.mass > 0.5 ? 4 : 0));
     L(A.TrKomp.out, A.Nor2.in, flowOf("TrKomp"), null, { pts: [A.TrKomp.out, [2030, 1100], [2030, 1100], A.Nor2.in] });
     L(A.Nor2.out, A.TrPBD.in, flowOf("Nor2"));
-    L(A.TrPBD.out, [A.TrPBD.out[0], A.PBD.in[1]], flowOf("TrPBD"));
-    // «штаны» под выпуском НДБ — на два питателя
-    L([2400, 450], A.Pit1.in, () => (running("Pit1") ? 1.2 : 0), () => CT.PBD.kind, { pts: [[2400, 450], [2400, 462], [A.Pit1.in[0], 500], A.Pit1.in] });
-    L([2400, 450], A.Pit2.in, () => (running("Pit2") ? 1.2 : 0), () => CT.PBD.kind, { pts: [[2400, 450], [2400, 462], [A.Pit2.in[0], 500], A.Pit2.in] });
+    L(A.TrPBD.out, A.PBD.in, flowOf("TrPBD"));
+    L([2370, 470], A.Pit1.in, () => (running("Pit1") ? 1.2 : 0), () => CT.PBD.kind, { pts: [[2370, 470], [2370, 490], [A.Pit1.in[0], 490], A.Pit1.in] });
+    L([2430, 470], A.Pit2.in, () => (running("Pit2") ? 1.2 : 0), () => CT.PBD.kind, { pts: [[2430, 470], [2430, 490], [A.Pit2.in[0], 490], A.Pit2.in] });
     [["Pit1", "mag1", "Drob1"], ["Pit2", "mag2", "Drob2"]].forEach(([p, mg, d]) => {
       const o = A[p].out, i = A[d].in, g = ND[mg], gb = g ? g.y + g.h + 4 : o[1] + 40;
       L(o, i, flowOf(p), null, { pts: [o, [o[0], gb], [o[0], Math.max(gb + 4, i[1] - 26)], [i[0], i[1] - 10], i] });
@@ -283,7 +282,7 @@
     { id: "Asp1", w: 16, end: true, pts: [[795, 70], [795, 470]] },
     { id: "Asp2", w: 26, pts: [[4956, 139], [4930, 139], [4930, 50], [2088, 50]] },
     { id: "Asp2", w: 16, end: true, pts: [[2088, 50], [2088, 140]] },
-    { id: "Asp2", w: 16, end: true, pts: [[2440, 50], [2440, 200], [2370, 230], [2370, 250]] },
+    { id: "Asp2", w: 16, end: true, pts: [[2440, 50], [2440, 250]] },
     { id: "Asp2", w: 16, end: true, pts: [[2676, 50], [2676, 982]] },
     { id: "Asp2", w: 16, end: true, pts: [[2748, 50], [2748, 120]] },
     { id: "Asp2", w: 16, end: true, pts: [[3062, 50], [3062, 712]] },

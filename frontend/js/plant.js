@@ -46,7 +46,7 @@
   // ---------------- дробление
   noria("Nor2", 2040, 140, 1120, "20200");
   screw("TrPBD", 2150, 2440, 210, { poz: "20300" });
-  bunker("PBD", 2400, 250, 470, 170, { poz: "30100", label: "НДБ", level: "PBD", kindB: "hopper2" });
+  bunker("PBD", 2400, 250, 470, 370, { poz: "30100", label: "НДБ", level: "PBD", kindB: "hopper2", outs: [2272, 2528] });
   screw("Pit1", 2250, 2345, 530, { poz: "30210", small: true, pch: true });
   screw("Pit2", 2550, 2455, 530, { poz: "30220", small: true, pch: true });
   N("mag1", { kind: "magnet", x: 2335, y: 552, w: 46, h: 54, poz: "30310" });
@@ -108,7 +108,7 @@
   N("FiltNor6", { kind: "filter", drive: "FiltNor6", x: 3880, y: 1250, w: 60, h: 90, poz: "40920" });
   N("PP1", { kind: "diverter", drive: "PP1", x: 3930, y: 1345, w: 64, h: 64, poz: "40910" });
   N("Pros", { kind: "sifter", drive: "Pros1", drive2: "Pros2", x: 3990, y: 1440, w: 330, h: 180, poz: "40950" });
-  N("PP2", { kind: "diverter", drive: "PP2", x: 4268, y: 1640, w: 64, h: 64, poz: "40960" });
+  N("PP2", { kind: "diverter", drive: "PP2", x: 4175, y: 1690, w: 64, h: 64, poz: "40960" });
   scraper("Tr51100", 4364, 1738, 4612, 1052, { poz: "51100" });
   N("PP3", { kind: "diverter", drive: "PP3", x: 4600, y: 1097, w: 64, h: 64, poz: "51110" });
   scraper("Tr51200", 4575, 1185, 3790, 1185, { poz: "51200" });

@@ -148,6 +148,17 @@
     ctx.lineWidth = 2; ctx.strokeStyle = "rgba(0,0,0,.45)"; ctx.stroke();
     if (c !== COL.idle) { ctx.beginPath(); ctx.arc(x - 2, y - 2, (r || 7) * 0.35, 0, TAU); ctx.fillStyle = "rgba(255,255,255,.6)"; ctx.fill(); }
   }
+  // сигнальная лампа в обечайке на корпусе
+  function bezelLed(x, y, id, r) {
+    ctx.beginPath(); ctx.arc(x, y, r + 3, 0, TAU); ctx.fillStyle = "#2a3238"; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = "#11171b"; ctx.stroke();
+    led(x, y, id, r);
+  }
+  // лампа на кронштейне, приваренном к корпусу в точке (x, y0)
+  function lampMount(x, y0, y, id, r) {
+    ctx.fillStyle = "#56626a"; ctx.fillRect(x - 2.5, Math.min(y0, y) - 1, 5, Math.abs(y - y0) + 2);
+    ctx.fillStyle = "#7d8a93"; ctx.fillRect(x - 6, y0 - 1.5, 12, 3);
+    bezelLed(x, y, id, r);
+  }
   function label(text, x, y, o) {
     o = o || {};
     ctx.font = `${o.w || 800} ${Math.round((o.size || 22) * (o.fixed ? 1 : lblK()))}px Raleway, 'Segoe UI', sans-serif`;
@@ -207,8 +218,8 @@
     L(A.TrKomp.out, A.Nor2.in, flowOf("TrKomp"), null, { pts: [A.TrKomp.out, [2030, 1100], [2030, 1100], A.Nor2.in] });
     L(A.Nor2.out, A.TrPBD.in, flowOf("Nor2"));
     L(A.TrPBD.out, A.PBD.in, flowOf("TrPBD"));
-    L([2370, 470], [2300, 512], () => (running("Pit1") ? 1.2 : 0), () => CT.PBD.kind, { pts: [[2370, 470], [2370, 490], [2300, 490], [2300, 512]] });
-    L([2430, 470], [2500, 512], () => (running("Pit2") ? 1.2 : 0), () => CT.PBD.kind, { pts: [[2430, 470], [2430, 490], [2500, 490], [2500, 512]] });
+    L([2272, 470], A.Pit1.in, () => (running("Pit1") ? 1.2 : 0), () => CT.PBD.kind, { pts: [[2272, 470], A.Pit1.in] });
+    L([2528, 470], A.Pit2.in, () => (running("Pit2") ? 1.2 : 0), () => CT.PBD.kind, { pts: [[2528, 470], A.Pit2.in] });
     [["Pit1", "mag1", "Drob1"], ["Pit2", "mag2", "Drob2"]].forEach(([p, mg, d]) => {
       const o = A[p].out, i = A[d].in, g = ND[mg], gb = g ? g.y + g.h + 4 : o[1] + 40;
       L(o, i, flowOf(p), null, { pts: [o, [o[0], gb], [o[0], Math.max(gb + 4, i[1] - 26)], [i[0], i[1] - 10], i] });
@@ -235,7 +246,7 @@
     L([gk[3], 280], [gk[3], 330], flowOf("Tr50300"), kindOf("Tr50300"));
     [0, 1, 2].forEach((i) => L([gk[4 + i], 306], [gk[4 + i], 330], outletOn("Tr50400", i), kindOf("Tr50400")));
     L([gk[7], 280], [gk[7], 330], flowOf("Tr50400"), kindOf("Tr50400"));
-    gk.forEach((cx, i) => L([cx, 820], [cx, 900], () => (M["ShO" + (i + 1)].pos > 0.3 && CT["s" + (i + 1)].mass > 5 ? 5 : 0), () => CT["s" + (i + 1)].kind, { w: 14 }));
+    gk.forEach((cx, i) => L([cx, 820], [cx, 900], () => (M["ShO" + (i + 1)].pos > 0.3 && CT["s" + (i + 1)].mass > 5 ? 5 : 0), () => CT["s" + (i + 1)].kind, { w: 14, spout: true }));
     // гранулирование
     L(A.Tr40100.out, A.Nor5.in, flowOf("Tr40100"), kindOf("Tr40100"), { pts: [[2350, 2400], [A.Nor5.in[0], 2400]] });
     L(A.Nor5.out, A.Tr40300.in, flowOf("Nor5"), () => "mash", { pts: [A.Nor5.out, A.Tr40300.in] });
@@ -245,20 +256,20 @@
     L(A.KondGr.out, A.Gran.in, () => (S.kondFlow || 0) * 2, () => "mash", { pts: [A.KondGr.out, A.Gran.in] });
     L(A.Gran.out, A.Ohl.in, () => (S.granFlow || 0) * 2, () => "pellet");
     L(A.Ohl.out, A.Tr40700.in, () => (M.Ohl.spin > 0.3 && CT.Ohl.mass > 5 ? 2 : 0), () => "pellet", { pts: [A.Ohl.out, [A.Ohl.out[0], A.Tr40700.in[1]]] });
-    L(A.Tr40700.out, A.Nor6.in, flowOf("Tr40700"), () => "pellet", { pts: [A.Tr40700.out, A.Nor6.in] });
+    L(A.Tr40700.out, A.Nor6.in, flowOf("Tr40700"), () => "pellet", { pts: [A.Tr40700.out, [A.Tr40700.out[0] + 4, A.Tr40700.out[1] + 6], A.Nor6.in] });
     L(A.Nor6.out, A.PP1.in, flowOf("Nor6"), () => "pellet", { pts: [A.Nor6.out, [3962, 1358], A.PP1.in] });
     L(A.PP1.o1, A.Pros.in, () => (V.PP1_Pos1 ? EL.Nor6.flow : 0), () => "pellet", { pts: [A.PP1.o1, [A.PP1.o1[0], 1424], [A.Pros.in[0], 1424], A.Pros.in] });
-    L(A.PP1.o2, A.Torba.in, () => (V.PP1_Pos2 ? EL.Nor6.flow : 0), () => "pellet", { pts: [A.PP1.o2, [A.PP1.o2[0], 1700], [4200, 1752], [4200, 1780]] });
-    L(A.Pros.out, A.PP2.in, flowOf("Pros"), () => "pellet", { pts: [A.Pros.out, A.PP2.in] });
-    L(A.Pros.waste, A.Tr40800.in, () => (EL.Pros.flow > 0.05 ? 0.4 : 0), () => "fines", { pts: [A.Pros.waste, [A.Pros.waste[0], 2340], [A.Tr40800.in[0], 2366], A.Tr40800.in] });
-    L(A.PP2.o2, A.Tr51100.in, () => (V.PP2_Pos2 ? EL.Pros.flow : 0), () => "pellet", { pts: [A.PP2.o2, [A.Tr51100.in[0], A.PP2.o2[1]], A.Tr51100.in] });
-    L(A.PP2.o1, A.Torba.in, () => (V.PP2_Pos1 ? EL.Pros.flow : 0), () => "pellet", { pts: [A.PP2.o1, [A.PP2.o1[0], 1730], [4240, 1760], [4240, 1780]] });
+    L(A.PP1.o2, A.Torba.in, () => (V.PP1_Pos2 ? EL.Nor6.flow : 0), () => "pellet", { pts: [A.PP1.o2, [A.PP1.o2[0], A.PP1.o2[1] + 14], [3952, A.PP1.o2[1] + 44], [3952, 1676], [4152, 1770], [4152, 1780]] });
+    L(A.Pros.out, A.PP2.in, flowOf("Pros"), () => "pellet", { pts: [A.Pros.out, A.PP2.in], front: true });
+    L(A.Pros.waste, A.Tr40800.in, () => (EL.Pros.flow > 0.05 ? 0.4 : 0), () => "fines", { pts: [A.Pros.waste, [A.Pros.waste[0], 2340], [A.Tr40800.in[0], 2366], A.Tr40800.in], front: true });
+    L(A.PP2.o2, A.Tr51100.in, () => (V.PP2_Pos2 ? EL.Pros.flow : 0), () => "pellet", { pts: [A.PP2.o2, [A.PP2.o2[0], A.PP2.o2[1] + 10], [ND.Torba.x + ND.Torba.w + 18, A.PP2.o2[1] + 10], A.Tr51100.in] });
+    L(A.PP2.o1, A.Torba.in, () => (V.PP2_Pos1 ? EL.Pros.flow : 0), () => "pellet", { pts: [A.PP2.o1, [A.PP2.o1[0], 1780]] });
     L(A.Tr51100.out, A.PP3.in, flowOf("Tr51100"), () => "pellet", { pts: [A.Tr51100.out, [A.PP3.in[0], A.Tr51100.out[1] + 8], A.PP3.in] });
     L(A.PP3.o1, A.Tr51200.in, () => (V.PP3_Pos1 ? EL.Tr51100.flow : 0), () => "pellet", { pts: [A.PP3.o1, [A.Tr51200.in[0], A.PP3.o1[1]], A.Tr51200.in], behind: true });
     L(A.PP3.o2, A.Nor7.in, () => (V.PP3_Pos2 ? EL.Tr51100.flow : 0), () => "pellet", { pts: [A.PP3.o2, [A.Nor7.in[0] - 40, A.PP3.o2[1]], [A.Nor7.in[0] - 40, A.Nor7.in[1] - 40], A.Nor7.in] });
     { const bi = A.Nor4.sin || [A.Nor4.in[0] + 120, A.Nor4.in[1]]; L(A.Tr51200.out, bi, flowOf("Tr51200"), () => "pellet", { pts: [A.Tr51200.out, [A.Tr51200.out[0], bi[1] - 10], [bi[0] + 6, bi[1] - 10], bi] }); }
     L(A.Nor7.out, A.b309.in, flowOf("Nor7"), () => "pellet", { pts: [A.Nor7.out, [4930, 1358], A.b309.in] });
-    L([4930, 1990], [4930, 2060], () => (M.ShO9.pos > 0.3 && CT.s9.mass > 5 ? 5 : 0), () => "pellet", { w: 14 });
+    L([4930, 1990], [4930, 2060], () => (M.ShO9.pos > 0.3 && CT.s9.mass > 5 ? 5 : 0), () => "pellet", { w: 14, spout: true });
     if (A.Leb && A.Leb.in) L(A.Torba.out, A.Leb.in, () => (S.bagFill ? 2 : 0), () => "pellet", { pts: [A.Torba.out, A.Leb.in] });
     L(A.Tr40800.out, A.Tr40100.in, flowOf("Tr40800"), () => "fines", { pts: [[3200, 2400], [3175, 2400]] });
   }
@@ -332,14 +343,24 @@
   }
   /* ============================================================ трубы, воздуховоды, пар */
   const T = () => performance.now() / 1000;
-  function drawPipes() {
+  // Телескопический загрузочный рукав отгрузки в автомобиль: гофра + пылезащитный конус
+  function loadSpout([x, y], w) {
+    const y0 = y - 30;
+    for (let k = 0; k < 5; k++) { const yy = y0 + k * 6; K.rr(x - w / 2 - 4, yy, w + 8, 5, 2); ctx.fillStyle = k % 2 ? "#3b4349" : "#4c565d"; ctx.fill(); ctx.strokeStyle = "#1b2227"; ctx.lineWidth = 0.8; ctx.stroke(); }
+    ctx.beginPath(); ctx.moveTo(x - w / 2 - 3, y); ctx.lineTo(x + w / 2 + 3, y); ctx.lineTo(x + w / 2 + 13, y + 14); ctx.lineTo(x - w / 2 - 13, y + 14); ctx.closePath();
+    const g = ctx.createLinearGradient(x - w, 0, x + w, 0); g.addColorStop(0, "#22292e"); g.addColorStop(0.45, "#4d575e"); g.addColorStop(1, "#1d2328");
+    ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = "#11171b"; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = "#f0c040"; ctx.fillRect(x - w / 2 - 12, y + 12, w + 24, 2);
+  }
+  function drawPipes(front) {
     const t = T();
     for (const L of LINKS) {
+      if (front && !L.front) continue;
       const oil = L.kind() === "oil";
       K.pipe(L.pts, oil ? 8 : L.w, { kind: oil ? "oil" : "galv" });
       if (!oil && L.w >= 10 && L.pts.length > 1) {
         const n = L.pts.length, f = (p, q) => { const d = Math.hypot(q[0] - p[0], q[1] - p[1]); if (d > 6) K.flange(p[0] + (q[0] - p[0]) / d * 4, p[1] + (q[1] - p[1]) / d * 4, (q[0] - p[0]) / d, (q[1] - p[1]) / d, L.w); };
-        f(L.pts[0], L.pts[1]); f(L.pts[n - 1], L.pts[n - 2]);
+        f(L.pts[0], L.pts[1]); if (L.spout) loadSpout(L.pts[n - 1], L.w); else f(L.pts[n - 1], L.pts[n - 2]);
       }
       if (oil && (+L.on() || 0) > 0.05) K.pipeFlow(L.pts, 8, "rgba(246,196,40,.95)", 70, t);
     }
@@ -606,7 +627,13 @@
     else K.gearMotor(n.dir > 0 ? x - 8 : x + w + 8, cy, n.chain ? 0.7 : 0.62, { dir: n.dir > 0 ? -1 : 1, run, t });
     if (n.pch && !small) { ctx.font = "800 13px Raleway"; ctx.fillStyle = "#0a4c9a"; ctx.textAlign = "left"; ctx.fillText("ПЧ", x + 4, cy - h / 2 - 6); }
     if (f) faultFrame(x, cy - h / 2, w, h);
-    led(n.dir > 0 ? x + w - 12 : x + 12, cy + h / 2 + 9, n.id, small ? 4 : 6);
+    // патрубки питателей с ПЧ: загрузка сверху, выпуск снизу — точно под/над трубами
+    if (small && n.pch && A[n.id]) {
+      const ix = A[n.id].in[0], ox = A[n.id].out[0], ty = cy - h / 2, by = cy + h / 2;
+      K.rr(ix - 9, ty - 8, 18, 9, 1); K.skin("galv", K.shadeCyl(ix - 9, 0, ix + 9, 0), "#26323a", 1.2);
+      K.rr(ox - 9, by - 1, 18, 9, 1); K.skin("galv", K.shadeCyl(ox - 9, 0, ox + 9, 0), "#26323a", 1.2);
+    }
+    lampMount(n.dir > 0 ? x + w - 12 : x + 12, cy + h / 2, cy + h / 2 + (small ? 8 : 10), n.id, small ? 4 : 5);
   }
   /* ---------- цепной скребковый транспортёр (ТСЦ): секционный короб с крышкой и фланцами,
      смотровые окна по секциям (цепь из пластин, скребки, продукт перед скребком, холостая ветвь),
@@ -657,31 +684,12 @@
   function drawChain(n) {
     const m = M[n.id], e = EL[n.id], f = faulty(n.id), t = T(), run = m ? m.spin : 0;
     const G = chainGeom(n), { x1, y1, x2, y2, h, ang, len, ux, flip } = G, io = CHAIN_IO[n.id] || {};
-    m._ph = (m._ph || 0) + run * 0.22;
+    m._ph = (m._ph || 0) + run * 0.075;
     const pitch = 30, mov = m._ph * pitch, TL = 48, HL = 66, Lm = Math.max(40, len - TL - HL);
     const nSec = Math.max(1, Math.round(Lm / 150)), secL = Lm / nSec;
     const W = G.W;
     const prod = (X) => (e ? [Math.min(1, cellAt(e, X / len) / (e.cap || 1)), e.kinds[Math.max(0, Math.min(e.N - 1, Math.floor(X / len * e.N)))], e.prod] : [0, "grain"]);
-    // ---- опоры (за корпусом)
-    const sup = CHAIN_SUP[n.id];
     const flX = []; for (let k = 0; k <= nSec; k++) flX.push(TL + k * secL);
-    if (sup === "trestle") {
-      const floor = Math.max(y1, y2) + 34, cols = [0.2, 0.5, 0.78].map((q) => W(len * q, h / 2 + 4));
-      ctx.lineWidth = 2; ctx.strokeStyle = "#6b767d";
-      for (let k = 0; k + 1 < cols.length; k++) { const a = cols[k], b = cols[k + 1]; ctx.beginPath(); ctx.moveTo(a[0], a[1] + 30); ctx.lineTo(b[0], floor - 8); ctx.moveTo(b[0], b[1] + 30); ctx.lineTo(a[0], floor - 8); ctx.stroke(); }
-      cols.forEach(([cx, cy]) => {
-        ctx.fillStyle = "#56626a"; ctx.fillRect(cx - 5, cy, 10, floor - cy); ctx.fillStyle = "#8c979e"; ctx.fillRect(cx - 1.5, cy, 3, floor - cy);
-        ctx.strokeStyle = "#1f282d"; ctx.lineWidth = 1; ctx.strokeRect(cx - 5, cy, 10, floor - cy);
-        ctx.fillStyle = "#3f4a51"; ctx.fillRect(cx - 15, floor - 4, 30, 6); ctx.fillRect(cx - 10, cy - 3, 20, 5); K.bolts(cx - 10, floor - 1, cx + 10, floor - 1, 2, 1.3);
-      });
-    } else if (sup === "hang") {
-      flX.forEach((X) => { const [hx, hy] = W(X, -h / 2 - 6), top = hy - 52;
-        ctx.strokeStyle = "#7a858c"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(hx - 7, hy); ctx.lineTo(hx - 7, top); ctx.moveTo(hx + 7, hy); ctx.lineTo(hx + 7, top); ctx.stroke();
-        ctx.fillStyle = "#4c565d"; ctx.fillRect(hx - 11, hy - 30, 22, 7); ctx.fillRect(hx - 16, top - 5, 32, 6);
-        ctx.strokeStyle = "#1f282d"; ctx.lineWidth = 1; ctx.strokeRect(hx - 16, top - 5, 32, 6); K.bolts(hx - 9, top - 2, hx + 9, top - 2, 2, 1.3); });
-    } else if (sup === "feet") {
-      flX.forEach((X) => { const [fx, fy] = W(X, h / 2 + 4), fl = fy + 26; ctx.fillStyle = "#56626a"; ctx.fillRect(fx - 4, fy, 8, fl - fy); ctx.fillStyle = "#3f4a51"; ctx.fillRect(fx - 12, fl - 3, 24, 5); });
-    }
     // ---- корпус в локальной системе: X вдоль хода цепи, +Y — днище
     ctx.save(); ctx.translate(x1, y1); ctx.rotate(ang); if (flip) ctx.scale(1, -1);
     K.rr(TL - 2, -h / 2, Lm + 4, h, 2); K.skin("galv", K.shadeCyl(0, -h / 2, 0, h / 2, 0.6), "#26323a", 1.8);
@@ -745,7 +753,57 @@
     ctx.strokeStyle = "#4c565d"; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(mx, my + 6); ctx.stroke();
     K.gearMotor(mx, my, 0.6, { dir: ux >= 0 ? -1 : 1, run, t });
     if (f) faultFrame(Math.min(x1, x2), Math.min(y1, y2) - h / 2, Math.abs(x2 - x1), Math.abs(y2 - y1) + h);
-    const [lx, ly] = W(len - HL / 2, h / 2 + 30); led(lx, ly, n.id, 6);
+    const [lx, ly] = W(len - HL + 10, h / 2 + 2); bezelLed(lx, ly, n.id, 5);
+  }
+  // Опоры ТЦ. Стойка крепится к днищу короба через приварную косынку (по уклону
+  // короба сверху, горизонтальная площадка снизу) на болтах; внизу — опорная плита на полу.
+  // trestle — эстакада с раскосами; floor — стойки до пола (за соседними механизмами);
+  // hang — подвески к перекрытию.
+  const CHAIN_FLOOR = { Tr40700: 2420, Tr51100: 2420 };
+  function chainSupports(n) {
+    const G = chainGeom(n), { y1, y2, h, len, W } = G, sup = CHAIN_SUP[n.id]; if (!sup) return;
+    const TL = 48, HL = 66, Lm = Math.max(40, len - TL - HL), nSec = Math.max(1, Math.round(Lm / 150)), secL = Lm / nSec;
+    const post = (X, floor) => {
+      // опорный лист, приваренный к днищу короба (заходит под корпус), стойка — от его нижней кромки
+      const q = [W(X - 13, h / 2 - 8), W(X + 13, h / 2 - 8), W(X + 13, h / 2 + 12), W(X - 13, h / 2 + 12)], c = W(X, h / 2 + 12), cx = c[0];
+      const top = Math.min(q[2][1], q[3][1]) + 2;
+      ctx.fillStyle = "#56626a"; ctx.fillRect(cx - 5, top, 10, floor - top); ctx.fillStyle = "#8c979e"; ctx.fillRect(cx - 1.5, top, 3, floor - top);
+      ctx.strokeStyle = "#1f282d"; ctx.lineWidth = 1; ctx.strokeRect(cx - 5, top, 10, floor - top);
+      K.path(q, true); ctx.fillStyle = "#4c575e"; ctx.fill(); ctx.stroke();
+      const m1 = W(X - 6, h / 2 + 6), m2 = W(X + 6, h / 2 + 6); [m1, m2].forEach(([bx, by]) => { ctx.beginPath(); ctx.arc(bx, by, 1.6, 0, TAU); ctx.fillStyle = "#c3cbd0"; ctx.fill(); });
+      ctx.fillStyle = "#3f4a51"; ctx.fillRect(cx - 15, floor - 4, 30, 6); K.bolts(cx - 10, floor - 1, cx + 10, floor - 1, 2, 1.3);
+      return [cx, top];
+    };
+    if (sup === "trestle") {
+      const floor = CHAIN_FLOOR[n.id] || Math.max(y1, y2) + 34, cols = [0.2, 0.5, 0.78].map((q) => post(len * q, floor));
+      ctx.lineWidth = 2; ctx.strokeStyle = "#6b767d";
+      for (let k = 0; k + 1 < cols.length; k++) { const a = cols[k], b = cols[k + 1]; ctx.beginPath(); ctx.moveTo(a[0], a[1] + 30); ctx.lineTo(b[0], floor - 8); ctx.moveTo(b[0], b[1] + 30); ctx.lineTo(a[0], floor - 8); ctx.stroke(); }
+    } else if (sup === "hang") {
+      for (let k = 0; k <= nSec; k++) { const [hx, hy] = W(TL + k * secL, -h / 2 - 6), top = hy - 52;
+        ctx.strokeStyle = "#7a858c"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(hx - 7, hy); ctx.lineTo(hx - 7, top); ctx.moveTo(hx + 7, hy); ctx.lineTo(hx + 7, top); ctx.stroke();
+        ctx.fillStyle = "#4c565d"; ctx.fillRect(hx - 11, hy - 30, 22, 7); ctx.fillRect(hx - 16, top - 5, 32, 6);
+        ctx.strokeStyle = "#1f282d"; ctx.lineWidth = 1; ctx.strokeRect(hx - 16, top - 5, 32, 6); K.bolts(hx - 9, top - 2, hx + 9, top - 2, 2, 1.3); }
+    } else if (sup === "feet") {
+      const floor = CHAIN_FLOOR[n.id] || Math.max(y1, y2) + 60;
+      for (let k = 0; k <= nSec; k++) post(TL + k * secL, floor);
+    }
+  }
+  // Перекрытие под просеивателем 40950: машина стоит на нём опорами рамы,
+  // трубы выпусков проходят сквозь проёмы. Справа — линия обрыва (перекрытие продолжается).
+  function drawSifterFloor() {
+    const n = ND.Pros, z = n && n._spr, nr = ND.Nor6; if (!z || !nr) return;
+    const y = z.P([0.5, 1])[1], x0 = nr.x + nr.w / 2, x1 = z.P([1, 1])[0] + 26, th = 18;
+    ctx.fillStyle = "#4b555c"; ctx.fillRect(x0, y + th, x1 - x0, 7); ctx.fillStyle = "#6e7a82"; ctx.fillRect(x0, y + th, x1 - x0, 2);   // балка перекрытия
+    for (let X = x0 + 30; X < x1 - 10; X += 46) { ctx.fillStyle = "#56626a"; ctx.fillRect(X, y + th, 3, 7); }
+    ctx.fillStyle = K.pat("concrete") || "#8d9297"; ctx.fillRect(x0, y, x1 - x0, th);
+    ctx.fillStyle = "rgba(0,0,0,.18)"; ctx.fillRect(x0, y + th - 4, x1 - x0, 4); ctx.fillStyle = "rgba(255,255,255,.25)"; ctx.fillRect(x0, y, x1 - x0, 1.5);
+    ctx.strokeStyle = "#3d454b"; ctx.lineWidth = 1.2; ctx.strokeRect(x0, y, x1 - x0, th);
+    ctx.beginPath(); ctx.moveTo(x1, y - 6); ctx.lineTo(x1, y + 3); ctx.lineTo(x1 + 6, y + 5); ctx.lineTo(x1 - 6, y + 9); ctx.lineTo(x1, y + 11); ctx.lineTo(x1, y + th + 12);
+    ctx.strokeStyle = "#3d454b"; ctx.lineWidth = 1.4; ctx.stroke();
+  }
+  function drawStructs() {
+    drawSifterFloor();
+    for (const n of Object.values(ND)) if ((n.chain || (n.kind === "scraper" && !n.screwType)) && CHAIN_SUP[n.id]) chainSupports(n);
   }
   function drawScraper(n) {
     if (!n.screwType) return drawChain(n);
@@ -759,15 +817,20 @@
     ctx.restore();
     K.gearMotor(x2 + Math.cos(ang) * 10, y2 + Math.sin(ang) * 10 - 4, 0.66, { dir: Math.cos(ang) >= 0 ? 1 : -1, run, t });
     if (f) faultFrame(Math.min(x1, x2), Math.min(y1, y2) - h / 2, Math.abs(x2 - x1), Math.abs(y2 - y1) + h);
-    led(x2 - Math.cos(ang) * 20, y2 - Math.sin(ang) * 20 + 26, n.id, 6);
+    { const lx = x2 - Math.cos(ang) * 20, ly = y2 - Math.sin(ang) * 20; lampMount(lx, ly + h / 2, ly + h / 2 + 10, n.id, 5); }
   }
 
   /* ============================================================ бункеры */
   function bunkerFill(n) { const c = CT[n.level]; return c ? Math.max(0, Math.min(1.04, c.mass / c.cap)) : 0; }
   function drawBunker(n) {
     const c = CT[n.level], x = n.x, y = n.y, w = n.w, h = n.h;
-    const cone = Math.min(w * 0.55, h * 0.3), body = h - cone, nz = Math.max(18, w * 0.16);
-    const shape = () => { ctx.beginPath(); ctx.moveTo(x, y + 8); ctx.lineTo(x + w, y + 8); ctx.lineTo(x + w, y + body); ctx.lineTo(x + w / 2 + nz / 2, y + h); ctx.lineTo(x + w / 2 - nz / 2, y + h); ctx.lineTo(x, y + body); ctx.closePath(); };
+    const outs = n.outs, cone = outs ? h * 0.42 : Math.min(w * 0.55, h * 0.3), body = h - cone, nz = outs ? 22 : Math.max(18, w * 0.16), ridge = y + body - 34;
+    const shape = () => {
+      ctx.beginPath(); ctx.moveTo(x, y + 8); ctx.lineTo(x + w, y + 8); ctx.lineTo(x + w, y + body);
+      if (outs) { const [o1, o2] = outs; ctx.lineTo(o2 + nz / 2, y + h); ctx.lineTo(o2 - nz / 2, y + h); ctx.lineTo(x + w / 2, ridge); ctx.lineTo(o1 + nz / 2, y + h); ctx.lineTo(o1 - nz / 2, y + h); }
+      else { ctx.lineTo(x + w / 2 + nz / 2, y + h); ctx.lineTo(x + w / 2 - nz / 2, y + h); }
+      ctx.lineTo(x, y + body); ctx.closePath();
+    };
     // разрез: полость, продукт с откосом, стенки по краям
     const fr = bunkerFill(n);
     ctx.save(); shape(); ctx.clip();
@@ -782,14 +845,14 @@
     [[x, y + 8, wall, body - 8], [x + w - wall, y + 8, wall, body - 8]].forEach(([X, Y, W, H]) => { ctx.fillStyle = K.pat("galv"); ctx.fillRect(X, Y, W, H); ctx.fillStyle = "rgba(0,0,0,.2)"; ctx.fillRect(X, Y, W, H); });
     shape(); ctx.lineWidth = 2.6; ctx.strokeStyle = "#26323a"; ctx.stroke();
     for (let yy = y + 60; yy < y + body - 10; yy += 70) { ctx.fillStyle = "#6e7b84"; ctx.fillRect(x - 5, yy, 7, 9); ctx.fillRect(x + w - 2, yy, 7, 9); }
-    ctx.strokeStyle = "rgba(200,210,216,.5)"; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x + 3, y + body); ctx.lineTo(x + w / 2 - nz / 2 + 2, y + h - 2); ctx.moveTo(x + w - 3, y + body); ctx.lineTo(x + w / 2 + nz / 2 - 2, y + h - 2); ctx.stroke();
+    if (!outs) { ctx.strokeStyle = "rgba(200,210,216,.5)"; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x + 3, y + body); ctx.lineTo(x + w / 2 - nz / 2 + 2, y + h - 2); ctx.moveTo(x + w - 3, y + body); ctx.lineTo(x + w / 2 + nz / 2 - 2, y + h - 2); ctx.stroke(); }
     ctx.fillStyle = "#7d8a93"; ctx.fillRect(x - 3, y + body - 3, 8, 6); ctx.fillRect(x + w - 5, y + body - 3, 8, 6);
     // крыша с люком
     ctx.beginPath(); ctx.rect(x - 4, y, w + 8, 10); K.skin("galv", K.shadeFlat(x, y, w, 10), "#26323a", 1.4);
     K.bolts(x, y + 5, x + w, y + 5, Math.max(3, Math.round(w / 22)), 1.3);
     if (w >= 90) { K.rr(x + w * 0.62, y - 7, w * 0.22, 8, 2); K.skin("galv", null, "#26323a", 1); }
     // выпускной фланец
-    ctx.fillStyle = "#7d8a93"; ctx.fillRect(x + w / 2 - nz / 2 - 4, y + h - 3, nz + 8, 6); ctx.strokeStyle = "#1f292f"; ctx.lineWidth = 1; ctx.strokeRect(x + w / 2 - nz / 2 - 4, y + h - 3, nz + 8, 6);
+    (outs || [x + w / 2]).forEach((ox) => { ctx.fillStyle = "#7d8a93"; ctx.fillRect(ox - nz / 2 - 4, y + h - 3, nz + 8, 6); ctx.strokeStyle = "#1f292f"; ctx.lineWidth = 1; ctx.strokeRect(ox - nz / 2 - 4, y + h - 3, nz + 8, 6); });
     // ДВУ / ДНУ — ротационные датчики уровня на стенке
     if (VOPT.levels && c) {
       const dvu = sensorDVU(n), dnu = sensorDNU(n);
@@ -817,6 +880,17 @@
   // поэтому горох даёт пологий конус, а мел и шроты — крутой.
   function heap(n, c, fr, x, y, w, h, body, nz) {
     const cxm = x + w / 2;
+    if (n.outs) {
+      const [o1, o2] = n.outs, ridge = y + body - 34, lin = (X, xa, ya, xb, yb) => ya + (yb - ya) * (X - xa) / (xb - xa);
+      return heapG(n, c, fr, { x, w, top: y + 8, bot: y + h, nz, cx: cxm, outs: n.outs, floor: (X) => {
+        if (X < o1 - nz / 2) return lin(X, x, y + body, o1 - nz / 2, y + h);
+        if (X <= o1 + nz / 2) return y + h - 1;
+        if (X < cxm) return lin(X, o1 + nz / 2, y + h, cxm, ridge);
+        if (X < o2 - nz / 2) return lin(X, cxm, ridge, o2 - nz / 2, y + h);
+        if (X <= o2 + nz / 2) return y + h - 1;
+        return lin(X, o2 + nz / 2, y + h, x + w, y + body);
+      } });
+    }
     return heapG(n, c, fr, { x, w, top: y + 8, bot: y + h, nz, cx: cxm, floor: (X) => { const d = Math.abs(X - cxm); return d <= nz / 2 ? y + h - 1 : y + body + (h - body) * Math.max(0, Math.min(1, (w / 2 - d) / (w / 2 - nz / 2))); } });
   }
   // geo: x, w — ширина насыпи; top — верх ёмкости; bot — низ (для тени);
@@ -848,10 +922,10 @@
       st.debt += -d / dx; st.outT = t;
     }
     if (st.debt > 1e-4) {
-      const r0 = Math.max(1, Math.round(nz / dx / 2)), c0 = Math.max(0, Math.min(N - 1, Math.floor((cxm - x) / dx)));
+      const r0 = Math.max(1, Math.round(nz / dx / 2)), outX = geo.outs || [cxm];
       for (let pass = 0; pass < 2 && st.debt > 1e-4; pass++) {
-        const per = st.debt / (2 * r0);
-        for (let i = c0 - r0; i < c0 + r0; i++) if (i >= 0 && i < N) st.debt -= takeTop(i, per);
+        const per = st.debt / (2 * r0 * outX.length);
+        for (const ox of outX) { const c0 = Math.max(0, Math.min(N - 1, Math.floor((ox - x) / dx))); for (let i = c0 - r0; i < c0 + r0; i++) if (i >= 0 && i < N) st.debt -= takeTop(i, per); }
       }
       if (cur < 1) st.debt = 0;
     }
@@ -1709,7 +1783,7 @@
     mixer: { win: [[0.149, 0.196], [0.787, 0.196], [0.787, 0.50], [0.149, 0.50]], pts: { in: [0.22, 0.0], oil: [0.655, 0.0], out: [0.47, 0.84], top: [0.5, 0.06] } },
     conditioner: { win: [[0.355, 0.33], [0.78, 0.33], [0.78, 0.62], [0.355, 0.62]], pts: { in: [0.21, 0.0], out: [0.935, 0.85], steam: [0.61, 0.06] } },
     cooler: { win: [[0.19, 0.225], [0.70, 0.225], [0.70, 0.622], [0.19, 0.622]], pts: { in: [0.485, 0.0], out: [0.485, 0.90], duct: [0.70, 0.09] } },
-    sifter: { win: [[0.17, 0.21], [0.71, 0.145], [0.71, 0.53], [0.17, 0.595]], pts: { in: [0.165, 0.0], waste: [0.24, 0.72], out: [0.63, 0.72] } },
+    sifter: { win: [[0.17, 0.21], [0.71, 0.145], [0.71, 0.53], [0.17, 0.595]], pts: { in: [0.165, 0.0], waste: [0.237, 0.79], out: [0.63, 0.812] } },
     scalp: { win: [[0.355, 0.18], [0.773, 0.18], [0.773, 0.61], [0.355, 0.61]], pts: { in: [0.88, 0.0], out: [0.726, 0.915], waste: [0.98, 0.82], asp: [0.35, 0.0] } },
     boiler: { win: [[0.40, 0.357], [0.74, 0.357], [0.74, 0.66], [0.40, 0.66]], pts: { steam: [0.55, 0.0] } },
     tank: { win: [[0.393, 0.164], [0.679, 0.164], [0.679, 0.526], [0.393, 0.526]], pts: {} },
@@ -1876,7 +1950,7 @@
     // боковой загрузочный носок башмака нории 50300 — для ТЦ 51200 (подход справа)
     if (ND.Nor4 && ND.Nor4._nb) A.Nor4.sin = ND.Nor4._nb.P([0.97, 0.66]);
     // нижняя головка ТЦ 51100 — под правым выходом ПП 40960
-    if (A.PP2 && A.PP2.o2 && ND.Tr51100) { const sc = ND.Tr51100; sc.x1 = A.PP2.o2[0] + 52; sc.y1 = A.PP2.o2[1] + 72; A.Tr51100.in[0] = sc.x1; A.Tr51100.in[1] = sc.y1 - 14; sc.x = Math.min(sc.x1, sc.x2); sc.y = Math.min(sc.y1, sc.y2) - 20; sc.w = Math.abs(sc.x2 - sc.x1); sc.h = Math.abs(sc.y2 - sc.y1) + 40; }
+    if (A.PP2 && A.PP2.o2 && ND.Tr51100) { const sc = ND.Tr51100; sc.x1 = A.PP2.o2[0] + 136; sc.y1 = A.PP2.o2[1] + 150; A.Tr51100.in[0] = sc.x1; A.Tr51100.in[1] = sc.y1 - 14; sc.x = Math.min(sc.x1, sc.x2); sc.y = Math.min(sc.y1, sc.y2) - 20; sc.w = Math.abs(sc.x2 - sc.x1); sc.h = Math.abs(sc.y2 - sc.y1) + 40; }
     // концы воздуховодов аспирации — на патрубки машин
     const dEnd = (x0, pts) => DUCTS.find((d) => d.pts[d.pts.length - 1][0] === x0 && (d.pts = pts));
     if (A.Ohl.duct) { const [dx, dy] = A.Ohl.duct, yy = dy - 46; dEnd(2896, [[3014, 1409], [3072, 1409], [3072, yy], [dx, yy], [dx, dy]]); }
@@ -1897,8 +1971,9 @@
     mainFrom("Asp1"); mainFrom("Asp2");
     const dg = DUCTS.find((d) => d.id === "AspGr"); if (dg && A.AspGr.in) { dg.pts[0] = [A.AspGr.in[0], A.AspGr.in[1]]; dg.pts[1] = [3072, A.AspGr.in[1]]; }
     if (IMG.m_gearmotor) K.setGearMotor((w, flip) => mipImg("m_gearmotor" + (flip ? "_flip" : ""), w), IMG.m_gearmotor.naturalHeight / IMG.m_gearmotor.naturalWidth, MSPR.gearmotor);
-    // ТЦ 40700 — наклонный: хвост под выпуском охладителя, головка у приёмного носка нории 40900
-    if (ND.Tr40700 && A.Nor6 && A.Ohl) { const c = ND.Tr40700; c.h0 = c.h0 || c.h; c.cy1 = A.Ohl.out[1] + 14 + c.h0 / 2; c.cx2 = A.Nor6.in[0] - 20; c.cy2 = A.Nor6.in[1] - 5;
+    // ТЦ 40700 — наклонный: хвост под выпуском охладителя, головка не доходит до нории 40900,
+    // из носка головки продукт идёт в башмак трубой под 45°
+    if (ND.Tr40700 && A.Nor6 && A.Ohl) { const c = ND.Tr40700; c.h0 = c.h0 || c.h; c.cy1 = A.Ohl.out[1] + 6 + c.h0 / 2; c.cx2 = A.Nor6.in[0] - 150; c.cy2 = A.Nor6.in[1] - 137;
       c.y = Math.min(c.cy1, c.cy2) - c.h0 / 2; c.h = Math.abs(c.cy1 - c.cy2) + c.h0; c.w = c.cx2 - c.x1; }
     // ТЦ 51200 — хвост левее наклонного ТЦ 51100, чтобы корпуса не наезжали
     if (ND.Tr51200 && ND.Tr51100) { const c = ND.Tr51200; c.x1 = 4515; c.x = Math.min(c.x1, c.x2); c.w = Math.abs(c.x2 - c.x1); }
@@ -2728,11 +2803,13 @@
     ctx.setTransform(scale, 0, 0, scale, offX, offY);
     K.use(ctx);
     drawBackdrop();
+    drawStructs();
     if (VOPT.pipes) drawDucts();
     drawPipes();
     drawSteam();
     const nodes = Object.values(ND).sort((a, b) => ORDER.indexOf(a.kind) - ORDER.indexOf(b.kind));
     for (const n of nodes) { const f = n._spr && IMG[n._spr.img] ? drawMach : n._nh ? drawNoriaSpr : DRAW[n.kind]; if (f) { try { f(n); } catch (e) { if (!render._err) { render._err = 1; console.error(n.id, e); } } } }
+    drawPipes(true);
     drawParticles();
     drawRamp();
     drawLabels();

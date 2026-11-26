@@ -55,7 +55,17 @@
     const c = document.createElement("canvas"); c.width = im.naturalWidth; c.height = im.naturalHeight;
     const x = c.getContext("2d"); x.translate(c.width, 0); x.scale(-1, 1); x.drawImage(im, 0, 0); return c;
   }
-  function drawLit(key, W, ox, oy, H) { ctx.drawImage(mipImg(key, W), ox, oy, W, H); }
+  // «погашенная» копия спрайта: выключенный механизм темнее, при разгоне светлеет
+  function dark(im) {
+    const w = im.naturalWidth || im.width, h = im.naturalHeight || im.height, c = document.createElement("canvas"); c.width = w; c.height = h;
+    const x = c.getContext("2d"); x.filter = "brightness(.6) saturate(.65)"; x.drawImage(im, 0, 0); return c;
+  }
+  const OFF_K = 0.9;
+  function drawLit(key, W, ox, oy, H, run) {
+    ctx.drawImage(mipImg(key, W), ox, oy, W, H);
+    const k = (1 - Math.max(0, Math.min(1, run))) * OFF_K;
+    if (k > 0.01 && IMG[key + "_dk"]) { ctx.globalAlpha = k; ctx.drawImage(mipImg(key + "_dk", W), ox, oy, W, H); ctx.globalAlpha = 1; }
+  }
   function resize() {
     const r = cv.parentElement.getBoundingClientRect();
     if (r.width <= 0 || r.height <= 0) return;
@@ -496,6 +506,7 @@
     if (e) { const boot = e.cells[0] + e.cells[1] + e.cells[2]; const fr = Math.min(1, boot / (e.cap * 3)); ctx.save(); ctx.beginPath(); ctx.rect(x + 8, by + 10, w - 16, 46); ctx.clip(); cavity(x + 8, by + 10, w - 16, 46); if (fr > 0.02) bulk(x + 8, w - 16, by + 56 - 44 * fr, by + 56, e.kinds[0], 8); ctx.restore(); cutFrame(x + 8, by + 10, w - 16, 46); }
     ctx.beginPath(); ctx.arc(x + w - 6, by + 33, 6, 0, TAU); ctx.fillStyle = "#e3b51e"; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = "#5b4508"; ctx.stroke();
     ctx.fillStyle = K.pat("concrete"); ctx.fillRect(x - 10, y + h, w + 20, 10); ctx.strokeStyle = "#5b5f60"; ctx.lineWidth = 1; ctx.strokeRect(x - 10, y + h, w + 20, 10);
+    if (run < 0.99) { ctx.fillStyle = `rgba(6,12,18,${0.32 * (1 - run)})`; [lx, rx].forEach((X) => ctx.fillRect(X - 3, y + 60, legW + 6, h - 126)); }
     if (f) faultFrame(x, y, w, h);
     led(x + w / 2, by + 33, n.id, 7);
   }
@@ -578,6 +589,7 @@
     if (!small) [x + 30, x + w - 34].forEach((X) => { ctx.fillStyle = "#56636c"; ctx.fillRect(X, cy + h / 2, 6, 14); ctx.fillRect(X - 6, cy + h / 2 + 12, 18, 4); });
     ctx.save(); ctx.translate(x, cy);
     conveyorBody(w, h, { chain: n.chain, small, phase: m._ph, prod, sgn: n.reverse ? (V.GoR_Tr1 ? 1 : -1) : n.dir });
+    if (run < 0.99) { K.rr(-3, -h / 2 - 3, w + 6, h + 6, small ? 4 : 6); ctx.fillStyle = `rgba(6,12,18,${0.32 * (1 - run)})`; ctx.fill(); }
     ctx.restore();
     // патрубки загрузки / выгрузки
     if (!small && !n.chain) {
@@ -600,6 +612,7 @@
     const prod = (X) => (e ? [Math.min(1, cellAt(e, X / len) / (e.cap || 1)), e.kinds[Math.max(0, Math.min(e.N - 1, Math.floor(X / len * e.N)))], e.prod] : [0, "grain"]);
     ctx.save(); ctx.translate(x1, y1); ctx.rotate(ang);
     conveyorBody(len, h, { chain: !n.screwType, phase: m._ph, prod, pitch: 26, sgn: 1 });
+    if (run < 0.99) { K.rr(-3, -h / 2 - 3, len + 6, h + 6, 4); ctx.fillStyle = `rgba(6,12,18,${0.32 * (1 - run)})`; ctx.fill(); }
     ctx.restore();
     K.gearMotor(x2 + Math.cos(ang) * 10, y2 + Math.sin(ang) * 10 - 4, 0.66, { dir: Math.cos(ang) >= 0 ? 1 : -1, run, t });
     if (f) faultFrame(Math.min(x1, x2), Math.min(y1, y2) - h / 2, Math.abs(x2 - x1), Math.abs(y2 - y1) + h);
@@ -1622,7 +1635,7 @@
     const names = Object.keys(MSPR); let left = names.length;
     names.forEach((nm) => {
       const im = new Image();
-      im.onload = () => { IMG["m_" + nm] = im; IMG["m_" + nm + "_flip"] = flip(im); if (--left === 0) done(); };
+      im.onload = () => { IMG["m_" + nm] = im; IMG["m_" + nm + "_flip"] = flip(im); IMG["m_" + nm + "_dk"] = dark(im); IMG["m_" + nm + "_flip_dk"] = dark(IMG["m_" + nm + "_flip"]); if (--left === 0) done(); };
       im.onerror = () => { if (--left === 0) done(); };
       im.src = "assets/mach/" + nm + ".webp";
     });
@@ -2046,6 +2059,8 @@
       ctx.strokeStyle = "rgba(200,120,70,.9)"; ctx.lineWidth = 3; ctx.beginPath(); for (let k = 0; k <= 5; k++) { const X = wn.x + wn.w * (0.45 + k * 0.09); ctx.moveTo(X, wn.y + wn.h * 0.35); ctx.lineTo(X, wn.y + wn.h * 0.92); } ctx.stroke();
     },
   };
+  // без привода — не гасятся
+  const PASSIVE = new Set(["pit", "diverter", "bigbag", "cabinet", "tank", "oilscale", "trash", "filter", "sluice"]);
   // ---------- станция биг-бэгов: мешок, рольганг выдачи, погрузчик
   function bagGeo(n, z) {
     const sp = z.sp, [sx] = z.P(sp.pts.spout), roll = z.oy + sp.roll * z.H, bw = z.W * 0.25, bh = z.H * 0.43;
@@ -2149,7 +2164,7 @@
     ctx.save(); ctx.translate(jx, jy);
     ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
     if (n.kind === "bigbag") bagBehind(n, z, t);
-    drawLit(z.img, z.W, z.ox, z.oy, z.H);
+    drawLit(z.img, z.W, z.ox, z.oy, z.H, PASSIVE.has(n.kind) ? 1 : run);
     const wn = machWin(n), f = INSIDE[z.name];
     if (wn && f) { ctx.save(); clipWin(wn); f(n, wn, run, t); ctx.restore(); }
     ctx.restore();
@@ -2157,7 +2172,7 @@
   }
   function noriaPart(n, z, run, t, ph, head) {
     const im = IMG[z.img]; if (!im) return;
-    drawLit(z.img, z.W, z.ox, z.oy, z.H);
+    drawLit(z.img, z.W, z.ox, z.oy, z.H, run);
     const pts = z.sp.win.map(z.P), [cx, cy] = z.P(z.sp.pul), r = z.sp.pul[2] * z.W, c = CT[n.id], e = EL[n.id];
     const load = c ? Math.min(1, c.mass / Math.max(1, c.cap * 0.25)) : 0, kind = (c && c.kind) || (e && e.kinds[0]) || "grain", prod = e && e.prod;
     ctx.save(); K.path(pts, true); ctx.clip();

@@ -158,8 +158,29 @@
   }
   // Мотор-редуктор: цилиндрический редуктор (серый чугун) + фланцевый двигатель.
   // (x,y) — центр выходного вала редуктора, size — масштаб, dir — куда «уходит» двигатель.
+  // Мотор-редуктор: рисованный спрайт (если загружен), иначе — в коде.
+  // (x, y) — ось выходного вала редуктора; dir > 0 — двигатель справа.
+  let GM = null;
+  function setGearMotor(get, ar, sp) { GM = { get, ar, sp }; }
   function gearMotor(x, y, size, o) {
     o = o || {};
+    if (GM) {
+      const s = size || 1, W = 128 * s, H = W * GM.ar, flip = (o.dir || 1) > 0, sp = GM.sp, hub = sp.pts.hub;
+      const ox = x - (flip ? 1 - hub[0] : hub[0]) * W, oy = y - hub[1] * H, P = (f) => [ox + (flip ? 1 - f[0] : f[0]) * W, oy + f[1] * H];
+      ctx.drawImage(GM.get(W, flip), ox, oy, W, H);
+      if (o.run > 0.15) {
+        const [cx, cy] = P(sp.pul), r = sp.pul[2] * W * 2.2, a = (o.t || 0) * 9 * o.run;
+        const wp = sp.win.map(P); ctx.save(); path(wp, true); ctx.clip();
+        ctx.fillStyle = "rgba(10,16,24,.55)"; ctx.fillRect(ox, oy, W, H);
+        [[cx - r * 0.55, cy, r * 0.55, a, 12], [cx + r * 0.25, cy - r * 0.15, r * 0.8, -a * 0.69, 18]].forEach(([gx, gy, gr, ga, nt]) => {
+          ctx.beginPath(); for (let k = 0; k < nt * 2; k++) { const aa = ga + k * Math.PI / nt, rr2 = k % 2 ? gr * 0.82 : gr; ctx.lineTo(gx + Math.cos(aa) * rr2, gy + Math.sin(aa) * rr2); } ctx.closePath();
+          ctx.fillStyle = pat("brushed"); ctx.fill(); ctx.lineWidth = 0.6; ctx.strokeStyle = "#1c252b"; ctx.stroke();
+          ctx.beginPath(); ctx.arc(gx, gy, gr * 0.28, 0, TAU); ctx.fillStyle = "#2a343b"; ctx.fill();
+        });
+        ctx.restore();
+      }
+      return;
+    }
     const s = size || 1, dir = o.dir || 1, gw = 34 * s, gh = 40 * s;
     ctx.save(); ctx.translate(x, y); if (dir < 0) ctx.scale(-1, 1);
     // корпус редуктора
@@ -292,5 +313,142 @@
     return e.p;
   }
 
-  global.RKIT = { grain, use, buildPatterns, pat, shadeCyl, shadeFlat, path, rr, skin, sheetBox, bolts, flange, motor, gearMotor, pipe, pipeFlow, duct, aspNozzle, gauge, valve, spring, TAU };
+  // Фактура конкретного сырья по названию: у каждого своя форма частиц,
+  // размер, цвет и угол естественного откоса (repose, тангенс).
+  const MAT = [
+    ["пшениц", { cols: ["#e0ad62", "#c38b3e", "#94642a"], shape: "wheat", n: 300, repose: 0.53 }],
+    ["тритикале", { cols: ["#d4a05a", "#b5813d", "#86592a"], shape: "wheat", n: 260, size: 1.15, repose: 0.55 }],
+    ["ячмен", { cols: ["#ead296", "#cfb16b", "#a5874a"], shape: "barley", n: 260, repose: 0.55 }],
+    ["кукуруз", { cols: ["#f4b93a", "#e39b1c", "#c27610"], shape: "corn", n: 95, repose: 0.5, tile: 72 }],
+    ["овёс", { cols: ["#efe3bd", "#d8c597", "#b29e70"], shape: "oat", n: 230, repose: 0.6 }],
+    ["овес", { cols: ["#efe3bd", "#d8c597", "#b29e70"], shape: "oat", n: 230, repose: 0.6 }],
+    ["горох", { cols: ["#e0c75e", "#c3a83f", "#97802a"], shape: "pea", n: 120, repose: 0.42 }],
+    ["шрот подсолн", { cols: ["#8f8777", "#6e665a", "#4c463e"], shape: "flake", n: 900, repose: 0.84 }],
+    ["шрот соев", { cols: ["#e2c690", "#c9a86c", "#a2834c"], shape: "crumb", n: 900, repose: 0.8 }],
+    ["мел", { cols: ["#f8f7f3", "#e8e5de", "#cdc8bd"], shape: "powder", n: 1000, repose: 1.0 }],
+    ["соль", { cols: ["#ffffff", "#e7ecf2", "#c3ccd7"], shape: "crystal", n: 420, repose: 0.62 }],
+    ["премикс", { cols: ["#cda96f", "#a9864f", "#7b5d33"], shape: "premix", n: 1000, repose: 0.9 }],
+    ["монокальц", { cols: ["#ecebe6", "#d4d1c8", "#b0aca0"], shape: "granule", n: 520, repose: 0.6 }],
+    ["дрожж", { cols: ["#cfa062", "#ae8046", "#835d30"], shape: "powder", n: 1000, repose: 0.95 }],
+    ["жмых", { cols: ["#7c5c34", "#5e4426", "#3d2b17"], shape: "chunk", n: 160, repose: 0.75 }],
+    ["гранул", { cols: ["#a8743c", "#86562a", "#5c3a1a"], shape: "pellet", n: 70, repose: 0.58 }],
+    ["комбикорм", { cols: ["#d9b77a", "#b58d4c", "#7f5f2c"], shape: "mash", n: 900, repose: 0.78 }],
+    ["масло", { cols: ["#f2c437", "#d8a316", "#a77a08"], shape: "oil", n: 0, repose: 0 }],
+  ];
+  const BYKIND = {
+    grain: "пшениц", meal: "комбикорм", mash: "комбикорм", pellet: "гранул", oil: "масло",
+    add: "мел", fines: null,
+  };
+  function matSpec(prod, kind) {
+    const s = String(prod || "").toLowerCase();
+    if (s) for (const [k, v] of MAT) if (s.includes(k)) return v;
+    const k = BYKIND[kind]; if (k) for (const [kk, v] of MAT) if (kk === k) return v;
+    return null;
+  }
+  const MP = {};
+  function material(prod, kind, fallbackCols) {
+    const spec = matSpec(prod, kind);
+    if (!spec) return grain(kind || "grain", fallbackCols);
+    const key = spec.shape + spec.cols[0];
+    let e = MP[key];
+    if (!e) {
+      const T = spec.tile || 64, sz = spec.size || 1;
+      e = MP[key] = { p: null, c: null, img: off(T, T, (g, w, h) => {
+        const r = rnd(key.length * 97 + spec.n), C = spec.cols;
+        g.fillStyle = C[1]; g.fillRect(0, 0, w, h);
+        if (spec.shape === "oil") return;
+        const hi = (x, y, rx, ry, a) => { g.fillStyle = "rgba(255,255,255,.4)"; g.beginPath(); g.ellipse(x - rx * 0.3, y - ry * 0.3, rx * 0.35, ry * 0.3, a, 0, TAU); g.fill(); };
+        // частицы рисуются с переносом через край тайла — шов не виден
+        const each = (fn) => { for (let i = 0; i < spec.n; i++) { const x = r() * w, y = r() * h, a = r() * Math.PI, c = C[Math.floor(r() * 3)], q = r();
+          for (const dx of [-w, 0, w]) for (const dy of [-h, 0, h]) fn(x + dx, y + dy, a, c, q); } };
+        switch (spec.shape) {
+          case "wheat": case "barley": case "oat": {
+            const L = (spec.shape === "oat" ? 4.2 : spec.shape === "barley" ? 3.3 : 2.7) * sz, W = (spec.shape === "oat" ? 1.05 : spec.shape === "barley" ? 1.35 : 1.6) * sz;
+            each((x, y, a, c, q) => {
+              g.save(); g.translate(x, y); g.rotate(a);
+              g.fillStyle = "rgba(40,25,8,.35)"; g.beginPath(); g.ellipse(0.5, 0.6, L, W, 0, 0, TAU); g.fill();
+              g.fillStyle = c; g.beginPath();
+              if (spec.shape === "wheat") g.ellipse(0, 0, L, W, 0, 0, TAU);
+              else { g.moveTo(-L, 0); g.quadraticCurveTo(0, -W * 1.5, L, 0); g.quadraticCurveTo(0, W * 1.5, -L, 0); }
+              g.fill();
+              if (spec.shape === "wheat") { g.strokeStyle = "rgba(90,55,15,.55)"; g.lineWidth = 0.45; g.beginPath(); g.moveTo(-L * 0.7, 0); g.lineTo(L * 0.7, 0); g.stroke(); }
+              if (spec.shape === "oat") { g.strokeStyle = "rgba(255,250,230,.6)"; g.lineWidth = 0.4; g.beginPath(); g.moveTo(-L, 0); g.lineTo(L, 0); g.stroke(); }
+              g.restore(); if (q > 0.5) hi(x, y, L * 0.6, W * 0.6, a);
+            });
+            break;
+          }
+          case "corn":
+            each((x, y, a, c, q) => {
+              g.save(); g.translate(x, y); g.rotate(a);
+              g.fillStyle = "rgba(60,30,0,.35)"; g.beginPath(); g.roundRect ? g.roundRect(-3.6, -2.6, 7.6, 6, 2) : g.rect(-3.6, -2.6, 7.6, 6); g.fill();
+              g.fillStyle = c; g.beginPath(); g.moveTo(-3.6, -2.2); g.lineTo(3, -2.8); g.quadraticCurveTo(4.4, 0, 3, 2.8); g.lineTo(-3.6, 2.2); g.closePath(); g.fill();
+              g.fillStyle = "rgba(255,240,200,.75)"; g.beginPath(); g.ellipse(-2.6, 0, 1.1, 1.6, 0, 0, TAU); g.fill();
+              g.restore(); if (q > 0.4) hi(x, y, 2.4, 1.8, a);
+            });
+            break;
+          case "pea":
+            each((x, y, a, c, q) => {
+              const R = 2.5 + q * 0.5;
+              g.fillStyle = "rgba(50,40,0,.4)"; g.beginPath(); g.arc(x + 0.7, y + 0.8, R, 0, TAU); g.fill();
+              const gr = g.createRadialGradient(x - R * 0.4, y - R * 0.4, 0.3, x, y, R); gr.addColorStop(0, "#fbeaa0"); gr.addColorStop(0.5, c); gr.addColorStop(1, C[2]);
+              g.fillStyle = gr; g.beginPath(); g.arc(x, y, R, 0, TAU); g.fill();
+              if (q > 0.7) { g.strokeStyle = "rgba(110,90,20,.6)"; g.lineWidth = 0.5; g.beginPath(); g.arc(x, y, R * 0.6, a, a + 1.4); g.stroke(); }
+            });
+            break;
+          case "flake":
+            each((x, y, a, c, q) => {
+              g.fillStyle = q > 0.86 ? "#2a2520" : c; g.save(); g.translate(x, y); g.rotate(a);
+              g.beginPath(); g.moveTo(-1.4, -0.6); g.lineTo(1.2, -0.9); g.lineTo(1.6, 0.5); g.lineTo(-0.8, 1); g.closePath(); g.fill();
+              if (q > 0.86) { g.fillStyle = "rgba(255,255,255,.35)"; g.fillRect(-1, -0.6, 1.8, 0.4); }
+              g.restore();
+            });
+            break;
+          case "crumb": case "mash":
+            each((x, y, a, c, q) => { g.fillStyle = c; g.beginPath(); g.ellipse(x, y, 0.8 + q * 0.9, 0.6 + q * 0.5, a, 0, TAU); g.fill(); if (q > 0.92) { g.fillStyle = "rgba(255,245,220,.5)"; g.fillRect(x - 0.5, y - 0.5, 1, 1); } });
+            break;
+          case "powder":
+            each((x, y, a, c, q) => { g.fillStyle = c; g.fillRect(x, y, 0.7 + q * 0.6, 0.7 + q * 0.6); });
+            for (let i = 0; i < 14; i++) { const x = r() * w, y = r() * h, R = 2 + r() * 3; g.fillStyle = "rgba(255,255,255,.35)"; g.beginPath(); g.arc(x, y, R, 0, TAU); g.fill(); g.fillStyle = "rgba(0,0,0,.06)"; g.beginPath(); g.arc(x + R * 0.4, y + R * 0.5, R * 0.8, 0, TAU); g.fill(); }
+            break;
+          case "crystal":
+            each((x, y, a, c, q) => {
+              g.save(); g.translate(x, y); g.rotate(a); const S = 0.9 + q * 0.9;
+              g.fillStyle = "rgba(90,110,130,.25)"; g.fillRect(-S + 0.4, -S + 0.5, 2 * S, 2 * S);
+              g.fillStyle = c; g.fillRect(-S, -S, 2 * S, 2 * S); g.fillStyle = "rgba(255,255,255,.9)"; g.fillRect(-S, -S, S, 0.5);
+              g.restore();
+              if (q > 0.95) { g.strokeStyle = "rgba(255,255,255,.95)"; g.lineWidth = 0.5; g.beginPath(); g.moveTo(x - 2, y); g.lineTo(x + 2, y); g.moveTo(x, y - 2); g.lineTo(x, y + 2); g.stroke(); }
+            });
+            break;
+          case "premix":
+            each((x, y, a, c, q) => { g.fillStyle = q > 0.97 ? "#c8352a" : q > 0.94 ? "#4f8a3a" : q > 0.9 ? "#f6f2e6" : c; g.fillRect(x, y, 0.9 + q * 0.5, 0.9 + q * 0.5); });
+            break;
+          case "granule":
+            each((x, y, a, c, q) => { g.fillStyle = "rgba(60,60,60,.25)"; g.beginPath(); g.arc(x + 0.4, y + 0.4, 1.2, 0, TAU); g.fill(); g.fillStyle = c; g.beginPath(); g.arc(x, y, 1 + q * 0.5, 0, TAU); g.fill(); });
+            break;
+          case "chunk":
+            each((x, y, a, c, q) => {
+              g.save(); g.translate(x, y); g.rotate(a); const S = 1.6 + q * 2;
+              g.fillStyle = "rgba(20,10,0,.4)"; g.beginPath(); g.moveTo(-S + 0.6, -S * 0.5 + 0.7); g.lineTo(S + 0.6, -S * 0.7 + 0.7); g.lineTo(S * 0.7 + 0.6, S * 0.8 + 0.7); g.lineTo(-S * 0.8 + 0.6, S * 0.6 + 0.7); g.closePath(); g.fill();
+              g.fillStyle = c; g.beginPath(); g.moveTo(-S, -S * 0.5); g.lineTo(S, -S * 0.7); g.lineTo(S * 0.7, S * 0.8); g.lineTo(-S * 0.8, S * 0.6); g.closePath(); g.fill();
+              g.restore();
+            });
+            break;
+          case "pellet":
+            each((x, y, a, c, q) => {
+              g.save(); g.translate(x, y); g.rotate(a);
+              g.fillStyle = "rgba(30,15,0,.4)"; g.fillRect(-4.2 + 0.7, -1.9 + 0.8, 8.4, 3.8);
+              g.fillStyle = c; g.fillRect(-4.2, -1.9, 8.4, 3.8);
+              g.fillStyle = "rgba(255,220,170,.35)"; g.fillRect(-4.2, -1.9, 8.4, 0.9);
+              g.fillStyle = C[2]; g.beginPath(); g.ellipse(4.2, 0, 0.8, 1.9, 0, 0, TAU); g.fill();
+              g.restore();
+            });
+            break;
+        }
+      }) };
+    }
+    if (!e.p || e.c !== ctx) { e.p = ctx.createPattern(e.img, "repeat"); e.c = ctx; }
+    return e.p;
+  }
+
+  global.RKIT = { grain, material, matSpec, setGearMotor, use, buildPatterns, pat, shadeCyl, shadeFlat, path, rr, skin, sheetBox, bolts, flange, motor, gearMotor, pipe, pipeFlow, duct, aspNozzle, gauge, valve, spring, TAU };
 })(window);
